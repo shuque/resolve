@@ -1,8 +1,8 @@
 resolve
 =======
 
-resolve.py
-Command line iterative DNS resolution testing program
+resolve.py  
+Command line iterative DNS resolution testing program  
 Author: Shumon Huque
 
 A command line tool to perform iterative DNS resolution of a single
