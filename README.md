@@ -8,6 +8,7 @@ Author: Shumon Huque
 A command line tool to perform iterative DNS resolution of a single
 DNS name, type, and class.
 
+```
 $ ./resolve.py
 
 resolve.py version 0.10
@@ -19,4 +20,4 @@ Usage: resolve.py [-dmtsnx] <qname> [<qtype>] [<qclass>]
      -s: print summary statistics
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
-
+```
