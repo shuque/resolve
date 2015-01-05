@@ -294,23 +294,6 @@ def process_referral(message):
     return zone
 
 
-def sanity_check_empty(message):
-
-    """Sanity check empty authoritative NOERROR/NODATA response"""
-
-    num_auth_rrset = len(message.authority)
-    if num_auth_rrset > 1:
-        print("ERROR: AUTHORITY section contains more than one RRset:")
-        print(message.authority)
-    elif num_auth_rrset == 1:
-        rrset = message.authority[0]
-        if rrset.rdtype != dns.rdatatype.SOA:
-            print("ERROR: NODATA response contains bad AUTHORITY section:");
-            print(rrset)
-
-    return
-
-
 def process_answer(response, query, addResults=None):
 
     """Process answer section, chasing aliases when needed"""
@@ -327,7 +310,6 @@ def process_answer(response, query, addResults=None):
         if not query.quiet:
             print("ERROR: NODATA: %s of type %s not found" % \
                   (query.qname, query.qtype))
-            sanity_check_empty(response)            # should we bother?
 
     for rrset in answer:
         if rrset.rdtype == dns.rdatatype.from_text(query.qtype) and \
