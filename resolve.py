@@ -275,25 +275,20 @@ def process_referral(message):
 
     """Process referral. Returns a zone object for the referred zone"""
 
-    num_auth_rrset = len(message.authority)
-    if num_auth_rrset != 1:
-        print("ERROR: authority contains other than 1 RRset:")
-        print(message.authority)
+    for rrset in message.authority:
+        if rrset.rdtype == dns.rdatatype.NS:
+            break
+    else:
+        print("ERROR: unable to find NS RRset in referral response")
         return None
 
-    rrset = message.authority[0]
-    if rrset.rdtype == dns.rdatatype.NS:
-        zonename = rrset.name
-        if zonename in Cache.ZoneDict:
-            zone = Cache.ZoneDict[zonename]
-        else:
-            zone = Zone(zonename)
-            for rr in rrset:
-                nsobj = zone.install_ns(rr.target)
+    zonename = rrset.name
+    if zonename in Cache.ZoneDict:
+        zone = Cache.ZoneDict[zonename]
     else:
-        print("ERROR: unexpected RRset in authority:")
-        print(rrset)
-        return None
+        zone = Zone(zonename)
+        for rr in rrset:
+            nsobj = zone.install_ns(rr.target)
 
     get_ns_addrs(zone, message)
     return zone
