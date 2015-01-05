@@ -10,6 +10,10 @@ DNS name, type, and class. If either type or class or both are omitted,
 then a  default type of 'A' (IPv4 address record), and a default class 
 of 'IN' (Internet class) are used.
 
+Pre-requisites:  
+- Python 2.7 or later, or Python 3
+- dnspython module
+
 ```
 $ ./resolve.py
 
