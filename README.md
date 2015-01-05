@@ -13,7 +13,7 @@ of 'IN' (Internet class) are used.
 ```
 $ ./resolve.py
 
-resolve.py version 0.10
+resolve.py version 0.11
 
 Usage: resolve.py [-dmtsnx] <qname> [<qtype>] [<qclass>]
      -d: print debugging output
