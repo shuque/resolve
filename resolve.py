@@ -298,7 +298,7 @@ def process_answer(response, query, addResults=None):
 
     """Process answer section, chasing aliases when needed"""
 
-    global Stats
+    global Stats, Prefs
     answer = response.answer
 
     # If minimizing, then we ignore answers for intermediate query names.
@@ -320,9 +320,13 @@ def process_answer(response, query, addResults=None):
         elif rrset.rdtype == dns.rdatatype.DNAME:
             query.answer_rrset.append(rrset)
             addResults and addResults.full_answer_rrset.append(rrset)
+            if Prefs.TRACE:
+                print(rrset.to_text())
         elif rrset.rdtype == dns.rdatatype.CNAME:
             query.answer_rrset.append(rrset)
             addResults and addResults.full_answer_rrset.append(rrset)
+            if Prefs.TRACE:
+                print(rrset.to_text())
             cname = rrset[0].target
             Stats.cnt_cname += 1
             if Stats.cnt_cname >= MAX_CNAME:
