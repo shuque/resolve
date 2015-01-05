@@ -7,6 +7,10 @@ Usage: resolve.py [-dmtsx] <qname> [<qtype>] [<qclass>]
      -t: trace query & zone path
      -s: print summary statistics
      -x: workaround NXDOMAIN on empty non-terminals
+
+##########################################################################
+# Normal Resolution:
+##########################################################################
     
 ## TEST INPUT: www.amazon.com. A
 $ ./resolve.py -t www.amazon.com. A
@@ -105,7 +109,10 @@ fd-fp3.wg1.b.yahoo.com. 60 IN A 98.139.183.24
 fd-fp3.wg1.b.yahoo.com. 60 IN A 98.139.180.149
 
 
-With the qname minimization mode (-q) turned on ..
+##########################################################################
+# Resolution with qname minimization (-q):
+##########################################################################
+
 
 ## TEST INPUT: www.amazon.com. A
 $ ./resolve.py -m -t www.amazon.com. A
