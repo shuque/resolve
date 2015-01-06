@@ -1,5 +1,6 @@
 ## TODO List
 
+* Flag to use TCP-only
 * DNSSEC - support DNSSEC enabled queries and verification of RRSIGs
 * Remember zone cuts, and depth of node traversal. This might help for
   some specific query names, to reduce repeated queries to the same zone. 
