@@ -274,6 +274,7 @@ def get_ns_addrs(zone, message):
 def process_referral(message):
 
     """Process referral. Returns a zone object for the referred zone"""
+    global Prefs
 
     for rrset in message.authority:
         if rrset.rdtype == dns.rdatatype.NS:
@@ -283,6 +284,8 @@ def process_referral(message):
         return None
 
     zonename = rrset.name
+    if Prefs.TRACE:
+        print(">>        [Got Referral to zone: %s]" % zonename)
     if zonename in Cache.ZoneDict:
         zone = Cache.ZoneDict[zonename]
     else:
