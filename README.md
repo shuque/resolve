@@ -39,3 +39,18 @@ be implemented. I chose to implement the simplest one that starts with
 one non-root label at the root DNS servers, and successively prepends 
 additional labels as it follows referrals and descends zones.
 
+Here's an example run with qname minimization (-m) and the trace (-t)
+option, to resolve the amazon.com website:
+
+```
+$ ./resolve.py -tm www.amazon.com
+>> Query: com. A IN at zone .
+>>        [Got Referral to zone: com.]
+>> Query: amazon.com. A IN at zone com.
+>>        [Got Referral to zone: amazon.com.]
+>> Query: www.amazon.com. A IN at zone amazon.com.
+>>        [Got Referral to zone: www.amazon.com.]
+>> Query: www.amazon.com. A IN at zone www.amazon.com.
+www.amazon.com. 60 IN A 176.32.98.166
+```
+
