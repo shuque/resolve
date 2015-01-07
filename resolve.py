@@ -260,18 +260,20 @@ def get_ns_addrs(zone, message):
 
     if Prefs.NSRESOLVE:       
         for name in needToResolve:
+            nsobj = Cache.NSDict[name]
+            if nsobj.iplist:
+                continue
             for addrtype in ['A', 'AAAA']:
                 nsquery = Query(name, addrtype, 'IN', Prefs.MINIMIZE)
                 nsquery.quiet = True
                 resolve_name(nsquery, closest_zone(nsquery.qname), inPath=False)
-                nsobj = Cache.NSDict[name]
                 for ip in nsquery.get_answer_ip_list():
                     nsobj.install_ip(ip)
 
     return
 
 
-def process_referral(message):
+def process_referral(message, query):
 
     """Process referral. Returns a zone object for the referred zone"""
     global Prefs
@@ -284,7 +286,7 @@ def process_referral(message):
         return None
 
     zonename = rrset.name
-    if Prefs.TRACE:
+    if Prefs.TRACE and not query.quiet:
         print(">>        [Got Referral to zone: %s]" % zonename)
     if zonename in Cache.ZoneDict:
         zone = Cache.ZoneDict[zonename]
@@ -358,7 +360,7 @@ def process_response(response, query, addResults=None):
     if rc == dns.rcode.NOERROR:
         answerlen = len(response.answer)
         if answerlen == 0 and not aa:                    # Referral
-            referral = process_referral(response)
+            referral = process_referral(response, query)
             if referral:
                 dprint("Obtained referral to zone: %s" % referral.name)
             else:
@@ -377,7 +379,7 @@ def send_query(query, zone):
     global Prefs, Stats
     response = None
 
-    if Prefs.DEBUG or Prefs.TRACE:
+    if Prefs.DEBUG or (Prefs.TRACE and not query.quiet):
         print(">> Query: %s %s %s at zone %s" % \
                (query.qname, query.qtype, query.qclass, zone.name))
 
