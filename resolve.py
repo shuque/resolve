@@ -238,7 +238,8 @@ def get_ns_addrs(zone, message):
     in the additional section of the referral. To be complete, we should 
     really explicitly resolve all non-glue NS addresses, which results in a 
     large number of additional queries and corresponding latency. This 
-    complete mode can be turned on with -n (NSRESOLVE).
+    complete mode can be turned on with -n (NSRESOLVE). If no NS addresses
+    can be found in the additional section, we resort to NSRESOLVE mode.
     """
 
     global Prefs
@@ -259,7 +260,7 @@ def get_ns_addrs(zone, message):
                     nsobj = Cache.NSDict[name]
                     nsobj.install_ip(rr.address)
 
-    if Prefs.NSRESOLVE:       
+    if not zone.iplist() or Prefs.NSRESOLVE:       
         for name in needToResolve:
             nsobj = Cache.NSDict[name]
             if nsobj.iplist:
