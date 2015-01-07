@@ -14,75 +14,95 @@ Usage: resolve.py [-dmtsx] <qname> [<qtype>] [<qclass>]
     
 ## TEST INPUT: www.amazon.com. A
 $ ./resolve.py -t www.amazon.com. A
->> Issuing query: www.amazon.com. A IN at zone .
->> Issuing query: www.amazon.com. A IN at zone com.
->> Issuing query: www.amazon.com. A IN at zone amazon.com.
->> Issuing query: www.amazon.com. A IN at zone www.amazon.com.
-www.amazon.com. 60 IN A 205.251.242.103
+>> Query: www.amazon.com. A IN at zone .
+>>        [Got Referral to zone: com.]
+>> Query: www.amazon.com. A IN at zone com.
+>>        [Got Referral to zone: amazon.com.]
+>> Query: www.amazon.com. A IN at zone amazon.com.
+>>        [Got Referral to zone: www.amazon.com.]
+>> Query: www.amazon.com. A IN at zone www.amazon.com.
+www.amazon.com. 60 IN A 176.32.98.166
 
 ## TEST INPUT: www.huque.com. A
 $ ./resolve.py -t www.huque.com. A
->> Issuing query: www.huque.com. A IN at zone .
->> Issuing query: www.huque.com. A IN at zone com.
->> Issuing query: www.huque.com. A IN at zone huque.com.
->> Issuing query: cheetara.huque.com. A IN at zone huque.com.
+>> Query: www.huque.com. A IN at zone .
+>>        [Got Referral to zone: com.]
+>> Query: www.huque.com. A IN at zone com.
+>>        [Got Referral to zone: huque.com.]
+>> Query: www.huque.com. A IN at zone huque.com.
+www.huque.com. 300 IN CNAME cheetara.huque.com.
+>> Query: cheetara.huque.com. A IN at zone huque.com.
 www.huque.com. 300 IN CNAME cheetara.huque.com.
 cheetara.huque.com. 86400 IN A 50.116.63.23
 
 ## TEST INPUT: nxdomain.huque.com. A
 $ ./resolve.py -t nxdomain.huque.com. A
->> Issuing query: nxdomain.huque.com. A IN at zone .
->> Issuing query: nxdomain.huque.com. A IN at zone com.
->> Issuing query: nxdomain.huque.com. A IN at zone huque.com.
+>> Query: nxdomain.huque.com. A IN at zone .
+>>        [Got Referral to zone: com.]
+>> Query: nxdomain.huque.com. A IN at zone com.
+>>        [Got Referral to zone: huque.com.]
+>> Query: nxdomain.huque.com. A IN at zone huque.com.
 ERROR: NXDOMAIN: nxdomain.huque.com. not found
 
 ## TEST INPUT: www.upenn.edu. A
 $ ./resolve.py -t www.upenn.edu. A
->> Issuing query: www.upenn.edu. A IN at zone .
->> Issuing query: www.upenn.edu. A IN at zone edu.
->> Issuing query: www.upenn.edu. A IN at zone upenn.edu.
->> Issuing query: www.upenn.edu-dscg.edgesuite.net. A IN at zone .
->> Issuing query: www.upenn.edu-dscg.edgesuite.net. A IN at zone net.
->> Issuing query: www.upenn.edu-dscg.edgesuite.net. A IN at zone edgesuite.net.
->> Issuing query: a1165.dscg.akamai.net. A IN at zone net.
->> Issuing query: a1165.dscg.akamai.net. A IN at zone akamai.net.
->> Issuing query: a1165.dscg.akamai.net. A IN at zone dscg.akamai.net.
+>> Query: www.upenn.edu. A IN at zone .
+>>        [Got Referral to zone: edu.]
+>> Query: www.upenn.edu. A IN at zone edu.
+>>        [Got Referral to zone: upenn.edu.]
+>> Query: www.upenn.edu. A IN at zone upenn.edu.
+www.upenn.edu. 300 IN CNAME www.upenn.edu-dscg.edgesuite.net.
+>> Query: www.upenn.edu-dscg.edgesuite.net. A IN at zone .
+>>        [Got Referral to zone: net.]
+>> Query: www.upenn.edu-dscg.edgesuite.net. A IN at zone net.
+>>        [Got Referral to zone: edgesuite.net.]
+>> Query: www.upenn.edu-dscg.edgesuite.net. A IN at zone edgesuite.net.
+www.upenn.edu-dscg.edgesuite.net. 21600 IN CNAME a1165.dscg.akamai.net.
+>> Query: a1165.dscg.akamai.net. A IN at zone net.
+>>        [Got Referral to zone: akamai.net.]
+>> Query: a1165.dscg.akamai.net. A IN at zone akamai.net.
+>>        [Got Referral to zone: dscg.akamai.net.]
+>> Query: a1165.dscg.akamai.net. A IN at zone dscg.akamai.net.
 www.upenn.edu. 300 IN CNAME www.upenn.edu-dscg.edgesuite.net.
 www.upenn.edu-dscg.edgesuite.net. 21600 IN CNAME a1165.dscg.akamai.net.
-a1165.dscg.akamai.net. 20 IN A 23.62.6.82
 a1165.dscg.akamai.net. 20 IN A 23.62.6.81
+a1165.dscg.akamai.net. 20 IN A 23.62.6.59
 
 ## TEST INPUT: upenn.edu. DNSKEY
 $ ./resolve.py -t upenn.edu. DNSKEY
->> Issuing query: upenn.edu. DNSKEY IN at zone .
->> Issuing query: upenn.edu. DNSKEY IN at zone edu.
->> Issuing query: upenn.edu. DNSKEY IN at zone upenn.edu.
-upenn.edu. 7200 IN DNSKEY 256 3 5 AwEAAfdhCwSImS/vqlPV7nQMPCCjd7P8 za38PFH606zhz7zc7lirVewUphYijpDT eeX2nEfq3leFKmHqQw4Oc7Jxp7/Bdfr2 uZfeCws0zwal2kZDJX/O+wBNqtIltc6t dwzXtGU21VEvDsFdl3xiQpRHkXt9PclV IqnGv39hK9mimx7b
-upenn.edu. 7200 IN DNSKEY 256 3 5 AwEAAagz1Jnnm3p/6PQV64BGyR79bzX/ jUFkqISBolBC/MZ7IR/Z/C8IU1+XiU87 CRoqmZQZIpD4UsutEADU75ECFqsfsu7o 3gaVsoyPA+OKLAaZWBGuDZ/P6BW50MMC Jb9Ji0MeIMPbXZ7axL/fl/72LoxyAHpo V90I2Zk2PxknJ6CP
+>> Query: upenn.edu. DNSKEY IN at zone .
+>>        [Got Referral to zone: edu.]
+>> Query: upenn.edu. DNSKEY IN at zone edu.
+>>        [Got Referral to zone: upenn.edu.]
+>> Query: upenn.edu. DNSKEY IN at zone upenn.edu.
 upenn.edu. 7200 IN DNSKEY 257 3 5 AwEAAf02wZZMtX2ofTKfJ/xoQffn17NF JV0Y5s4F3tMdkktC/abDax+SB0MJWRAc znigKoirdVL7ZbVS2DYRoUvJv44VLRtL lbggxDnhpP4fCJ88Yu33/5GFZwmgxco4 OA6yxhwEniIveQ5B7LJ0Vh8KyfqU6obu 7wFR7pSV1UVybLZfF3n1Kb+6KRWtave5 JLbhfYfXYxhUpVWlbeKYmoroO9SHsQao R3vr7L168MEe4VRE+SKcuNRkzLBG5XQD nImYanv6Pf4tYaNTGYPgkXSVJKeGUdnc JOxZ8NrAqOncGDgQML3xALGWHWlrpmeN 6EQdf7+qv1vm7uHxN1L0MhS7B4U=
+upenn.edu. 7200 IN DNSKEY 256 3 5 AwEAAagz1Jnnm3p/6PQV64BGyR79bzX/ jUFkqISBolBC/MZ7IR/Z/C8IU1+XiU87 CRoqmZQZIpD4UsutEADU75ECFqsfsu7o 3gaVsoyPA+OKLAaZWBGuDZ/P6BW50MMC Jb9Ji0MeIMPbXZ7axL/fl/72LoxyAHpo V90I2Zk2PxknJ6CP
+upenn.edu. 7200 IN DNSKEY 256 3 5 AwEAAfdhCwSImS/vqlPV7nQMPCCjd7P8 za38PFH606zhz7zc7lirVewUphYijpDT eeX2nEfq3leFKmHqQw4Oc7Jxp7/Bdfr2 uZfeCws0zwal2kZDJX/O+wBNqtIltc6t dwzXtGU21VEvDsFdl3xiQpRHkXt9PclV IqnGv39hK9mimx7b
 
 ## TEST INPUT: . NS
 $ ./resolve.py -t . NS
->> Issuing query: . NS IN at zone .
-. 518400 IN NS a.root-servers.net.
+>> Query: . NS IN at zone .
+. 518400 IN NS l.root-servers.net.
+. 518400 IN NS f.root-servers.net.
 . 518400 IN NS b.root-servers.net.
 . 518400 IN NS c.root-servers.net.
-. 518400 IN NS d.root-servers.net.
-. 518400 IN NS e.root-servers.net.
-. 518400 IN NS f.root-servers.net.
-. 518400 IN NS g.root-servers.net.
 . 518400 IN NS h.root-servers.net.
 . 518400 IN NS i.root-servers.net.
+. 518400 IN NS a.root-servers.net.
+. 518400 IN NS e.root-servers.net.
+. 518400 IN NS g.root-servers.net.
+. 518400 IN NS d.root-servers.net.
 . 518400 IN NS j.root-servers.net.
-. 518400 IN NS k.root-servers.net.
-. 518400 IN NS l.root-servers.net.
 . 518400 IN NS m.root-servers.net.
+. 518400 IN NS k.root-servers.net.
 
 ## TEST INPUT: amazon.com. NS
 $ ./resolve.py -t amazon.com. NS
->> Issuing query: amazon.com. NS IN at zone .
->> Issuing query: amazon.com. NS IN at zone com.
->> Issuing query: amazon.com. NS IN at zone amazon.com.
+>> Query: amazon.com. NS IN at zone .
+>>        [Got Referral to zone: com.]
+>> Query: amazon.com. NS IN at zone com.
+>>        [Got Referral to zone: amazon.com.]
+>> Query: amazon.com. NS IN at zone amazon.com.
 amazon.com. 3600 IN NS ns1.p31.dynect.net.
 amazon.com. 3600 IN NS pdns6.ultradns.co.uk.
 amazon.com. 3600 IN NS ns3.p31.dynect.net.
@@ -92,92 +112,117 @@ amazon.com. 3600 IN NS pdns1.ultradns.net.
 
 ## TEST INPUT: _443._tcp.www.huque.com. TLSA
 $ ./resolve.py -t _443._tcp.www.huque.com. TLSA
->> Issuing query: _443._tcp.www.huque.com. TLSA IN at zone .
->> Issuing query: _443._tcp.www.huque.com. TLSA IN at zone com.
->> Issuing query: _443._tcp.www.huque.com. TLSA IN at zone huque.com.
+>> Query: _443._tcp.www.huque.com. TLSA IN at zone .
+>>        [Got Referral to zone: com.]
+>> Query: _443._tcp.www.huque.com. TLSA IN at zone com.
+>>        [Got Referral to zone: huque.com.]
+>> Query: _443._tcp.www.huque.com. TLSA IN at zone huque.com.
 _443._tcp.www.huque.com. 7200 IN TLSA 3 0 1 0013bef11b875a58f3b0b1d7a0d439a608277f58433bbb12245b2a28b398c281
 
 ## TEST INPUT: www.yahoo.com.
 $ ./resolve.py -t www.yahoo.com.
->> Issuing query: www.yahoo.com. A IN at zone .
->> Issuing query: www.yahoo.com. A IN at zone com.
->> Issuing query: www.yahoo.com. A IN at zone yahoo.com.
->> Issuing query: fd-fp3.wg1.b.yahoo.com. A IN at zone yahoo.com.
->> Issuing query: fd-fp3.wg1.b.yahoo.com. A IN at zone wg1.b.yahoo.com.
+>> Query: www.yahoo.com. A IN at zone .
+>>        [Got Referral to zone: com.]
+>> Query: www.yahoo.com. A IN at zone com.
+>>        [Got Referral to zone: yahoo.com.]
+>> Query: www.yahoo.com. A IN at zone yahoo.com.
 www.yahoo.com. 300 IN CNAME fd-fp3.wg1.b.yahoo.com.
-fd-fp3.wg1.b.yahoo.com. 60 IN A 98.139.183.24
+>> Query: fd-fp3.wg1.b.yahoo.com. A IN at zone yahoo.com.
+>>        [Got Referral to zone: wg1.b.yahoo.com.]
+>> Query: fd-fp3.wg1.b.yahoo.com. A IN at zone wg1.b.yahoo.com.
+www.yahoo.com. 300 IN CNAME fd-fp3.wg1.b.yahoo.com.
 fd-fp3.wg1.b.yahoo.com. 60 IN A 98.139.180.149
-
+fd-fp3.wg1.b.yahoo.com. 60 IN A 98.139.183.24
 
 ##########################################################################
 # Resolution with qname minimization (-q):
 ##########################################################################
 
-
 ## TEST INPUT: www.amazon.com. A
 $ ./resolve.py -m -t www.amazon.com. A
->> Issuing query: com. A IN at zone .
->> Issuing query: amazon.com. A IN at zone com.
->> Issuing query: www.amazon.com. A IN at zone amazon.com.
->> Issuing query: www.amazon.com. A IN at zone www.amazon.com.
-www.amazon.com. 60 IN A 72.21.206.6
+>> Query: com. A IN at zone .
+>>        [Got Referral to zone: com.]
+>> Query: amazon.com. A IN at zone com.
+>>        [Got Referral to zone: amazon.com.]
+>> Query: www.amazon.com. A IN at zone amazon.com.
+>>        [Got Referral to zone: www.amazon.com.]
+>> Query: www.amazon.com. A IN at zone www.amazon.com.
+www.amazon.com. 60 IN A 205.251.242.103
 
 ## TEST INPUT: www.huque.com. A
 $ ./resolve.py -m -t www.huque.com. A
->> Issuing query: com. A IN at zone .
->> Issuing query: huque.com. A IN at zone com.
->> Issuing query: www.huque.com. A IN at zone huque.com.
->> Issuing query: cheetara.huque.com. A IN at zone huque.com.
+>> Query: com. A IN at zone .
+>>        [Got Referral to zone: com.]
+>> Query: huque.com. A IN at zone com.
+>>        [Got Referral to zone: huque.com.]
+>> Query: www.huque.com. A IN at zone huque.com.
+www.huque.com. 300 IN CNAME cheetara.huque.com.
+>> Query: cheetara.huque.com. A IN at zone huque.com.
 www.huque.com. 300 IN CNAME cheetara.huque.com.
 cheetara.huque.com. 86400 IN A 50.116.63.23
 
 ## TEST INPUT: nxdomain.huque.com. A
 $ ./resolve.py -m -t nxdomain.huque.com. A
->> Issuing query: com. A IN at zone .
->> Issuing query: huque.com. A IN at zone com.
->> Issuing query: nxdomain.huque.com. A IN at zone huque.com.
+>> Query: com. A IN at zone .
+>>        [Got Referral to zone: com.]
+>> Query: huque.com. A IN at zone com.
+>>        [Got Referral to zone: huque.com.]
+>> Query: nxdomain.huque.com. A IN at zone huque.com.
 ERROR: NXDOMAIN: nxdomain.huque.com. not found
 
 ## TEST INPUT: www.sas.upenn.edu. A
 $ ./resolve.py -m -t www.sas.upenn.edu. A
->> Issuing query: edu. A IN at zone .
->> Issuing query: upenn.edu. A IN at zone edu.
->> Issuing query: sas.upenn.edu. A IN at zone upenn.edu.
->> Issuing query: www.sas.upenn.edu. A IN at zone upenn.edu.
->> Issuing query: SAS.upenn.edu. A IN at zone upenn.edu.
->> Issuing query: virgo.SAS.upenn.edu. A IN at zone upenn.edu.
+>> Query: edu. A IN at zone .
+>>        [Got Referral to zone: edu.]
+>> Query: upenn.edu. A IN at zone edu.
+>>        [Got Referral to zone: upenn.edu.]
+>> Query: sas.upenn.edu. A IN at zone upenn.edu.
+>> Query: www.sas.upenn.edu. A IN at zone upenn.edu.
+WWW.SAS.upenn.edu. 300 IN CNAME virgo.SAS.upenn.edu.
+>> Query: SAS.upenn.edu. A IN at zone upenn.edu.
+>> Query: virgo.SAS.upenn.edu. A IN at zone upenn.edu.
 WWW.SAS.upenn.edu. 300 IN CNAME virgo.SAS.upenn.edu.
 virgo.SAS.upenn.edu. 900 IN A 128.91.234.142
 
 ## TEST INPUT: _443._tcp.www.huque.com. TLSA
 $ ./resolve.py -m -t _443._tcp.www.huque.com. TLSA
->> Issuing query: com. TLSA IN at zone .
->> Issuing query: huque.com. TLSA IN at zone com.
->> Issuing query: www.huque.com. TLSA IN at zone huque.com.
->> Issuing query: _tcp.www.huque.com. TLSA IN at zone huque.com.
->> Issuing query: _443._tcp.www.huque.com. TLSA IN at zone huque.com.
+>> Query: com. TLSA IN at zone .
+>>        [Got Referral to zone: com.]
+>> Query: huque.com. TLSA IN at zone com.
+>>        [Got Referral to zone: huque.com.]
+>> Query: www.huque.com. TLSA IN at zone huque.com.
+>> Query: _tcp.www.huque.com. TLSA IN at zone huque.com.
+>> Query: _443._tcp.www.huque.com. TLSA IN at zone huque.com.
 _443._tcp.www.huque.com. 7200 IN TLSA 3 0 1 0013bef11b875a58f3b0b1d7a0d439a608277f58433bbb12245b2a28b398c281
 
+##########################################################################
+# Qname minimization with workaround for NXDOMAIN on non-terminals (-mx)
+##########################################################################
 
 An interesting case: Resolving 'www.upenn.edu' fails with query
-minimization. This website uses Akamai's content delivery network 
-(CDN), which takes it through a chain of aliases. The Akamai DNS 
+minimization. This website uses Akamai's content delivery network
+(CDN), which takes it through a chain of aliases. The Akamai DNS
 servers appear to incorrectly return NXDOMAIN for empty nonterminals,
 which is an authoritative indication that the queried node doesn't
 exist in the DNS (and hence nothing below it exists either). In
 the example below edu-dscg.edgesuite.net wrongly returns NXDOMAIN
 and causes the program to stop.
 
-## TEST INPUT: www.upenn.edu. A
 $ ./resolve.py -m -t www.upenn.edu. A
->> Issuing query: edu. A IN at zone .
->> Issuing query: upenn.edu. A IN at zone edu.
->> Issuing query: www.upenn.edu. A IN at zone upenn.edu.
->> Issuing query: net. A IN at zone .
->> Issuing query: edgesuite.net. A IN at zone net.
->> Issuing query: edu-dscg.edgesuite.net. A IN at zone edgesuite.net.
+>> Query: edu. A IN at zone .
+>>        [Got Referral to zone: edu.]
+>> Query: upenn.edu. A IN at zone edu.
+>>        [Got Referral to zone: upenn.edu.]
+>> Query: www.upenn.edu. A IN at zone upenn.edu.
+www.upenn.edu. 300 IN CNAME www.upenn.edu-dscg.edgesuite.net.
+>> Query: net. A IN at zone .
+>>        [Got Referral to zone: net.]
+>> Query: edgesuite.net. A IN at zone net.
+>>        [Got Referral to zone: edgesuite.net.]
+>> Query: edu-dscg.edgesuite.net. A IN at zone edgesuite.net.
 ERROR: NXDOMAIN: edu-dscg.edgesuite.net. not found
 www.upenn.edu. 300 IN CNAME www.upenn.edu-dscg.edgesuite.net.
+
 
 Supplying resolve.py with the -x switch works around this brokenness
 by continuing to prepend labels and re-query after encountering NXDOMAIN,
@@ -185,33 +230,43 @@ until the full query name is reached.
 
 $ ./resolve.py -m -t -x www.upenn.edu
 >> Query: edu. A IN at zone .
+>>        [Got Referral to zone: edu.]
 >> Query: upenn.edu. A IN at zone edu.
+>>        [Got Referral to zone: upenn.edu.]
 >> Query: www.upenn.edu. A IN at zone upenn.edu.
+www.upenn.edu. 300 IN CNAME www.upenn.edu-dscg.edgesuite.net.
 >> Query: net. A IN at zone .
+>>        [Got Referral to zone: net.]
 >> Query: edgesuite.net. A IN at zone net.
+>>        [Got Referral to zone: edgesuite.net.]
 >> Query: edu-dscg.edgesuite.net. A IN at zone edgesuite.net.
 ERROR: NXDOMAIN: edu-dscg.edgesuite.net. not found
 >> Query: upenn.edu-dscg.edgesuite.net. A IN at zone edgesuite.net.
 ERROR: NXDOMAIN: upenn.edu-dscg.edgesuite.net. not found
 >> Query: www.upenn.edu-dscg.edgesuite.net. A IN at zone edgesuite.net.
+www.upenn.edu-dscg.edgesuite.net. 21600 IN CNAME a1165.dscg.akamai.net.
 >> Query: akamai.net. A IN at zone net.
+>>        [Got Referral to zone: akamai.net.]
 >> Query: dscg.akamai.net. A IN at zone akamai.net.
 >> Query: a1165.dscg.akamai.net. A IN at zone akamai.net.
+>>        [Got Referral to zone: dscg.akamai.net.]
 >> Query: a1165.dscg.akamai.net. A IN at zone dscg.akamai.net.
 www.upenn.edu. 300 IN CNAME www.upenn.edu-dscg.edgesuite.net.
 www.upenn.edu-dscg.edgesuite.net. 21600 IN CNAME a1165.dscg.akamai.net.
-a1165.dscg.akamai.net. 20 IN A 184.84.243.193
-a1165.dscg.akamai.net. 20 IN A 184.84.243.215
+a1165.dscg.akamai.net. 20 IN A 23.62.6.59
+a1165.dscg.akamai.net. 20 IN A 23.62.6.81
 
-# Effect of the above workaround is that it causes unnecessary additional 
-# queries to well behaved servers. In the example below the first NXDOMAIN 
+# Effect of the above workaround is that it causes unnecessary additional
+# queries to well behaved servers. In the example below the first NXDOMAIN
 # at z.huque.com should have indicated that a.b.c.z.huque.com also doesn't
 # exist. Because of the workaround, we are forced to issue 3 more queries
 # by successively prepending labels until we get to the full qname.
 
 $ ./resolve.py -m -t -x a.b.c.z.huque.com
 >> Query: com. A IN at zone .
+>>        [Got Referral to zone: com.]
 >> Query: huque.com. A IN at zone com.
+>>        [Got Referral to zone: huque.com.]
 >> Query: z.huque.com. A IN at zone huque.com.
 ERROR: NXDOMAIN: z.huque.com. not found
 >> Query: c.z.huque.com. A IN at zone huque.com.
@@ -220,4 +275,3 @@ ERROR: NXDOMAIN: c.z.huque.com. not found
 ERROR: NXDOMAIN: b.c.z.huque.com. not found
 >> Query: a.b.c.z.huque.com. A IN at zone huque.com.
 ERROR: NXDOMAIN: a.b.c.z.huque.com. not found
-
