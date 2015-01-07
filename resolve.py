@@ -39,11 +39,12 @@ class Prefs:
 
 class Stats:
     """Statistics counters"""
-    cnt_cname  = 0
-    cnt_query  = 0
-    cnt_fail   = 0
-    cnt_tcp    = 0
-    cnt_deleg  = 0
+    cnt_cname        = 0
+    cnt_query1       = 0                  # regular queries
+    cnt_query2       = 0                  # NS address queries
+    cnt_fail         = 0
+    cnt_tcp          = 0
+    cnt_deleg        = 0
     delegation_depth = 0
 
 class Cache:
@@ -266,7 +267,7 @@ def get_ns_addrs(zone, message):
             for addrtype in ['A', 'AAAA']:
                 nsquery = Query(name, addrtype, 'IN', Prefs.MINIMIZE)
                 nsquery.quiet = True
-                resolve_name(nsquery, closest_zone(nsquery.qname), inPath=False)
+                resolve_name(nsquery, closest_zone(nsquery.qname), inPath=False, nsQuery=True)
                 for ip in nsquery.get_answer_ip_list():
                     nsobj.install_ip(ip)
 
@@ -374,7 +375,7 @@ def process_response(response, query, addResults=None):
     return (rc, ans, referral)
 
 
-def send_query(query, zone):
+def send_query(query, zone, nsQuery=False):
     """send DNS query to nameservers of given zone"""
     global Prefs, Stats
     response = None
@@ -393,13 +394,16 @@ def send_query(query, zone):
         return response
 
     for nsaddr in nsaddr_list:
-        if Stats.cnt_query >= MAX_QUERY:
+        if Stats.cnt_query1 + Stats.cnt_query2 >= MAX_QUERY:
             print("ERROR: Max number of queries (%d) exceeded." % MAX_QUERY)
             return response
         dprint("Querying zone %s at address %s" % (zone.name, nsaddr.addr))
         try:
             nsaddr.query_count += 1
-            Stats.cnt_query += 1
+            if nsQuery:
+                Stats.cnt_query2 += 1
+            else:
+                Stats.cnt_query1 += 1
             msg.id = random.randint(1,65535)          # randomize txid
             t1 = time.time()
             response = dns.query.udp(msg, nsaddr.addr, timeout=TIMEOUT,
@@ -407,7 +411,10 @@ def send_query(query, zone):
             t2 = time.time()
             nsaddr.rtt = (t2 - t1)
             if response.flags & dns.flags.TC == dns.flags.TC:
-                Stats.cnt_query += 1
+                if nsQuery:
+                    Stats.cnt_query2 += 1
+                else:
+                    Stats.cnt_query1 += 1
                 Stats.cnt_tcp += 1
                 nsaddr.query_count += 1
                 dprint("WARNING: Truncated response; Retrying with TCP ...")
@@ -429,7 +436,7 @@ def send_query(query, zone):
     return response
 
 
-def resolve_name(query, zone, inPath=True, addResults=None):
+def resolve_name(query, zone, inPath=True, nsQuery=False, addResults=None):
     """resolve a DNS query. addResults is an optional Query object to
     which the answer results are to be added."""
 
@@ -450,7 +457,7 @@ def resolve_name(query, zone, inPath=True, addResults=None):
             else:
                 query.set_minimized(curr_zone)
 
-        response = send_query(query, curr_zone)
+        response = send_query(query, curr_zone, nsQuery=nsQuery)
         if not response:
             return
 
@@ -484,14 +491,16 @@ def print_stats():
     """Print some statistics"""
     global Stats
     print('')
+    cnt_query_total = Stats.cnt_query1 + Stats.cnt_query2
     print("Qname Delegation depth: %d" % Stats.delegation_depth)
     print("Number of delegations traversed: %d" % Stats.cnt_deleg)
-    print("Number of queries performed: %d" % Stats.cnt_query)
+    print("Number of queries performed (regular): %d" % Stats.cnt_query1)
+    print("Number of queries performed:(nsaddr)   %d" % Stats.cnt_query2)
     if Stats.cnt_tcp:
         print("Number of TCP fallbacks: %d" % Stats.cnt_tcp)
     if Stats.cnt_fail:
         print("Number of queries failed: %d (%.2f%%)" %
-              (Stats.cnt_fail, (100.0 * Stats.cnt_fail/Stats.cnt_query)))
+              (Stats.cnt_fail, (100.0 * Stats.cnt_fail/cnt_query_total)))
     if Stats.cnt_cname:
         print("Number of CNAME indirections: %d" % Stats.cnt_cname)
     return
