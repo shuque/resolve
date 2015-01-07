@@ -384,8 +384,13 @@ def send_query(query, zone):
     msg = dns.message.make_query(query.qname, query.qtype, rdclass=query.qclass)
     msg.flags ^= dns.flags.RD
 
+    nsaddr_list = zone.iplist_sorted_by_rtt();
+    if len(nsaddr_list) == 0:
+        print("ERROR: No IP addresses found for zone: %s\nUse -n option." 
+              % zone.name)
+        return response
 
-    for nsaddr in zone.iplist_sorted_by_rtt():
+    for nsaddr in nsaddr_list:
         if Stats.cnt_query >= MAX_QUERY:
             print("ERROR: Max number of queries (%d) exceeded." % MAX_QUERY)
             return response
@@ -444,6 +449,9 @@ def resolve_name(query, zone, inPath=True, addResults=None):
                 query.set_minimized(curr_zone)
 
         response = send_query(query, curr_zone)
+        if not response:
+            return
+
         rc, ans, referral = process_response(response, query, addResults=addResults)
 
         if rc == dns.rcode.NXDOMAIN:
