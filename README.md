@@ -17,7 +17,7 @@ Pre-requisites:
 ```
 $ ./resolve.py
 
-resolve.py version 0.11
+resolve.py version 0.12
 
 Usage: resolve.py [-dmtsnx] <qname> [<qtype>] [<qclass>]
      -d: print debugging output
@@ -164,5 +164,3 @@ www.ietf.org. 1800 IN CNAME www.ietf.org.cdn.cloudflare.net.
 www.ietf.org.cdn.cloudflare.net. 300 IN A 104.20.0.85
 www.ietf.org.cdn.cloudflare.net. 300 IN A 104.20.1.85
 ```
-
-

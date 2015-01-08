@@ -16,7 +16,7 @@ import dns.message, dns.query, dns.rdatatype, dns.rcode, dns.dnssec
 
 
 PROGNAME   = os.path.basename(sys.argv[0])
-VERSION    = "0.11"
+VERSION    = "0.12"
 ROOTHINTS  = "./root.hints"               # root server names and addresses
 
 TIMEOUT    = 3                            # Query timeout in seconds
