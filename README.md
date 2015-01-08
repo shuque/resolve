@@ -29,9 +29,21 @@ Usage: resolve.py [-dmtsnx] <qname> [<qtype>] [<qclass>]
 ```
 
 This program implements the normal iterative DNS resolution algorithm 
-described in the DNS protocol specifications.
+described in the DNS protocol specifications. Here's an example
+invocation with the -t (trace) switch to lookup the IPv6 address
+of the server www.seas.upenn.edu:
 
-With the -m switch, it uses a query name minimization algorithm that
+```
+$ ./resolve.py -t www.seas.upenn.edu. AAAA
+>> Query: www.seas.upenn.edu. AAAA IN at zone .
+>>        [Got Referral to zone: edu.]
+>> Query: www.seas.upenn.edu. AAAA IN at zone edu.
+>>        [Got Referral to zone: upenn.edu.]
+>> Query: www.seas.upenn.edu. AAAA IN at zone upenn.edu.
+www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
+```
+
+With the -m switch, it uses a **query name minimization** algorithm that
 exposes only the needed query labels to authoritative servers as it
 traverses the DNS delegation hierarchy down to the target DNS zone. There
 are a number of different ways a query name minimization algorithm could 
