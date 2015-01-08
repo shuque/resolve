@@ -43,13 +43,16 @@ $ ./resolve.py -t www.seas.upenn.edu. AAAA
 www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
 ```
 
-With the -m switch, it uses a **query name minimization** algorithm that
-exposes only the needed query labels to authoritative servers as it
-traverses the DNS delegation hierarchy down to the target DNS zone. There
-are a number of different ways a query name minimization algorithm could 
-be implemented. I chose to implement the simplest one that starts with 
-one non-root label at the root DNS servers, and successively prepends 
-additional labels as it follows referrals and descends zones.
+When invoked with the -m switch, this program uses a **query name 
+minimization** algorithm that exposes only the needed query labels to 
+authoritative servers as it traverses the DNS delegation hierarchy down 
+to the target DNS zone. This is a more *privacy preserving* mode of DNS 
+resolution, and efforts are underway to standardize this mode in the 
+official DNS protocol specifications. There are a number of different 
+ways a query name minimization algorithm could be implemented. I chose 
+to implement the simplest one that starts with one non-root label at 
+the root DNS servers, and successively prepends additional labels as 
+it follows referrals and descends zones.
 
 Here's an example run with qname minimization (-m) and the trace (-t)
 option, to resolve the amazon.com website:
