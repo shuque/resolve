@@ -75,8 +75,9 @@ hack that works around this incorrect behavior by ignoring intermediate
 NXDOMAIN responses. The Cloudflare servers additionally appear to 
 respond to some intermediate qnames with REFUSED.
 
-This behavior the CDN DNS servers was observed in January 2015. Hopefully
-they will get fixed before qname minimization is widely deployed.
+This behavior of the Akamai and Cloudflare DNS servers was observed 
+in January 2015. Hopefully they will get fixed before qname minimization 
+is widely deployed.
 
 An example resolution of www.upenn.edu (on Akamai):
 
