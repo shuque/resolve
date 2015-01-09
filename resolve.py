@@ -16,7 +16,7 @@ import dns.message, dns.query, dns.rdatatype, dns.rcode, dns.dnssec
 
 
 PROGNAME   = os.path.basename(sys.argv[0])
-VERSION    = "0.12"
+VERSION    = "0.13"
 ROOTHINTS  = "./root.hints"               # root server names and addresses
 
 TIMEOUT    = 3                            # Query timeout in seconds
@@ -32,8 +32,9 @@ class Prefs:
     """Preferences"""
     DEBUG      = False                    # -d: Print debugging output?
     MINIMIZE   = False                    # -m: Do qname minimization?
+    TCPONLY    = False                    # -t: Use TCP only
+    VERBOSE    = False                    # -v: Trace query->zone path
     VIOLATE    = False                    # -x: ENT nxdomain workaround
-    TRACE      = False                    # -t: Trace query->zone path
     STATS      = False                    # -s: Print statistics
     NSRESOLVE  = False                    # -n: Resolve all NS addresses
 
@@ -74,7 +75,8 @@ def usage():
 Usage: %s [-dmtsnx] <qname> [<qtype>] [<qclass>]
      -d: print debugging output
      -m: do qname minimization
-     -t: trace query & zone path
+     -t: use TCP only
+     -v: verbose - trace query & zone path
      -s: print summary statistics
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
@@ -288,7 +290,7 @@ def process_referral(message, query):
         return None
 
     zonename = rrset.name
-    if Prefs.TRACE and not query.quiet:
+    if Prefs.VERBOSE and not query.quiet:
         print(">>        [Got Referral to zone: %s]" % zonename)
     if zonename in Cache.ZoneDict:
         zone = Cache.ZoneDict[zonename]
@@ -327,12 +329,12 @@ def process_answer(response, query, addResults=None):
         elif rrset.rdtype == dns.rdatatype.DNAME:
             query.answer_rrset.append(rrset)
             addResults and addResults.full_answer_rrset.append(rrset)
-            if Prefs.TRACE:
+            if Prefs.VERBOSE:
                 print(rrset.to_text())
         elif rrset.rdtype == dns.rdatatype.CNAME:
             query.answer_rrset.append(rrset)
             addResults and addResults.full_answer_rrset.append(rrset)
-            if Prefs.TRACE:
+            if Prefs.VERBOSE:
                 print(rrset.to_text())
             cname = rrset[0].target
             Stats.cnt_cname += 1
@@ -381,7 +383,7 @@ def send_query(query, zone, nsQuery=False):
     global Prefs, Stats
     response = None
 
-    if Prefs.DEBUG or (Prefs.TRACE and not query.quiet):
+    if Prefs.DEBUG or (Prefs.VERBOSE and not query.quiet):
         print(">> Query: %s %s %s at zone %s" % \
                (query.qname, query.qtype, query.qclass, zone.name))
 
@@ -390,8 +392,7 @@ def send_query(query, zone, nsQuery=False):
 
     nsaddr_list = zone.iplist_sorted_by_rtt();
     if len(nsaddr_list) == 0:
-        print("ERROR: No IP addresses found for zone: %s\nUse -n option." 
-              % zone.name)
+        print("ERROR: No nameserver addresses found for zone: %s." % zone.name)
         return response
 
     for nsaddr in nsaddr_list:
@@ -406,19 +407,23 @@ def send_query(query, zone, nsQuery=False):
             else:
                 Stats.cnt_query1 += 1
             msg.id = random.randint(1,65535)          # randomize txid
-            t1 = time.time()
-            response = dns.query.udp(msg, nsaddr.addr, timeout=TIMEOUT,
-                                     ignore_unexpected=True)
-            t2 = time.time()
-            nsaddr.rtt = (t2 - t1)
-            if response.flags & dns.flags.TC == dns.flags.TC:
+            truncated = False
+            if not Prefs.TCPONLY:
+                t1 = time.time()
+                response = dns.query.udp(msg, nsaddr.addr, timeout=TIMEOUT,
+                                         ignore_unexpected=True)
+                t2 = time.time()
+                nsaddr.rtt = (t2 - t1)
+                truncated = (response.flags & dns.flags.TC == dns.flags.TC)
+            if Prefs.TCPONLY or truncated:
                 if nsQuery:
                     Stats.cnt_query2 += 1
                 else:
                     Stats.cnt_query1 += 1
                 Stats.cnt_tcp += 1
                 nsaddr.query_count += 1
-                dprint("WARNING: Truncated response; Retrying with TCP ...")
+                if truncated:
+                    dprint("WARNING: Truncated response; Retrying with TCP ..")
                 response = dns.query.tcp(msg, nsaddr.addr, timeout=TIMEOUT)
         except Exception as e:
             print("Query failed: %s (%s, %s)" % (nsaddr.addr, type(e).__name__, e))
@@ -529,7 +534,7 @@ def process_args(arguments):
     global Prefs
 
     try:
-        (options, args) = getopt.getopt(arguments, 'dmtsnx')
+        (options, args) = getopt.getopt(arguments, 'dmtvsnx')
     except getopt.GetoptError:
         usage()
 
@@ -539,7 +544,9 @@ def process_args(arguments):
         elif opt == "-m":
             Prefs.MINIMIZE = True
         elif opt == "-t":
-            Prefs.TRACE = True
+            Prefs.TCPONLY = True
+        elif opt == "-v":
+            Prefs.VERBOSE = True
         elif opt == "-s":
             Prefs.STATS = True
         elif opt == "-n":

@@ -15,14 +15,13 @@ Pre-requisites:
 - dnspython module
 
 ```
-$ ./resolve.py
-
-resolve.py version 0.12
+resolve.py version 0.13
 
 Usage: resolve.py [-dmtsnx] <qname> [<qtype>] [<qclass>]
      -d: print debugging output
      -m: do qname minimization
-     -t: trace query & zone path
+     -t: use TCP only
+     -v: verbose - trace query & zone path
      -s: print summary statistics
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
@@ -30,11 +29,11 @@ Usage: resolve.py [-dmtsnx] <qname> [<qtype>] [<qclass>]
 
 This program implements the normal iterative DNS resolution algorithm 
 described in the DNS protocol specifications. Here's an example
-invocation with the -t (trace) switch to lookup the IPv6 address
+invocation with the -v (verbose) switch to lookup the IPv6 address
 of the server www.seas.upenn.edu:
 
 ```
-$ ./resolve.py -t www.seas.upenn.edu. AAAA
+$ ./resolve.py -v www.seas.upenn.edu. AAAA
 >> Query: www.seas.upenn.edu. AAAA IN at zone .
 >>        [Got Referral to zone: edu.]
 >> Query: www.seas.upenn.edu. AAAA IN at zone edu.
@@ -54,11 +53,11 @@ to implement the simplest one that starts with one non-root label at
 the root DNS servers, and successively prepends additional labels as 
 it follows referrals and descends zones.
 
-Here's an example run with qname minimization (-m) and the trace (-t)
+Here's an example run with qname minimization (-m) and the verbose (-v)
 option, to resolve the amazon.com website:
 
 ```
-$ ./resolve.py -tm www.amazon.com
+$ ./resolve.py -vm www.amazon.com
 >> Query: com. A IN at zone .
 >>        [Got Referral to zone: com.]
 >> Query: amazon.com. A IN at zone com.
@@ -85,7 +84,7 @@ is widely deployed.
 An example resolution of www.upenn.edu (on Akamai):
 
 ```
-$ ./resolve.py -m -t www.upenn.edu. A
+$ ./resolve.py -vm www.upenn.edu. A
 >> Query: edu. A IN at zone .
 >>        [Got Referral to zone: edu.]
 >> Query: upenn.edu. A IN at zone edu.
@@ -105,7 +104,7 @@ Repeating the query with -x (intermediate NXDOMAIN workaround) allows
 the program to proceed to the final answer:
 
 ```
-$ ./resolve.py -tmx www.upenn.edu
+$ ./resolve.py -vmx www.upenn.edu
 >> Query: edu. A IN at zone .
 >>        [Got Referral to zone: edu.]
 >> Query: upenn.edu. A IN at zone edu.
@@ -138,7 +137,7 @@ Resolving www.ietf.org (on Cloudflare) with the NXDOMAIN workaround
 shows the following:
 
 ```
-$ ./resolve.py -tmx www.ietf.org
+$ ./resolve.py -vmx www.ietf.org
 >> Query: org. A IN at zone .
 >>        [Got Referral to zone: org.]
 >> Query: ietf.org. A IN at zone org.
