@@ -16,7 +16,7 @@ import dns.message, dns.query, dns.rdatatype, dns.rcode, dns.dnssec
 
 
 PROGNAME   = os.path.basename(sys.argv[0])
-VERSION    = "0.13"
+VERSION    = "0.14"
 ROOTHINTS  = "./root.hints"               # root server names and addresses
 
 TIMEOUT    = 3                            # Query timeout in seconds
@@ -37,6 +37,7 @@ class Prefs:
     VIOLATE    = False                    # -x: ENT nxdomain workaround
     STATS      = False                    # -s: Print statistics
     NSRESOLVE  = False                    # -n: Resolve all NS addresses
+    BATCHFILE  = None                     # -b: batch file mode
 
 class Stats:
     """Statistics counters"""
@@ -73,6 +74,8 @@ def usage():
 %s version %s
 
 Usage: %s [-dmtsnx] <qname> [<qtype>] [<qclass>]
+       %s [-dmtsnx] -b <batchfile>
+
      -d: print debugging output
      -m: do qname minimization
      -t: use TCP only
@@ -80,7 +83,11 @@ Usage: %s [-dmtsnx] <qname> [<qtype>] [<qclass>]
      -s: print summary statistics
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
-    """ % (PROGNAME, VERSION, PROGNAME))
+     -b <batchfile>: batch file mode
+
+When using -b, <batchfile> contains one (space separated) query name, type, 
+class per line.
+    """ % (PROGNAME, VERSION, PROGNAME, PROGNAME))
     sys.exit(1)
 
 
@@ -378,6 +385,20 @@ def process_response(response, query, addResults=None):
     return (rc, ans, referral)
 
 
+def update_query_counts(ip, nsQuery=False, tcp=False):
+    """Update query counts in Statistics"""
+    global Stats
+    ip.query_count += 1
+    if tcp:
+        Stats.cnt_tcp += 1
+    else:
+        if nsQuery:
+            Stats.cnt_query2 += 1
+        else:
+            Stats.cnt_query1 += 1
+    return
+
+
 def send_query(query, zone, nsQuery=False):
     """send DNS query to nameservers of given zone"""
     global Prefs, Stats
@@ -401,11 +422,7 @@ def send_query(query, zone, nsQuery=False):
             return response
         dprint("Querying zone %s at address %s" % (zone.name, nsaddr.addr))
         try:
-            nsaddr.query_count += 1
-            if nsQuery:
-                Stats.cnt_query2 += 1
-            else:
-                Stats.cnt_query1 += 1
+            update_query_counts(ip=nsaddr, nsQuery=nsQuery)
             msg.id = random.randint(1,65535)          # randomize txid
             truncated = False
             if not Prefs.TCPONLY:
@@ -416,12 +433,7 @@ def send_query(query, zone, nsQuery=False):
                 nsaddr.rtt = (t2 - t1)
                 truncated = (response.flags & dns.flags.TC == dns.flags.TC)
             if Prefs.TCPONLY or truncated:
-                if nsQuery:
-                    Stats.cnt_query2 += 1
-                else:
-                    Stats.cnt_query1 += 1
-                Stats.cnt_tcp += 1
-                nsaddr.query_count += 1
+                update_query_counts(ip=nsaddr, nsQuery=nsQuery, tcp=True)
                 if truncated:
                     dprint("WARNING: Truncated response; Retrying with TCP ..")
                 response = dns.query.tcp(msg, nsaddr.addr, timeout=TIMEOUT)
@@ -493,6 +505,41 @@ def resolve_name(query, zone, inPath=True, nsQuery=False, addResults=None):
     return
 
 
+def do_batchmode(RootZone):
+    """Execute batch mode on input file supplied to -b"""
+
+    global Prefs, Stats
+    print("### resolve.py: Batch Mode file: %s" % Prefs.BATCHFILE)
+    linenum = 0
+    for line in open(Prefs.BATCHFILE):
+        linenum += 1
+        line = line.rstrip('\n')
+        parts = line.split()
+        if len(parts) == 1:
+            qname, = parts
+            qtype = 'A'
+            qclass = 'IN'
+        elif len(parts) == 2:
+            qname, qtype = parts
+            qclass = 'IN'
+        elif len(parts) == 3:
+            qname, qtype, qclass = parts
+        else:
+            print("\nERROR input line %d: %s" % (linenum, line))
+            continue
+
+        print("\n### INPUT: %s, %s, %s" % (qname, qtype, qclass))
+        query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
+        starting_zone = closest_zone(query.qname)
+        print("### Query: %s" % query)
+        print("### Starting at zone: %s" % starting_zone)
+        resolve_name(query, starting_zone, addResults=query)
+        query.print_full_answer()
+
+    print("\n### End Batch Mode.")
+    return
+
+
 def print_stats():
     """Print some statistics"""
     global Stats
@@ -534,7 +581,7 @@ def process_args(arguments):
     global Prefs
 
     try:
-        (options, args) = getopt.getopt(arguments, 'dmtvsnx')
+        (options, args) = getopt.getopt(arguments, 'dmtvsnxb:')
     except getopt.GetoptError:
         usage()
 
@@ -553,6 +600,14 @@ def process_args(arguments):
             Prefs.NSRESOLVE = True
         elif opt == "-x":
             Prefs.VIOLATE = True
+        elif opt == "-b":
+            Prefs.BATCHFILE = optval
+
+    if Prefs.BATCHFILE:
+        if not args:
+            return (None, None, None)
+        else:
+            usage()
 
     numargs = len(args)
     if numargs == 1:
@@ -574,13 +629,17 @@ if __name__ == '__main__':
 
     random.seed(os.urandom(64))
     qname, qtype, qclass = process_args(sys.argv[1:])
-    query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
     RootZone = get_root_zone()
-    resolve_name(query, RootZone, addResults=query)
-    query.print_full_answer()
 
-    if Prefs.DEBUG or Prefs.STATS:
-        print_stats()
+    if Prefs.BATCHFILE:
+        do_batchmode(RootZone)
+        sys.exit(0)
+    else:
+        query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
+        resolve_name(query, RootZone, addResults=query)
+        query.print_full_answer()
 
-    sys.exit(exit_status(query))
+        if Prefs.DEBUG or Prefs.STATS:
+            print_stats()
 
+        sys.exit(exit_status(query))

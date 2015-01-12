@@ -1,8 +1,7 @@
-resolve
-=======
+# resolve.py
 
 resolve.py  
-Command line iterative DNS resolution testing program  
+A command line iterative DNS resolution testing program  
 Author: Shumon Huque
 
 A command line tool to perform iterative DNS resolution of a single
@@ -12,12 +11,14 @@ of 'IN' (Internet class) are used.
 
 Pre-requisites:  
 - Python 2.7 or later, or Python 3
-- dnspython module
+- [dnspython module](http://www.dnspython.org/) (included with most Linux/*BSD distributions)
 
 ```
-resolve.py version 0.13
+resolve.py version 0.14
 
 Usage: resolve.py [-dmtsnx] <qname> [<qtype>] [<qclass>]
+       resolve.py [-dmtsnx] -b <batchfile>
+
      -d: print debugging output
      -m: do qname minimization
      -t: use TCP only
@@ -25,6 +26,10 @@ Usage: resolve.py [-dmtsnx] <qname> [<qtype>] [<qclass>]
      -s: print summary statistics
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
+     -b <batchfile>: batch file mode
+
+When using -b, <batchfile> contains one (space separated) query name, type,
+class per line.
 ```
 
 This program implements the normal iterative DNS resolution algorithm 
@@ -41,6 +46,16 @@ $ ./resolve.py -v www.seas.upenn.edu. AAAA
 >> Query: www.seas.upenn.edu. AAAA IN at zone upenn.edu.
 www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
 ```
+
+### Batch mode
+
+If executing many different queries, then it is recommended to use
+the batch mode (-b inputfile). This will cause the program to use its
+cache of previously queried zones and nameserver records, increasing
+performance, and reducing the possibility of responses being rate
+limited by authoritative servers.
+
+### Query-name minimization mode
 
 When invoked with the -m switch, this program uses a **query name 
 minimization** algorithm that exposes only the needed query labels to 
