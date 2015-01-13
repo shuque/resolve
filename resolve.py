@@ -528,6 +528,12 @@ def do_batchmode(RootZone):
             print("\nERROR input line %d: %s" % (linenum, line))
             continue
 
+        Stats.cnt_cname = 0
+        Stats.cnt_deleg = 0
+        Stats.cnt_query1 = 0
+        Stats.cnt_query2 = 0
+        Stats.cnt_fail = 0
+        Stats.cnt_tcp = 0
         print("\n### INPUT: %s, %s, %s" % (qname, qtype, qclass))
         query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
         starting_zone = closest_zone(query.qname)
@@ -611,7 +617,7 @@ def process_args(arguments):
 
     numargs = len(args)
     if numargs == 1:
-        qname = args[0]
+        qname, = args
         qtype = 'A'
         qclass = 'IN'
     elif numargs == 2:
