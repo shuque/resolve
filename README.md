@@ -55,6 +55,11 @@ cache of previously queried zones and nameserver records, increasing
 performance, and reducing the possibility of responses being rate
 limited by authoritative servers.
 
+The format of the batch input file is a space-separated query-name,
+query-type, and query-class per line. The type and class if omitted
+default to 'A' and 'IN'.
+
+
 ### Query-name minimization mode
 
 When invoked with the -m switch, this program uses a **query name 
@@ -85,12 +90,12 @@ www.amazon.com. 60 IN A 176.32.98.166
 
 Some Content Delivery Networks (CDN) like Akamai and Cloudflare have 
 problems with minimized query names, because they respond incorrectly
-to intermediate query names with NXDOMAIN (response code 3), rather 
-than NOERROR with an empty answer - the correct response for empty 
-non-terminals. Invoking resolve.py with the -x switch implements a 
-hack that works around this incorrect behavior by ignoring intermediate 
-NXDOMAIN responses. The Cloudflare servers additionally appear to 
-respond to some intermediate qnames with REFUSED.
+to intermediate query names with NXDOMAIN (response code 3). The correct
+response should be NOERROR, AA-bit set, and an empty answer section. 
+Invoking resolve.py with the -x switch implements a hack that works 
+around this incorrect behavior by ignoring intermediate NXDOMAIN 
+responses. The Cloudflare servers additionally appear to respond to 
+some intermediate qnames with REFUSED.
 
 This behavior of the Akamai and Cloudflare DNS servers was observed 
 in January 2015. Hopefully they will get fixed before qname minimization 
@@ -150,6 +155,12 @@ a1165.dscg.akamai.net. 20 IN A 23.62.6.81
 
 Resolving www.ietf.org (on Cloudflare) with the NXDOMAIN workaround
 shows the following:
+
+In this case, the first empty non-terminal, cdn.cloudflare.net returns
+NXDOMAIN, the next one, org.cdn.cloudflare.net returns REFUSED, the
+next one, ietf.org.cdn.cloudflare.net responds correctly (NOERROR, AA-bit,
+empty answer), and the final name www.ietf.org.cdn.cloudflare.net produces
+the answer records.
 
 ```
 $ ./resolve.py -vmx www.ietf.org
