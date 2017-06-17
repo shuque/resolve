@@ -497,6 +497,10 @@ def resolve_name(query, zone, inPath=True, nsQuery=False, addResults=None):
             Stats.cnt_deleg += 1
             if inPath:
                 Stats.delegation_depth += 1
+            if not referral.name.is_subdomain(curr_zone.name):
+                print("ERROR: Upward referral: %s is not subdomain of %s" %
+                      (referral.name, curr_zone.name))
+                break
             curr_zone = referral
 
     if Stats.cnt_deleg >= MAX_DELEG:
