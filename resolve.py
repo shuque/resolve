@@ -505,13 +505,14 @@ def resolve_name(query, zone, inPath=True, nsQuery=False, addResults=None):
     return
 
 
-def do_batchmode(RootZone):
+def do_batchmode(infile, cmdline):
     """Execute batch mode on input file supplied to -b"""
 
     global Prefs, Stats
     print("### resolve.py: Batch Mode file: %s" % Prefs.BATCHFILE)
+    print("### command: %s" % ' '.join(cmdline))
     linenum = 0
-    for line in open(Prefs.BATCHFILE):
+    for line in open(infile):
         linenum += 1
         line = line.rstrip('\n')
         parts = line.split()
@@ -638,7 +639,7 @@ if __name__ == '__main__':
     RootZone = get_root_zone()
 
     if Prefs.BATCHFILE:
-        do_batchmode(RootZone)
+        do_batchmode(infile=Prefs.BATCHFILE, cmdline=sys.argv)
         sys.exit(0)
     else:
         query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
