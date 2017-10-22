@@ -17,13 +17,42 @@ import dns.message, dns.query, dns.rdatatype, dns.rcode, dns.dnssec
 
 PROGNAME   = os.path.basename(sys.argv[0])
 VERSION    = "0.14"
-ROOTHINTS  = "./root.hints"               # root server names and addresses
 
 TIMEOUT    = 3                            # Query timeout in seconds
 RETRY      = 1                            # of full list (not implemented yet)
 MAX_CNAME  = 10                           # Max #CNAME indirections
 MAX_QUERY  = 300                          # Max number of queries
 MAX_DELEG  = 26                           # Max number of delegations
+
+# root server names and addresses
+ROOTHINTS = [
+    ("a.root-servers.net.", "198.41.0.4"),
+    ("a.root-servers.net.", "2001:503:ba3e::2:30"),
+    ("b.root-servers.net.", "192.228.79.201"),
+    ("b.root-servers.net.", "2001:500:200::b"),
+    ("c.root-servers.net.", "192.33.4.12"),
+    ("c.root-servers.net.", "2001:500:2::c"),
+    ("d.root-servers.net.", "199.7.91.13"),
+    ("d.root-servers.net.", "2001:500:2d::d"),
+    ("e.root-servers.net.", "192.203.230.10"),
+    ("e.root-servers.net.", "2001:500:a8::e"),
+    ("f.root-servers.net.", "192.5.5.241"),
+    ("f.root-servers.net.", "2001:500:2f::f"),
+    ("g.root-servers.net.", "192.112.36.4"),
+    ("g.root-servers.net.", "2001:500:12::d0d"),
+    ("h.root-servers.net.", "198.97.190.53"),
+    ("h.root-servers.net.", "2001:500:1::53"),
+    ("i.root-servers.net.", "192.36.148.17"),
+    ("i.root-servers.net.", "2001:7fe::53"),
+    ("j.root-servers.net.", "192.58.128.30"),
+    ("j.root-servers.net.", "2001:503:c27::2:30"),
+    ("k.root-servers.net.", "193.0.14.129"),
+    ("k.root-servers.net.", "2001:7fd::1"),
+    ("l.root-servers.net.", "199.7.83.42"),
+    ("l.root-servers.net.", "2001:500:9f::42"),
+    ("m.root-servers.net.", "2001:dc3::35"),
+    ("m.root-servers.net.", "202.12.27.33"),
+]
 
 # RootZone object
 RootZone   = None                         # Populated by get_root_zone()
@@ -71,10 +100,10 @@ def printCache():
 
 def usage():
     print("""
-%s version %s
+{0} version {1}
 
-Usage: %s [-dmtsnx] <qname> [<qtype>] [<qclass>]
-       %s [-dmtsnx] -b <batchfile>
+    Usage: {0} [-dmtvsnx] <qname> [<qtype>] [<qclass>]
+           {0} [-dmtvsnx] -b <batchfile>
 
      -d: print debugging output
      -m: do qname minimization
@@ -87,7 +116,7 @@ Usage: %s [-dmtsnx] <qname> [<qtype>] [<qclass>]
 
 When using -b, <batchfile> contains one (space separated) query name, type, 
 class per line.
-    """ % (PROGNAME, VERSION, PROGNAME, PROGNAME))
+    """.format(PROGNAME, VERSION))
     sys.exit(1)
 
 
@@ -222,8 +251,7 @@ class Zone:
 def get_root_zone():
     """populate the Root Zone object from hints file"""
     z = Zone(dns.name.root)
-    for line in open(ROOTHINTS, 'r'):
-        name, addr = line.split()
+    for name, addr in ROOTHINTS:
         name = dns.name.from_text(name)
         nsobj = z.install_ns(name, clobber=False)
         nsobj.install_ip(addr)
@@ -405,7 +433,7 @@ def send_query(query, zone, nsQuery=False):
     response = None
 
     if Prefs.DEBUG or (Prefs.VERBOSE and not query.quiet):
-        print(">> Query: %s %s %s at zone %s" % \
+        print("\n>> Query: %s %s %s at zone %s" % \
                (query.qname, query.qtype, query.qclass, zone.name))
 
     msg = dns.message.make_query(query.qname, query.qtype, rdclass=query.qclass)
@@ -545,6 +573,8 @@ def do_batchmode(infile, cmdline):
         print("### Query: %s" % query)
         print("### Starting at zone: %s" % starting_zone)
         resolve_name(query, starting_zone, addResults=query)
+        if Prefs.VERBOSE:
+            print('')
         query.print_full_answer()
 
     print("\n### End Batch Mode.")
@@ -648,6 +678,8 @@ if __name__ == '__main__':
     else:
         query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
         resolve_name(query, RootZone, addResults=query)
+        if Prefs.VERBOSE:
+            print('')
         query.print_full_answer()
 
         if Prefs.DEBUG or Prefs.STATS:
