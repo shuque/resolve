@@ -354,6 +354,9 @@ def process_answer(response, query, addResults=None):
         if not query.quiet:
             print("ERROR: NODATA: %s of type %s not found" % \
                   (query.qname, query.qtype))
+        return answer
+
+    gotCNAME = False
 
     for rrset in answer:
         if rrset.rdtype == dns.rdatatype.from_text(query.qtype) and \
@@ -363,13 +366,17 @@ def process_answer(response, query, addResults=None):
                 addResults.full_answer_rrset.append(rrset)
             query.got_answer = True
         elif rrset.rdtype == dns.rdatatype.DNAME:
-            # should really do DNAME->CNAME synthesis ourselves here
+            # Just add DNAME record to results. Technically a good resolver
+            # should really do DNAME->CNAME synthesis itself here, but we
+            # rely on the fact that most authorities provide the CNAMEs
+            # themselves.
             query.answer_rrset.append(rrset)
             if addResults:
                 addResults.full_answer_rrset.append(rrset)
             if Prefs.VERBOSE:
                 print(rrset.to_text())
         elif rrset.rdtype == dns.rdatatype.CNAME:
+            gotCNAME = True
             query.answer_rrset.append(rrset)
             if addResults:
                 addResults.full_answer_rrset.append(rrset)
@@ -380,13 +387,19 @@ def process_answer(response, query, addResults=None):
             if Stats.cnt_cname >= MAX_CNAME:
                 print("ERROR: Too many (%d) CNAME indirections." % MAX_CNAME)
                 return None
-            else:
-                dprint("CNAME found, resolving canonical name %s" % cname)
-                cname_query = Query(cname, query.qtype, query.qclass, Prefs.MINIMIZE)
-                if addResults:
-                    addResults.cname_chain.append(cname_query)
-                resolve_name(cname_query, closest_zone(cname), 
-                             inPath=False, addResults=addResults)
+
+    if gotCNAME:
+        # We query the last CNAME in the answer chain, making the assumption
+        # that authority servers return CNAME chains in an ordered fashion.
+        # Practically all of them do. But technically there is no intrinsic
+        # RRset ordering requirement in the spec, so we should really fix this
+        # code (TODO).
+        dprint("CNAME found, resolving canonical name %s" % cname)
+        cname_query = Query(cname, query.qtype, query.qclass, Prefs.MINIMIZE)
+        if addResults:
+            addResults.cname_chain.append(cname_query)
+        resolve_name(cname_query, closest_zone(cname),
+                     inPath=False, addResults=addResults)
 
     return answer
 
