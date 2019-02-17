@@ -325,8 +325,6 @@ def process_referral(message, query):
         return None
 
     zonename = rrset.name
-    if Prefs.VERBOSE and not query.quiet:
-        print(">>        [Got Referral to zone: %s]" % zonename)
     if zonename in Cache.ZoneDict:
         zone = Cache.ZoneDict[zonename]
     else:
@@ -335,6 +333,10 @@ def process_referral(message, query):
             nsobj = zone.install_ns(rr.target)
 
     get_ns_addrs(zone, message)
+    if Prefs.VERBOSE and not query.quiet:
+        print(">>        [Got Referral to zone: %s]" % zonename)
+        zone.print_details()
+
     return zone
 
 
