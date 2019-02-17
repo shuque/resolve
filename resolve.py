@@ -359,16 +359,20 @@ def process_answer(response, query, addResults=None):
         if rrset.rdtype == dns.rdatatype.from_text(query.qtype) and \
            rrset.name == query.qname:
             query.answer_rrset.append(rrset)
-            addResults and addResults.full_answer_rrset.append(rrset)
+            if addResults:
+                addResults.full_answer_rrset.append(rrset)
             query.got_answer = True
         elif rrset.rdtype == dns.rdatatype.DNAME:
+            # should really do DNAME->CNAME synthesis ourselves here
             query.answer_rrset.append(rrset)
-            addResults and addResults.full_answer_rrset.append(rrset)
+            if addResults:
+                addResults.full_answer_rrset.append(rrset)
             if Prefs.VERBOSE:
                 print(rrset.to_text())
         elif rrset.rdtype == dns.rdatatype.CNAME:
             query.answer_rrset.append(rrset)
-            addResults and addResults.full_answer_rrset.append(rrset)
+            if addResults:
+                addResults.full_answer_rrset.append(rrset)
             if Prefs.VERBOSE:
                 print(rrset.to_text())
             cname = rrset[0].target
@@ -379,7 +383,8 @@ def process_answer(response, query, addResults=None):
             else:
                 dprint("CNAME found, resolving canonical name %s" % cname)
                 cname_query = Query(cname, query.qtype, query.qclass, Prefs.MINIMIZE)
-                addResults and addResults.cname_chain.append(cname_query)
+                if addResults:
+                    addResults.cname_chain.append(cname_query)
                 resolve_name(cname_query, closest_zone(cname), 
                              inPath=False, addResults=addResults)
 
