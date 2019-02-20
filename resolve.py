@@ -19,10 +19,14 @@ PROGNAME   = os.path.basename(sys.argv[0])
 VERSION    = "0.14"
 
 TIMEOUT    = 3                            # Query timeout in seconds
+RETRIES    = 2                            # Number of retries per server
 RETRY      = 1                            # of full list (not implemented yet)
 MAX_CNAME  = 10                           # Max #CNAME indirections
 MAX_QUERY  = 300                          # Max number of queries
 MAX_DELEG  = 26                           # Max number of delegations
+UDPSIZE    = 1460                         # UDP payload size advertisement
+WANT_DNSSEC = False
+
 
 # root server names and addresses
 ROOTHINTS = [
@@ -267,6 +271,23 @@ def closest_zone(qname):
         return Cache.ZoneDict[dns.name.root]
 
 
+def is_authoritative(msg):
+    """Does DNS message have Authoritative Answer (AA) flag set?"""
+    return (msg.flags & dns.flags.AA == dns.flags.AA)
+
+
+def is_truncated(msg):
+    """Does DNS message have truncated (TC) flag set?"""
+    return (msg.flags & dns.flags.TC == dns.flags.TC)
+
+
+def is_referral(msg):
+    """Is the DNS response message a referral?"""
+    return (msg.rcode() == 0) and \
+        (not is_authoritative(msg)) and \
+        (len(msg.authority) > 0)
+
+
 def get_ns_addrs(zone, message):
     """
     Populate nameserver addresses for zone.
@@ -305,7 +326,8 @@ def get_ns_addrs(zone, message):
             for addrtype in ['A', 'AAAA']:
                 nsquery = Query(name, addrtype, 'IN', Prefs.MINIMIZE)
                 nsquery.quiet = True
-                resolve_name(nsquery, closest_zone(nsquery.qname), inPath=False, nsQuery=True)
+                resolve_name(nsquery, closest_zone(nsquery.qname),
+                             inPath=False, is_nsQuery=True)
                 for ip in nsquery.get_answer_ip_list():
                     nsobj.install_ip(ip)
 
@@ -417,8 +439,7 @@ def process_response(response, query, addResults=None):
     query.rcode = rc
     aa = (response.flags & dns.flags.AA == dns.flags.AA)
     if rc == dns.rcode.NOERROR:
-        answerlen = len(response.answer)
-        if answerlen == 0 and not aa:                    # Referral
+        if is_referral(response):
             referral = process_referral(response, query)
             if referral:
                 dprint("Obtained referral to zone: %s" % referral.name)
@@ -433,21 +454,68 @@ def process_response(response, query, addResults=None):
     return (rc, ans, referral)
 
 
-def update_query_counts(ip, nsQuery=False, tcp=False):
+def update_query_counts(ip, is_nsQuery=False, tcp=False):
     """Update query counts in Statistics"""
     global Stats
     ip.query_count += 1
     if tcp:
         Stats.cnt_tcp += 1
     else:
-        if nsQuery:
+        if is_nsQuery:
             Stats.cnt_query2 += 1
         else:
             Stats.cnt_query1 += 1
     return
 
 
-def send_query(query, zone, nsQuery=False):
+def send_query_tcp(msg, nsaddr, timeout=TIMEOUT, is_nsQuery=False):
+    res = None
+    update_query_counts(ip=nsaddr, is_nsQuery=is_nsQuery, tcp=True)
+    try:
+        res = dns.query.tcp(msg, nsaddr.addr, timeout=timeout)
+    except dns.exception.Timeout:
+        print("WARN: TCP query timeout for {}".format(ip))
+        pass
+    return res
+
+
+def send_query_udp(msg, nsaddr, timeout=TIMEOUT, retries=RETRIES, is_nsQuery=False):
+    gotresponse = False
+    res = None
+    update_query_counts(ip=nsaddr, is_nsQuery=is_nsQuery)
+    while (not gotresponse and (retries > 0)):
+        retries -= 1
+        try:
+            t0 = time.time()
+            res = dns.query.udp(msg, nsaddr.addr, timeout=timeout)
+            nsaddr.rtt = time.time() - t0
+            gotresponse = True
+        except dns.exception.Timeout:
+            print("WARN: UDP query timeout for {}".format(ip))
+            pass
+    return res
+
+
+def send_query(msg, nsaddr, timeout=TIMEOUT, retries=RETRIES,
+               newid=False, is_nsQuery=False):
+    res = None
+    if newid:
+        msg.id = random.randint(1,65535)
+    res = send_query_udp(msg, nsaddr)
+    if res and is_truncated(res):
+        print("WARN: response was truncated; retrying with TCP ..")
+        res = send_query_tcp(msg, nsaddr)
+    return res
+
+
+def make_query(qname, qtype, qclass):
+    msg = dns.message.make_query(qname, qtype, rdclass=qclass,
+                                 want_dnssec=WANT_DNSSEC, payload=UDPSIZE)
+    msg.flags &= ~dns.flags.RD  # set RD=0
+    return msg
+
+
+def send_query_zone(query, zone, is_nsQuery=False):
     """send DNS query to nameservers of given zone"""
     global Prefs, Stats
     response = None
@@ -456,40 +524,20 @@ def send_query(query, zone, nsQuery=False):
         print("\n>> Query: %s %s %s at zone %s" % \
                (query.qname, query.qtype, query.qclass, zone.name))
 
-    msg = dns.message.make_query(query.qname, query.qtype, rdclass=query.qclass)
-    msg.flags ^= dns.flags.RD
+    msg = make_query(query.qname, query.qtype, query.qclass)
 
     nsaddr_list = zone.iplist_sorted_by_rtt();
     if len(nsaddr_list) == 0:
         print("ERROR: No nameserver addresses found for zone: %s." % zone.name)
-        return response
+        return None
 
     for nsaddr in nsaddr_list:
         if Stats.cnt_query1 + Stats.cnt_query2 >= MAX_QUERY:
             print("ERROR: Max number of queries (%d) exceeded." % MAX_QUERY)
-            return response
+            return None
         dprint("Querying zone %s at address %s" % (zone.name, nsaddr.addr))
-        try:
-            update_query_counts(ip=nsaddr, nsQuery=nsQuery)
-            msg.id = random.randint(1,65535)          # randomize txid
-            truncated = False
-            if not Prefs.TCPONLY:
-                t1 = time.time()
-                response = dns.query.udp(msg, nsaddr.addr, timeout=TIMEOUT,
-                                         ignore_unexpected=True)
-                t2 = time.time()
-                nsaddr.rtt = (t2 - t1)
-                truncated = (response.flags & dns.flags.TC == dns.flags.TC)
-            if Prefs.TCPONLY or truncated:
-                update_query_counts(ip=nsaddr, nsQuery=nsQuery, tcp=True)
-                if truncated:
-                    dprint("WARNING: Truncated response; Retrying with TCP ..")
-                response = dns.query.tcp(msg, nsaddr.addr, timeout=TIMEOUT)
-        except Exception as e:
-            print("Query failed: %s (%s, %s)" % (nsaddr.addr, type(e).__name__, e))
-            Stats.cnt_fail += 1
-            pass
-        else:
+        response = send_query(msg, nsaddr, newid=True, is_nsQuery=is_nsQuery)
+        if response:
             rc = response.rcode()
             if rc not in [dns.rcode.NOERROR, dns.rcode.NXDOMAIN]:
                 Stats.cnt_fail += 1
@@ -502,7 +550,7 @@ def send_query(query, zone, nsQuery=False):
     return response
 
 
-def resolve_name(query, zone, inPath=True, nsQuery=False, addResults=None):
+def resolve_name(query, zone, inPath=True, is_nsQuery=False, addResults=None):
     """resolve a DNS query. addResults is an optional Query object to
     which the answer results are to be added."""
 
@@ -523,7 +571,7 @@ def resolve_name(query, zone, inPath=True, nsQuery=False, addResults=None):
             else:
                 query.set_minimized(curr_zone)
 
-        response = send_query(query, curr_zone, nsQuery=nsQuery)
+        response = send_query_zone(query, curr_zone, is_nsQuery=is_nsQuery)
         if not response:
             return
 
