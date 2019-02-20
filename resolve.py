@@ -97,7 +97,7 @@ class Stats:
                 self.cnt_query1 += 1
 
     def print_stats(self):
-        print('')
+        print('\n### Statistics:')
         cnt_query_total = self.cnt_query1 + self.cnt_query2
         print("Qname Delegation depth: %d" % self.delegation_depth)
         print("Number of delegations traversed: %d" % self.cnt_deleg)
@@ -117,22 +117,47 @@ class Stats:
 class Cache:
     """Cache of Zone & NameServer objects"""
 
-    ZoneDict   = dict()                   # dns.name.Name -> Zone
-    NSDict     = dict()                   # dns.name.Name -> NameServer
+    def __init__(self):
+        self.ZoneDict   = dict()              # dns.name.Name -> Zone
+        self.NSDict     = dict()              # dns.name.Name -> NameServer
 
+    def get_ns(self, nsname):
+        if nsname in self.NSDict:
+            return self.NSDict[nsname]
+        else:
+            return None
 
-def printCache():
-    """Print zone and NS cache contents - for debugging"""
-    print("---------------------------- Zone Cache ----------------")
-    for zname, zobj in Cache.ZoneDict.items():
-        print("Zone: %s" % zname)
-        for ns in zobj.nslist:
-            print("    NS: %s" % Cache.NSDict[ns].name)
-    print("---------------------------- NS   Cache ----------------")
-    for nsname, nsobj in Cache.NSDict.items():
-        ipstring_list = " ".join([x.addr for x in nsobj.iplist])
-        print("%s %s" % (nsname, ipstring_list))
-    return
+    def get_zone(self, zonename):
+        if zonename in self.ZoneDict:
+            return self.ZoneDict[zonename]
+        else:
+            return None
+
+    def install_ns(self, nsname, nsobj):
+        self.NSDict[nsname] = nsobj
+
+    def install_zone(self, zonename, zoneobj):
+        self.ZoneDict[zonename] = zoneobj
+
+    def closest_zone(self, qname):
+        """given query name, find closest enclosing zone object in Cache"""
+        for z in reversed(sorted(self.ZoneDict.keys())):
+            if qname.is_subdomain(z):
+                return self.get_zone(z)
+        else:
+            return self.get_zone(dns.name.root)
+
+    def dump(self):
+        """Dump zone and NS cache contents - for debugging"""
+        print("---------------------------- Zone Cache ----------------")
+        for zname, zobj in self.ZoneDict.items():
+            print("Zone: %s" % zname)
+            for ns in zobj.nslist:
+                print("    NS: %s" % self.NSDict[ns].name)
+        print("---------------------------- NS   Cache ----------------")
+        for nsname, nsobj in self.NSDict.items():
+            ipstring_list = " ".join([x.addr for x in nsobj.iplist])
+            print("%s %s" % (nsname, ipstring_list))
 
 
 def usage():
@@ -246,10 +271,11 @@ class NameServer:
 class Zone:
     """Zone class"""
 
-    def __init__(self, zone):
+    def __init__(self, zone, cache):
         self.name = zone                           # dns.name.Name
+        self.cache = cache                         # Cache class
         self.nslist = []                           # list of dns.name.Name
-        Cache.ZoneDict[zone] = self
+        self.cache.install_zone(zone, self)
 
     def has_ns(self, ns):
         if ns in self.nslist:
@@ -261,14 +287,14 @@ class Zone:
         """Install a nameserver record for this zone"""
         if nsname not in self.nslist:
             self.nslist.append(nsname)
-        if clobber or (nsname not in Cache.NSDict):
-            Cache.NSDict[nsname] = NameServer(nsname)
-        return Cache.NSDict[nsname]
+        if clobber or (cache.get_ns(nsname) is None):
+            self.cache.install_ns(nsname, NameServer(nsname))
+        return self.cache.get_ns(nsname)
 
     def iplist(self):
         result = []
         for ns in self.nslist:
-            result += Cache.NSDict[ns].iplist
+            result += self.cache.get_ns(ns).iplist
         return result
 
     def iplist_sorted_by_rtt(self):
@@ -277,7 +303,7 @@ class Zone:
     def print_details(self):
         print("ZONE: %s" % self.name)
         for nsname in self.nslist:
-            nsobj = Cache.NSDict[nsname]
+            nsobj = self.cache.get_ns(nsname)
             addresses = [x.addr for x in nsobj.iplist]
             print("%s %s %s" % (self.name, nsobj.name, addresses))
         return
@@ -286,23 +312,14 @@ class Zone:
         return "<Zone: %s>" % self.name
 
 
-def get_root_zone():
+def get_root_zone(cache):
     """populate the Root Zone object from hints file"""
-    z = Zone(dns.name.root)
+    z = Zone(dns.name.root, cache)
     for name, addr in ROOTHINTS:
         name = dns.name.from_text(name)
         nsobj = z.install_ns(name, clobber=False)
         nsobj.install_ip(addr)
     return z
-
-
-def closest_zone(qname):
-    """given query name, find closest enclosing zone object in Cache"""
-    for z in reversed(sorted(Cache.ZoneDict.keys())):
-        if qname.is_subdomain(z):
-            return Cache.ZoneDict[z]
-    else:
-        return Cache.ZoneDict[dns.name.root]
 
 
 def is_authoritative(msg):
@@ -349,19 +366,20 @@ def get_ns_addrs(zone, message):
                 if not zone.has_ns(name):
                     continue
                 if (not Prefs.NSRESOLVE) or (name in needsGlue):
-                    nsobj = Cache.NSDict[name]
+                    nsobj = cache.get_ns(name)
                     nsobj.install_ip(rr.address)
 
     if not zone.iplist() or Prefs.NSRESOLVE:       
         for name in needToResolve:
-            nsobj = Cache.NSDict[name]
+            nsobj = cache.get_ns(name)
             if nsobj.iplist:
                 continue
             for addrtype in ['A', 'AAAA']:
                 nsquery = Query(name, addrtype, 'IN', Prefs.MINIMIZE,
                                 is_nsquery=True)
                 nsquery.quiet = True
-                resolve_name(nsquery, closest_zone(nsquery.qname), inPath=False)
+                resolve_name(nsquery, cache.closest_zone(nsquery.qname),
+                             inPath=False)
                 for ip in nsquery.get_answer_ip_list():
                     nsobj.install_ip(ip)
 
@@ -381,10 +399,9 @@ def process_referral(message, query):
         return None
 
     zonename = rrset.name
-    if zonename in Cache.ZoneDict:
-        zone = Cache.ZoneDict[zonename]
-    else:
-        zone = Zone(zonename)
+    zone = cache.get_zone(zonename)
+    if zone is None:
+        zone = Zone(zonename, cache)
         for rr in rrset:
             nsobj = zone.install_ns(rr.target)
 
@@ -456,7 +473,7 @@ def process_answer(response, query, addResults=None):
         cname_query = Query(cname, query.qtype, query.qclass, Prefs.MINIMIZE)
         if addResults:
             addResults.cname_chain.append(cname_query)
-        resolve_name(cname_query, closest_zone(cname),
+        resolve_name(cname_query, cache.closest_zone(cname),
                      inPath=False, addResults=addResults)
 
     return answer
@@ -494,7 +511,7 @@ def send_query_tcp(msg, nsaddr, query, timeout=TIMEOUT):
     try:
         res = dns.query.tcp(msg, nsaddr.addr, timeout=timeout)
     except dns.exception.Timeout:
-        print("WARN: TCP query timeout for {}".format(ip))
+        print("WARN: TCP query timeout for {}".format(nsaddr.addr))
         pass
     return res
 
@@ -511,7 +528,7 @@ def send_query_udp(msg, nsaddr, query, timeout=TIMEOUT, retries=RETRIES):
             nsaddr.rtt = time.time() - t0
             gotresponse = True
         except dns.exception.Timeout:
-            print("WARN: UDP query timeout for {}".format(ip))
+            print("WARN: UDP query timeout for {}".format(nsaddr.addr))
             pass
     return res
 
@@ -652,7 +669,7 @@ def do_batchmode(infile, cmdline):
         stats = Stats()
         print("\n### INPUT: %s, %s, %s" % (qname, qtype, qclass))
         query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
-        starting_zone = closest_zone(query.qname)
+        starting_zone = cache.closest_zone(query.qname)
         print("### Query: %s" % query)
         print("### Starting at zone: %s" % starting_zone)
         resolve_name(query, starting_zone, addResults=query)
@@ -734,7 +751,8 @@ if __name__ == '__main__':
 
     random.seed(os.urandom(64))
     qname, qtype, qclass = process_args(sys.argv[1:])
-    RootZone = get_root_zone()
+    cache = Cache()
+    RootZone = get_root_zone(cache)
     stats = Stats()
 
     if Prefs.BATCHFILE:
