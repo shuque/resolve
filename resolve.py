@@ -363,6 +363,10 @@ def get_ns_addrs(zone, message):
                     nsobj.install_ip(rr.address)
 
     if not zone.iplist() or Prefs.NSRESOLVE:
+        if Prefs.DEBUG:
+            print(">> DEBUG: Need to resolve Nameserver names from referral:")
+            for x in needToResolve:
+                print(">> DEBUG: {}".format(x))
         for name in needToResolve:
             nsobj = cache.get_ns(name)
             if nsobj.iplist:
@@ -391,6 +395,9 @@ def process_referral(message, query):
         return None
 
     zonename = rrset.name
+    if Prefs.DEBUG or (Prefs.VERBOSE and not query.quiet):
+        print(">>        [Got Referral to zone: %s]" % zonename)
+
     zone = cache.get_zone(zonename)
     if zone is None:
         zone = Zone(zonename, cache)
@@ -398,8 +405,8 @@ def process_referral(message, query):
             _ = zone.install_ns(rr.target)
 
     get_ns_addrs(zone, message)
-    if Prefs.VERBOSE and not query.quiet:
-        print(">>        [Got Referral to zone: %s]" % zonename)
+
+    if Prefs.DEBUG or (Prefs.VERBOSE and not query.quiet):
         zone.print_details()
 
     return zone
@@ -409,14 +416,11 @@ def process_answer(response, query, addResults=None):
 
     """Process answer section, chasing aliases when needed"""
 
-    answer = response.answer
-
     # If minimizing, ignore answers for intermediate query names.
     if query.qname != query.orig_qname:
         return
 
-    empty_answer = (len(answer) == 0)
-    if empty_answer:
+    if not response.answer:
         if not query.quiet:
             print("ERROR: NODATA: %s of type %s not found" % \
                   (query.qname, query.qtype))
@@ -424,7 +428,7 @@ def process_answer(response, query, addResults=None):
 
     gotCNAME = False
 
-    for rrset in answer:
+    for rrset in response.answer:
         if rrset.rdtype == dns.rdatatype.from_text(query.qtype) and \
            rrset.name == query.qname:
             query.answer_rrset.append(rrset)
@@ -484,9 +488,7 @@ def process_response(response, query, addResults=None):
     if rc == dns.rcode.NOERROR:
         if is_referral(response):
             referral = process_referral(response, query)
-            if referral:
-                dprint("Obtained referral to zone: %s" % referral.name)
-            else:
+            if not referral:
                 print("ERROR: processing referral")
         else:                                            # Answer
             process_answer(response, query, addResults=addResults)
@@ -591,10 +593,6 @@ def resolve_name(query, zone, inPath=True, addResults=None):
     repeatZone = False
 
     while stats.cnt_deleg < MAX_DELEG:
-
-        if Prefs.DEBUG:
-            print("\n>> Current Zone: %s" % curr_zone.name)
-            curr_zone.print_details()
 
         if query.minimize:
             if repeatZone:
@@ -756,7 +754,7 @@ if __name__ == '__main__':
             print('')
         query.print_full_answer()
 
-        if Prefs.DEBUG or Prefs.STATS:
+        if Prefs.STATS:
             stats.print_stats()
 
         sys.exit(exit_status(query))
