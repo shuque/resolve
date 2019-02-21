@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 """
-
 resolve.py
 
 Perform an iterative resolution of a DNS name, type, class,
@@ -88,15 +87,16 @@ class Stats:
         self.delegation_depth = 0
 
     def update_query(self, is_nsQuery=False, tcp=False):
+        """update query counts"""
         if tcp:
             self.cnt_tcp += 1
+        if is_nsQuery:
+            self.cnt_query2 += 1
         else:
-            if is_nsQuery:
-                self.cnt_query2 += 1
-            else:
-                self.cnt_query1 += 1
+            self.cnt_query1 += 1
 
     def print_stats(self):
+        """Print statistics"""
         print('\n### Statistics:')
         cnt_query_total = self.cnt_query1 + self.cnt_query2
         print("Qname Delegation depth: %d" % self.delegation_depth)
@@ -118,20 +118,18 @@ class Cache:
     """Cache of Zone & NameServer objects"""
 
     def __init__(self):
-        self.ZoneDict   = dict()              # dns.name.Name -> Zone
-        self.NSDict     = dict()              # dns.name.Name -> NameServer
+        self.ZoneDict = {}               # dns.name.Name -> Zone
+        self.NSDict = {}                 # dns.name.Name -> NameServer
 
     def get_ns(self, nsname):
         if nsname in self.NSDict:
             return self.NSDict[nsname]
-        else:
-            return None
+        return None
 
     def get_zone(self, zonename):
         if zonename in self.ZoneDict:
             return self.ZoneDict[zonename]
-        else:
-            return None
+        return None
 
     def install_ns(self, nsname, nsobj):
         self.NSDict[nsname] = nsobj
@@ -139,13 +137,12 @@ class Cache:
     def install_zone(self, zonename, zoneobj):
         self.ZoneDict[zonename] = zoneobj
 
-    def closest_zone(self, qname):
+    def closest_zone(self, name):
         """given query name, find closest enclosing zone object in Cache"""
         for z in reversed(sorted(self.ZoneDict.keys())):
-            if qname.is_subdomain(z):
+            if name.is_subdomain(z):
                 return self.get_zone(z)
-        else:
-            return self.get_zone(dns.name.root)
+        return None
 
     def dump(self):
         """Dump zone and NS cache contents - for debugging"""
@@ -183,7 +180,9 @@ class per line.
 
 
 def dprint(msg):
-    if Prefs.DEBUG: print(">> DEBUG: %s" % msg)
+    """Print debugging message if DEBUG flag is set"""
+    if Prefs.DEBUG:
+        print(">> DEBUG: %s" % msg)
     return
 
 
@@ -200,7 +199,7 @@ class Query:
         self.qclass = qclass
         self.minimize = minimize
         self.is_nsquery = is_nsquery
-        self.quiet = False                      # don't print anything
+        self.quiet = False                # don't print query being issued
         self.rcode = None
         self.got_answer = False
         self.cname_chain = []
@@ -208,6 +207,7 @@ class Query:
         self.full_answer_rrset = []
 
     def print_full_answer(self):
+        """Print full set of answer records including aliases"""
         if self.full_answer_rrset:
             print("\n".join([x.to_text() for x in self.full_answer_rrset]))
 
@@ -220,12 +220,14 @@ class Query:
         return iplist
 
     def set_minimized(self, zone):
+        """Minimize query labels based on target zone"""
         labels_qname = self.orig_qname.labels
         labels_zone = zone.name.labels
         minLabels = len(labels_zone) + 1
         self.qname = dns.name.Name(labels_qname[-minLabels:])
 
     def prepend_label(self):
+        """Prepend next label"""
         numLabels = len(self.qname) + 1
         self.qname = dns.name.Name(self.orig_qname[-numLabels:])
 
@@ -254,10 +256,7 @@ class NameServer:
         self.iplist = []                           # list of IPaddress
 
     def has_ip(self, ipstring):
-        if ipstring in [x.addr for x in self.iplist]:
-            return True
-        else:
-            return False
+        return ipstring in [x.addr for x in self.iplist]
 
     def install_ip(self, ipstring):
         if not self.has_ip(ipstring):
@@ -278,10 +277,7 @@ class Zone:
         self.cache.install_zone(zone, self)
 
     def has_ns(self, ns):
-        if ns in self.nslist:
-            return True
-        else:
-            return False
+        return ns in self.nslist
 
     def install_ns(self, nsname, clobber=False):
         """Install a nameserver record for this zone"""
@@ -298,7 +294,7 @@ class Zone:
         return result
 
     def iplist_sorted_by_rtt(self):
-        return sorted(self.iplist(), key = lambda ip: ip.rtt)
+        return sorted(self.iplist(), key=lambda ip: ip.rtt)
 
     def print_details(self):
         print("ZONE: %s" % self.name)
@@ -324,34 +320,31 @@ def get_root_zone(cache):
 
 def is_authoritative(msg):
     """Does DNS message have Authoritative Answer (AA) flag set?"""
-    return (msg.flags & dns.flags.AA == dns.flags.AA)
+    return msg.flags & dns.flags.AA == dns.flags.AA
 
 
 def is_truncated(msg):
     """Does DNS message have truncated (TC) flag set?"""
-    return (msg.flags & dns.flags.TC == dns.flags.TC)
+    return msg.flags & dns.flags.TC == dns.flags.TC
 
 
 def is_referral(msg):
     """Is the DNS response message a referral?"""
-    return (msg.rcode() == 0) and \
-        (not is_authoritative(msg)) and \
-        (len(msg.authority) > 0)
+    return (msg.rcode() == 0) and (not is_authoritative(msg)) and msg.authority
 
 
 def get_ns_addrs(zone, message):
     """
-    Populate nameserver addresses for zone.
-    
-    Note: by default, we only save and use NS record addresses we can find 
-    in the additional section of the referral. To be complete, we should 
-    really explicitly resolve all non-glue NS addresses, which results in a 
-    large number of additional queries and corresponding latency. This 
-    complete mode can be turned on with -n (NSRESOLVE). If no NS addresses
-    can be found in the additional section, we resort to NSRESOLVE mode.
-    """
+    Populate nameserver addresses for zone from a given referral message.
 
-    global Prefs
+    Note: by default, we only save and use NS record addresses we can find
+    in the additional section of the referral. To be complete, we should
+    really explicitly resolve all non-glue NS addresses, but that would cause
+    a potentially large number of additional queries and corresponding latency
+    which are mostly unnecessary. This complete mode can be turned on with -n
+    (NSRESOLVE). If no NS addresses can be found in the additional section, we
+    of course resort to this complete mode.
+    """
 
     needsGlue = []
     for nsname in zone.nslist:
@@ -369,7 +362,7 @@ def get_ns_addrs(zone, message):
                     nsobj = cache.get_ns(name)
                     nsobj.install_ip(rr.address)
 
-    if not zone.iplist() or Prefs.NSRESOLVE:       
+    if not zone.iplist() or Prefs.NSRESOLVE:
         for name in needToResolve:
             nsobj = cache.get_ns(name)
             if nsobj.iplist:
@@ -389,7 +382,6 @@ def get_ns_addrs(zone, message):
 def process_referral(message, query):
 
     """Process referral. Returns a zone object for the referred zone"""
-    global Prefs
 
     for rrset in message.authority:
         if rrset.rdtype == dns.rdatatype.NS:
@@ -403,7 +395,7 @@ def process_referral(message, query):
     if zone is None:
         zone = Zone(zonename, cache)
         for rr in rrset:
-            nsobj = zone.install_ns(rr.target)
+            _ = zone.install_ns(rr.target)
 
     get_ns_addrs(zone, message)
     if Prefs.VERBOSE and not query.quiet:
@@ -417,19 +409,18 @@ def process_answer(response, query, addResults=None):
 
     """Process answer section, chasing aliases when needed"""
 
-    global Prefs
     answer = response.answer
 
-    # If minimizing, then we ignore answers for intermediate query names.
+    # If minimizing, ignore answers for intermediate query names.
     if query.qname != query.orig_qname:
-        return answer
+        return
 
     empty_answer = (len(answer) == 0)
     if empty_answer:
         if not query.quiet:
             print("ERROR: NODATA: %s of type %s not found" % \
                   (query.qname, query.qtype))
-        return answer
+        return
 
     gotCNAME = False
 
@@ -441,10 +432,9 @@ def process_answer(response, query, addResults=None):
                 addResults.full_answer_rrset.append(rrset)
             query.got_answer = True
         elif rrset.rdtype == dns.rdatatype.DNAME:
-            # Just add DNAME record to results. Technically a good resolver
-            # should really do DNAME->CNAME synthesis itself here, but we
-            # rely on the fact that most authorities provide the CNAMEs
-            # themselves.
+            # Add DNAME record to results. Technically a good resolver should
+            # do DNAME->CNAME synthesis itself here, but we rely on the fact
+            # that almost all authorities provide the CNAMEs themselves.
             query.answer_rrset.append(rrset)
             if addResults:
                 addResults.full_answer_rrset.append(rrset)
@@ -461,10 +451,10 @@ def process_answer(response, query, addResults=None):
             stats.cnt_cname += 1
             if stats.cnt_cname >= MAX_CNAME:
                 print("ERROR: Too many (%d) CNAME indirections." % MAX_CNAME)
-                return None
+                return
 
     if gotCNAME:
-        # We query the last CNAME in the answer chain, making the assumption
+        # Query the last CNAME in the answer chain, making the assumption
         # that authority servers return CNAME chains in an ordered fashion.
         # Practically all of them do. But technically there is no intrinsic
         # RRset ordering requirement in the spec, so we should really fix this
@@ -476,19 +466,21 @@ def process_answer(response, query, addResults=None):
         resolve_name(cname_query, cache.closest_zone(cname),
                      inPath=False, addResults=addResults)
 
-    return answer
+    return
 
 
 def process_response(response, query, addResults=None):
 
     """process a DNS response. Returns rcode, answer message, zone referral"""
 
-    rc = None; ans = None; referral = None
+    rc = None
+    ans = None
+    referral = None
+
     if not response:
-        return (rc, ans, z)
+        return (rc, ans, referral)
     rc = response.rcode()
     query.rcode = rc
-    aa = (response.flags & dns.flags.AA == dns.flags.AA)
     if rc == dns.rcode.NOERROR:
         if is_referral(response):
             referral = process_referral(response, query)
@@ -497,12 +489,12 @@ def process_response(response, query, addResults=None):
             else:
                 print("ERROR: processing referral")
         else:                                            # Answer
-                ans = process_answer(response, query, addResults=addResults)
+            process_answer(response, query, addResults=addResults)
     elif rc == dns.rcode.NXDOMAIN:                       # NXDOMAIN
         if not query.quiet:
             print("ERROR: NXDOMAIN: %s not found" % query.qname)
 
-    return (rc, ans, referral)
+    return (rc, referral)
 
 
 def send_query_tcp(msg, nsaddr, query, timeout=TIMEOUT):
@@ -512,7 +504,6 @@ def send_query_tcp(msg, nsaddr, query, timeout=TIMEOUT):
         res = dns.query.tcp(msg, nsaddr.addr, timeout=timeout)
     except dns.exception.Timeout:
         print("WARN: TCP query timeout for {}".format(nsaddr.addr))
-        pass
     return res
 
 
@@ -520,7 +511,7 @@ def send_query_udp(msg, nsaddr, query, timeout=TIMEOUT, retries=RETRIES):
     gotresponse = False
     res = None
     stats.update_query(is_nsQuery=query.is_nsquery)
-    while (not gotresponse and (retries > 0)):
+    while (not gotresponse) and (retries > 0):
         retries -= 1
         try:
             t0 = time.time()
@@ -533,11 +524,16 @@ def send_query_udp(msg, nsaddr, query, timeout=TIMEOUT, retries=RETRIES):
     return res
 
 
-def send_query(msg, nsaddr, query, timeout=TIMEOUT, retries=RETRIES, newid=False):
+def send_query(msg, nsaddr, query, timeout=TIMEOUT, retries=RETRIES,
+               newid=False):
     res = None
     if newid:
-        msg.id = random.randint(1,65535)
-    res = send_query_udp(msg, nsaddr, query)
+        msg.id = random.randint(1, 65535)
+
+    if Prefs.TCPONLY:
+        return send_query_tcp(msg, nsaddr, query, timeout=timeout)
+
+    res = send_query_udp(msg, nsaddr, query, timeout=timeout, retries=retries)
     if res and is_truncated(res):
         print("WARN: response was truncated; retrying with TCP ..")
         stats.cnt_tcp_fallback += 1
@@ -554,7 +550,7 @@ def make_query(qname, qtype, qclass):
 
 def send_query_zone(query, zone, is_nsQuery=False):
     """send DNS query to nameservers of given zone"""
-    global Prefs
+
     response = None
 
     if Prefs.DEBUG or (Prefs.VERBOSE and not query.quiet):
@@ -563,8 +559,8 @@ def send_query_zone(query, zone, is_nsQuery=False):
 
     msg = make_query(query.qname, query.qtype, query.qclass)
 
-    nsaddr_list = zone.iplist_sorted_by_rtt();
-    if len(nsaddr_list) == 0:
+    nsaddr_list = zone.iplist_sorted_by_rtt()
+    if not nsaddr_list:
         print("ERROR: No nameserver addresses found for zone: %s." % zone.name)
         return None
 
@@ -591,7 +587,6 @@ def resolve_name(query, zone, inPath=True, addResults=None):
     """resolve a DNS query. addResults is an optional Query object to
     which the answer results are to be added."""
 
-    global Prefs
     curr_zone = zone
     repeatZone = False
 
@@ -612,7 +607,7 @@ def resolve_name(query, zone, inPath=True, addResults=None):
         if not response:
             return
 
-        rc, ans, referral = process_response(response, query, addResults=addResults)
+        rc, referral = process_response(response, query, addResults=addResults)
 
         if rc == dns.rcode.NXDOMAIN:
             # for broken servers that give NXDOMAIN for empty non-terminals
@@ -645,7 +640,6 @@ def resolve_name(query, zone, inPath=True, addResults=None):
 def do_batchmode(infile, cmdline):
     """Execute batch mode on input file supplied to -b"""
 
-    global Prefs
     print("### resolve.py: Batch Mode file: %s" % Prefs.BATCHFILE)
     print("### command: %s" % ' '.join(cmdline))
     linenum = 0
@@ -693,14 +687,11 @@ def exit_status(query):
 
     if rcode == 0 and got_answer:
         return 0
-    else:
-        return 1
+    return 1
 
 
 def process_args(arguments):
     """Process all command line arguments"""
-
-    global Prefs
 
     try:
         (options, args) = getopt.getopt(arguments, 'dmtvsnxb:')
