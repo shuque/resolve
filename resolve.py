@@ -416,6 +416,8 @@ def process_answer(response, query, addResults=None):
 
     """Process answer section, chasing aliases when needed"""
 
+    cname_dict = {}              # dict of alias -> target
+
     # If minimizing, ignore answers for intermediate query names.
     if query.qname != query.orig_qname:
         return
@@ -425,8 +427,6 @@ def process_answer(response, query, addResults=None):
             print("ERROR: NODATA: %s of type %s not found" % \
                   (query.qname, query.qtype))
         return
-
-    gotCNAME = False
 
     for rrset in response.answer:
         if rrset.rdtype == dns.rdatatype.from_text(query.qtype) and \
@@ -445,26 +445,28 @@ def process_answer(response, query, addResults=None):
             if Prefs.VERBOSE:
                 print(rrset.to_text())
         elif rrset.rdtype == dns.rdatatype.CNAME:
-            gotCNAME = True
             query.answer_rrset.append(rrset)
             if addResults:
                 addResults.full_answer_rrset.append(rrset)
             if Prefs.VERBOSE:
                 print(rrset.to_text())
             cname = rrset[0].target
+            cname_dict[rrset.name] = rrset[0].target
             stats.cnt_cname += 1
             if stats.cnt_cname >= MAX_CNAME:
                 print("ERROR: Too many (%d) CNAME indirections." % MAX_CNAME)
                 return
 
-    if gotCNAME:
-        # Query the last CNAME in the answer chain, making the assumption
-        # that authority servers return CNAME chains in an ordered fashion.
-        # Practically all of them do. But technically there is no intrinsic
-        # RRset ordering requirement in the spec, so we should really fix this
-        # code (TODO).
-        dprint("CNAME found, resolving canonical name %s" % cname)
-        cname_query = Query(cname, query.qtype, query.qclass, Prefs.MINIMIZE)
+    if cname_dict:
+        final_alias = response.question[0].name
+        while True:
+            if final_alias in cname_dict:
+                final_alias = cname_dict[final_alias]
+            else:
+                break
+        dprint("CNAME found, resolving canonical name %s" % final_alias)
+        cname_query = Query(final_alias, query.qtype, query.qclass,
+                            Prefs.MINIMIZE)
         if addResults:
             addResults.cname_chain.append(cname_query)
         resolve_name(cname_query, cache.closest_zone(cname),
