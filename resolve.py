@@ -23,8 +23,6 @@ RETRY      = 1                            # of full list (not implemented yet)
 MAX_CNAME  = 10                           # Max #CNAME indirections
 MAX_QUERY  = 300                          # Max number of queries
 MAX_DELEG  = 26                           # Max number of delegations
-UDPSIZE    = 1460                         # UDP payload size advertisement
-WANT_DNSSEC = False
 
 
 # root server names and addresses
@@ -70,6 +68,8 @@ class Prefs:
     VIOLATE    = False                    # -x: ENT nxdomain workaround
     STATS      = False                    # -s: Print statistics
     NSRESOLVE  = False                    # -n: Resolve all NS addresses
+    PAYLOAD    = 1460                     # -e: no EDNS; set to None
+    WANT_DNSSEC = False                   # DNSSEC not implmented yet
     BATCHFILE  = None                     # -b: batch file mode
 
 
@@ -172,11 +172,12 @@ def usage():
      -s: print summary statistics
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
+     -e: don't use EDNS0 (default is EDNS0 with payload={2})
      -b <batchfile>: batch file mode
 
 When using -b, <batchfile> contains one (space separated) query name, type, 
 class per line.
-    """.format(PROGNAME, VERSION))
+    """.format(PROGNAME, VERSION, Prefs.PAYLOAD))
     sys.exit(1)
 
 
@@ -548,7 +549,8 @@ def send_query(msg, nsaddr, query, timeout=TIMEOUT, retries=RETRIES,
 
 def make_query(qname, qtype, qclass):
     msg = dns.message.make_query(qname, qtype, rdclass=qclass,
-                                 want_dnssec=WANT_DNSSEC, payload=UDPSIZE)
+                                 want_dnssec=Prefs.WANT_DNSSEC,
+                                 payload=Prefs.PAYLOAD)
     msg.flags &= ~dns.flags.RD  # set RD=0
     return msg
 
@@ -694,7 +696,7 @@ def process_args(arguments):
     """Process all command line arguments"""
 
     try:
-        (options, args) = getopt.getopt(arguments, 'dmtvsnxb:')
+        (options, args) = getopt.getopt(arguments, 'dmtvsnxeb:')
     except getopt.GetoptError:
         usage()
 
@@ -713,6 +715,8 @@ def process_args(arguments):
             Prefs.NSRESOLVE = True
         elif opt == "-x":
             Prefs.VIOLATE = True
+        elif opt == "-e":
+            Prefs.PAYLOAD = None
         elif opt == "-b":
             Prefs.BATCHFILE = optval
 

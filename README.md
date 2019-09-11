@@ -26,6 +26,7 @@ Usage: resolve.py [-dmtsnx] <qname> [<qtype>] [<qclass>]
      -s: print summary statistics
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
+     -e: don't use EDNS0 (default is EDNS0 with payload=1460)
      -b <batchfile>: batch file mode
 
 When using -b, <batchfile> contains one (space separated) query name, type,
