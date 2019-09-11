@@ -86,11 +86,11 @@ class Stats:
         self.cnt_deleg        = 0
         self.delegation_depth = 0
 
-    def update_query(self, is_nsQuery=False, tcp=False):
+    def update_query(self, query, tcp=False):
         """update query counts"""
         if tcp:
             self.cnt_tcp += 1
-        if is_nsQuery:
+        if query.is_nsquery:
             self.cnt_query2 += 1
         else:
             self.cnt_query1 += 1
@@ -99,7 +99,8 @@ class Stats:
         """Print statistics"""
         print('\n### Statistics:')
         cnt_query_total = self.cnt_query1 + self.cnt_query2
-        print("Qname Delegation depth: %d" % self.delegation_depth)
+        if not Prefs.BATCHFILE:
+            print("Qname Delegation depth: %d" % self.delegation_depth)
         print("Number of delegations traversed: %d" % self.cnt_deleg)
         print("Number of queries performed (regular): %d" % self.cnt_query1)
         print("Number of queries performed:(nsaddr)   %d" % self.cnt_query2)
@@ -503,7 +504,7 @@ def process_response(response, query, addResults=None):
 
 def send_query_tcp(msg, nsaddr, query, timeout=TIMEOUT):
     res = None
-    stats.update_query(is_nsQuery=query.is_nsquery, tcp=True)
+    stats.update_query(query, tcp=True)
     try:
         res = dns.query.tcp(msg, nsaddr.addr, timeout=timeout)
     except dns.exception.Timeout:
@@ -514,7 +515,7 @@ def send_query_tcp(msg, nsaddr, query, timeout=TIMEOUT):
 def send_query_udp(msg, nsaddr, query, timeout=TIMEOUT, retries=RETRIES):
     gotresponse = False
     res = None
-    stats.update_query(is_nsQuery=query.is_nsquery)
+    stats.update_query(query)
     while (not gotresponse) and (retries > 0):
         retries -= 1
         try:
@@ -552,7 +553,7 @@ def make_query(qname, qtype, qclass):
     return msg
 
 
-def send_query_zone(query, zone, is_nsQuery=False):
+def send_query_zone(query, zone):
     """send DNS query to nameservers of given zone"""
 
     response = None
@@ -660,7 +661,6 @@ def do_batchmode(infile, cmdline):
             print("\nERROR input line %d: %s" % (linenum, line))
             continue
 
-        stats = Stats()
         print("\n### INPUT: %s, %s, %s" % (qname, qtype, qclass))
         query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
         starting_zone = cache.closest_zone(query.qname)
@@ -748,6 +748,8 @@ if __name__ == '__main__':
 
     if Prefs.BATCHFILE:
         do_batchmode(infile=Prefs.BATCHFILE, cmdline=sys.argv)
+        if Prefs.STATS:
+            stats.print_stats()
         sys.exit(0)
     else:
         query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
