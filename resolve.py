@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 resolve.py
@@ -15,7 +15,7 @@ import dns.message, dns.query, dns.rdatatype, dns.rcode, dns.dnssec
 
 
 PROGNAME   = os.path.basename(sys.argv[0])
-VERSION    = "0.14"
+VERSION    = "0.15"
 
 TIMEOUT    = 3                            # Query timeout in seconds
 RETRIES    = 2                            # Number of retries per server
@@ -69,7 +69,7 @@ class Prefs:
     STATS      = False                    # -s: Print statistics
     NSRESOLVE  = False                    # -n: Resolve all NS addresses
     PAYLOAD    = 1460                     # -e: no EDNS; set to None
-    WANT_DNSSEC = False                   # DNSSEC not implmented yet
+    DNSSEC_OK  = False                    # -z: set DO=1 EDNS flag
     BATCHFILE  = None                     # -b: batch file mode
 
 
@@ -158,12 +158,14 @@ class Cache:
             print("%s %s" % (nsname, ipstring_list))
 
 
-def usage():
+def usage(msg=None):
+    if msg:
+        print(msg)
     print("""
 {0} version {1}
 
-    Usage: {0} [-dmtvsnx] <qname> [<qtype>] [<qclass>]
-           {0} [-dmtvsnx] -b <batchfile>
+    Usage: {0} [-dmtvsnxez] <qname> [<qtype>] [<qclass>]
+           {0} [-dmtvsnxez] -b <batchfile>
 
      -d: print debugging output
      -m: do qname minimization
@@ -173,6 +175,7 @@ def usage():
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
      -e: don't use EDNS0 (default is EDNS0 with payload={2})
+     -z: set DNSSEC_OK flag (default is do not)
      -b <batchfile>: batch file mode
 
 When using -b, <batchfile> contains one (space separated) query name, type, 
@@ -549,7 +552,7 @@ def send_query(msg, nsaddr, query, timeout=TIMEOUT, retries=RETRIES,
 
 def make_query(qname, qtype, qclass):
     msg = dns.message.make_query(qname, qtype, rdclass=qclass,
-                                 want_dnssec=Prefs.WANT_DNSSEC,
+                                 want_dnssec=Prefs.DNSSEC_OK,
                                  payload=Prefs.PAYLOAD)
     msg.flags &= ~dns.flags.RD  # set RD=0
     return msg
@@ -696,7 +699,7 @@ def process_args(arguments):
     """Process all command line arguments"""
 
     try:
-        (options, args) = getopt.getopt(arguments, 'dmtvsnxeb:')
+        (options, args) = getopt.getopt(arguments, 'dmtvsnxezb:')
     except getopt.GetoptError:
         usage()
 
@@ -717,8 +720,13 @@ def process_args(arguments):
             Prefs.VIOLATE = True
         elif opt == "-e":
             Prefs.PAYLOAD = None
+        elif opt == "-z":
+            Prefs.DNSSEC_OK = True
         elif opt == "-b":
             Prefs.BATCHFILE = optval
+
+    if (Prefs.PAYLOAD is None) and Prefs.DNSSEC_OK:
+        usage("Error: -e and -z are mutually incompatible.")
 
     if Prefs.BATCHFILE:
         if not args:

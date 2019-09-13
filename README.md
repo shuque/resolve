@@ -14,10 +14,10 @@ Pre-requisites:
 - [dnspython module](http://www.dnspython.org/) (included with most Linux/*BSD distributions)
 
 ```
-resolve.py version 0.14
+resolve.py version 0.15
 
-Usage: resolve.py [-dmtsnx] <qname> [<qtype>] [<qclass>]
-       resolve.py [-dmtsnx] -b <batchfile>
+Usage: resolve.py [-dmtsnxez] <qname> [<qtype>] [<qclass>]
+       resolve.py [-dmtsnxez] -b <batchfile>
 
      -d: print debugging output
      -m: do qname minimization
@@ -27,6 +27,7 @@ Usage: resolve.py [-dmtsnx] <qname> [<qtype>] [<qclass>]
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
      -e: don't use EDNS0 (default is EDNS0 with payload=1460)
+     -z: set DNSSEC_OK flag (default is do not)
      -b <batchfile>: batch file mode
 
 When using -b, <batchfile> contains one (space separated) query name, type,
