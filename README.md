@@ -166,8 +166,7 @@ some intermediate qnames with REFUSED.
 
 This behavior of the Akamai and Cloudflare DNS servers was observed 
 in January 2015. Further details can be found in a
-[presentation I did on this topic at the summer 2015 DNS-OARC workshop]
-(https://indico.dns-oarc.net/event/21/contributions/298/attachments/267/487/qname-min.pdf). Cloudflare has already fixed their DNS implementation (April 2015).
+[presentation I did on this topic at the summer 2015 DNS-OARC workshop](https://indico.dns-oarc.net/event/21/contributions/298/attachments/267/487/qname-min.pdf). Cloudflare has already fixed their DNS implementation (April 2015).
 Akamai has partially done so.
 
 The examples below used an older version of the program that shows
