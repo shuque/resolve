@@ -10,7 +10,7 @@ then a  default type of 'A' (IPv4 address record), and a default class
 of 'IN' (Internet class) are used.
 
 Pre-requisites:  
-- Python 2.7 or later, or Python 3
+- Python 3
 - [dnspython module](http://www.dnspython.org/) (included with most Linux/*BSD distributions)
 
 ```
@@ -35,17 +35,53 @@ class per line.
 ```
 
 This program implements the normal iterative DNS resolution algorithm 
-described in the DNS protocol specifications. Here's an example
-invocation with the -v (verbose) switch to lookup the IPv6 address
-of the server www.seas.upenn.edu:
+described in the DNS protocol specifications.
+
+Here's a basic lookup of the IPv6 address of www.seas.upenn.edu:
 
 ```
-$ ./resolve.py -v www.seas.upenn.edu. AAAA
+$ resolve.py www.seas.upenn.edu. AAAA
+www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
+```
+
+Here's the same lookup with the -v (verbose) switch to show the iterative
+resolution path taken through the DNS hierarchy:
+
+```
+$ resolve.py -v www.seas.upenn.edu. AAAA
+
 >> Query: www.seas.upenn.edu. AAAA IN at zone .
+>>   Send to zone . at address 198.41.0.4
 >>        [Got Referral to zone: edu.]
+ZONE: edu.
+edu. b.edu-servers.net. ['192.33.14.30', '2001:503:231d::2:30']
+edu. f.edu-servers.net. ['192.35.51.30', '2001:503:d414::30']
+edu. i.edu-servers.net. ['192.43.172.30', '2001:503:39c1::30']
+edu. a.edu-servers.net. ['192.5.6.30', '2001:503:a83e::2:30']
+edu. g.edu-servers.net. ['192.42.93.30', '2001:503:eea3::30']
+edu. j.edu-servers.net. ['192.48.79.30', '2001:502:7094::30']
+edu. k.edu-servers.net. ['192.52.178.30', '2001:503:d2d::30']
+edu. m.edu-servers.net. ['192.55.83.30', '2001:501:b1f9::30']
+edu. l.edu-servers.net. ['192.41.162.30', '2001:500:d937::30']
+edu. h.edu-servers.net. ['192.54.112.30', '2001:502:8cc::30']
+edu. c.edu-servers.net. ['192.26.92.30', '2001:503:83eb::30']
+edu. e.edu-servers.net. ['192.12.94.30', '2001:502:1ca1::30']
+edu. d.edu-servers.net. ['192.31.80.30', '2001:500:856e::30']
+
 >> Query: www.seas.upenn.edu. AAAA IN at zone edu.
+>>   Send to zone edu. at address 192.33.14.30
 >>        [Got Referral to zone: upenn.edu.]
+ZONE: upenn.edu.
+upenn.edu. dns1.udel.edu. ['128.175.13.16']
+upenn.edu. dns2.udel.edu. ['128.175.13.17']
+upenn.edu. sns-pb.isc.org. []
+upenn.edu. adns2.upenn.edu. ['128.91.254.22', '2607:f470:1002::2:3']
+upenn.edu. adns1.upenn.edu. ['128.91.3.128', '2607:f470:1001::1:a']
+upenn.edu. adns3.upenn.edu. ['128.91.251.33', '2607:f470:1003::3:c']
+
 >> Query: www.seas.upenn.edu. AAAA IN at zone upenn.edu.
+>>   Send to zone upenn.edu. at address 128.175.13.16
+
 www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
 ```
 
@@ -68,26 +104,55 @@ When invoked with the -m switch, this program uses a **query name
 minimization** algorithm that exposes only the needed query labels to 
 authoritative servers as it traverses the DNS delegation hierarchy down 
 to the target DNS zone. This is a more *privacy preserving* mode of DNS 
-resolution, and efforts are underway to standardize this mode in the 
-official DNS protocol specifications. There are a number of different 
-ways a query name minimization algorithm could be implemented. I chose 
-to implement the simplest one that starts with one non-root label at 
-the root DNS servers, and successively prepends additional labels as 
-it follows referrals and descends zones.
+resolution, that is specified in
+[RFC 7816](https://tools.ietf.org/html/rfc7816). The program deviates
+slightly from that specification, in that it makes no attempt to hide
+the query-type (e.g. by issuing NS record queries until it reaches the
+target zone). Experience in the field has shown that there are many
+nameservers that unfortunately don't respond to NS queries.
 
 Here's an example run with qname minimization (-m) and the verbose (-v)
-option, to resolve the amazon.com website:
+option:
 
 ```
-$ ./resolve.py -vm www.amazon.com
->> Query: com. A IN at zone .
->>        [Got Referral to zone: com.]
->> Query: amazon.com. A IN at zone com.
->>        [Got Referral to zone: amazon.com.]
->> Query: www.amazon.com. A IN at zone amazon.com.
->>        [Got Referral to zone: www.amazon.com.]
->> Query: www.amazon.com. A IN at zone www.amazon.com.
-www.amazon.com. 60 IN A 176.32.98.166
+$ resolve.py -vm www.seas.upenn.edu. A
+
+>> Query: edu. A IN at zone .
+>>   Send to zone . at address 198.41.0.4
+>>        [Got Referral to zone: edu.]
+ZONE: edu.
+edu. b.edu-servers.net. ['192.33.14.30', '2001:503:231d::2:30']
+edu. f.edu-servers.net. ['192.35.51.30', '2001:503:d414::30']
+edu. i.edu-servers.net. ['192.43.172.30', '2001:503:39c1::30']
+edu. a.edu-servers.net. ['192.5.6.30', '2001:503:a83e::2:30']
+edu. g.edu-servers.net. ['192.42.93.30', '2001:503:eea3::30']
+edu. j.edu-servers.net. ['192.48.79.30', '2001:502:7094::30']
+edu. k.edu-servers.net. ['192.52.178.30', '2001:503:d2d::30']
+edu. m.edu-servers.net. ['192.55.83.30', '2001:501:b1f9::30']
+edu. l.edu-servers.net. ['192.41.162.30', '2001:500:d937::30']
+edu. h.edu-servers.net. ['192.54.112.30', '2001:502:8cc::30']
+edu. c.edu-servers.net. ['192.26.92.30', '2001:503:83eb::30']
+edu. e.edu-servers.net. ['192.12.94.30', '2001:502:1ca1::30']
+edu. d.edu-servers.net. ['192.31.80.30', '2001:500:856e::30']
+
+>> Query: upenn.edu. A IN at zone edu.
+>>   Send to zone edu. at address 192.33.14.30
+>>        [Got Referral to zone: upenn.edu.]
+ZONE: upenn.edu.
+upenn.edu. dns1.udel.edu. ['128.175.13.16']
+upenn.edu. dns2.udel.edu. ['128.175.13.17']
+upenn.edu. sns-pb.isc.org. []
+upenn.edu. adns2.upenn.edu. ['128.91.254.22', '2607:f470:1002::2:3']
+upenn.edu. adns1.upenn.edu. ['128.91.3.128', '2607:f470:1001::1:a']
+upenn.edu. adns3.upenn.edu. ['128.91.251.33', '2607:f470:1003::3:c']
+
+>> Query: seas.upenn.edu. A IN at zone upenn.edu.
+>>   Send to zone upenn.edu. at address 128.175.13.16
+
+>> Query: www.seas.upenn.edu. A IN at zone upenn.edu.
+>>   Send to zone upenn.edu. at address 128.175.13.16
+
+www.seas.upenn.edu. 600 IN A 158.130.68.91
 ```
 
 Some Content Delivery Networks (CDN) like Akamai and Cloudflare have 
@@ -100,10 +165,16 @@ responses. The Cloudflare servers additionally appear to respond to
 some intermediate qnames with REFUSED.
 
 This behavior of the Akamai and Cloudflare DNS servers was observed 
-in January 2015. Hopefully they will get fixed before qname minimization 
-is widely deployed.
+in January 2015. Further details can be found in a
+[presentation I did on this topic at the summer 2015 DNS-OARC workshop]
+(https://indico.dns-oarc.net/event/21/contributions/298/attachments/267/487/qname-min.pdf). Cloudflare has already fixed their DNS implementation (April 2015).
+Akamai has partially done so.
 
-An example resolution of www.upenn.edu (on Akamai):
+The examples below used an older version of the program that shows
+a bit less information (namely, it doesn't show the server IP address
+queried or associated referral data).
+
+Attempted resolution of www.upenn.edu (on Akamai, January 2015):
 
 ```
 $ ./resolve.py -vm www.upenn.edu. A
@@ -155,8 +226,8 @@ a1165.dscg.akamai.net. 20 IN A 23.62.6.59
 a1165.dscg.akamai.net. 20 IN A 23.62.6.81
 ```
 
-Resolving www.ietf.org (on Cloudflare) with the NXDOMAIN workaround
-shows the following:
+Resolving www.ietf.org (on Cloudflare, January 2015) with the NXDOMAIN
+workaround shows the following:
 
 In this case, the first empty non-terminal, cdn.cloudflare.net returns
 NXDOMAIN, the next one, org.cdn.cloudflare.net returns REFUSED, the
