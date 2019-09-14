@@ -578,7 +578,8 @@ def send_query_zone(query, zone):
         if stats.cnt_query1 + stats.cnt_query2 >= MAX_QUERY:
             print("ERROR: Max number of queries (%d) exceeded." % MAX_QUERY)
             return None
-        dprint("Querying zone %s at address %s" % (zone.name, nsaddr.addr))
+        if Prefs.DEBUG or (Prefs.VERBOSE and not query.quiet):
+            print(">>   Send to zone %s at address %s" % (zone.name, nsaddr.addr))
         response = send_query(msg, nsaddr, query, newid=True)
         if response:
             rc = response.rcode()
