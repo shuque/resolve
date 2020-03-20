@@ -22,7 +22,7 @@ RETRIES    = 2                            # Number of retries per server
 RETRY      = 1                            # of full list (not implemented yet)
 MAX_CNAME  = 10                           # Max #CNAME indirections
 MAX_QUERY  = 300                          # Max number of queries
-MAX_DELEG  = 26                           # Max number of delegations
+MAX_DELEG  = 75                           # Max number of delegations
 
 
 # root server names and addresses
