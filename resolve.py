@@ -209,6 +209,7 @@ class Query:
         self.quiet = False                # don't print query being issued
         self.rcode = None
         self.got_answer = False
+        self.elapsed_last = None
         self.cname_chain = []
         self.answer_rrset = []
         self.full_answer_rrset = []
@@ -403,7 +404,8 @@ def process_referral(message, query):
 
     zonename = rrset.name
     if Prefs.DEBUG or (Prefs.VERBOSE and not query.quiet):
-        print(">>        [Got Referral to zone: %s]" % zonename)
+        print(">>        [Got Referral to zone: %s in %.3f s]" % \
+              (zonename, query.elapsed_last))
 
     zone = cache.get_zone(zonename)
     if zone is None:
@@ -428,6 +430,9 @@ def process_answer(response, query, addResults=None):
     # If minimizing, ignore answers for intermediate query names.
     if query.qname != query.orig_qname:
         return
+
+    if Prefs.DEBUG or (Prefs.VERBOSE and not query.quiet):
+        print(">>        [Got answer in  %.3f s]" % query.elapsed_last)
 
     if not response.answer:
         if not query.quiet:
@@ -576,6 +581,7 @@ def send_query_zone(query, zone):
         print("ERROR: No nameserver addresses found for zone: %s." % zone.name)
         return None
 
+    time_start = time.time()
     for nsaddr in nsaddr_list:
         if stats.cnt_query1 + stats.cnt_query2 >= MAX_QUERY:
             print("ERROR: Max number of queries (%d) exceeded." % MAX_QUERY)
@@ -593,6 +599,7 @@ def send_query_zone(query, zone):
     else:
         print("ERROR: Queries to all servers for zone %s failed." % zone.name)
 
+    query.elapsed_last = time.time() - time_start
     return response
 
 
@@ -775,7 +782,7 @@ if __name__ == '__main__':
         resolve_name(query, RootZone, addResults=query)
         stats.elapsed = time.time() - time_start
 
-        if Prefs.VERBOSE:
+        if Prefs.DEBUG or (Prefs.VERBOSE and not query.quiet):
             print('')
         query.print_full_answer()
 
