@@ -77,6 +77,7 @@ class Stats:
     """Statistics counters"""
 
     def __init__(self):
+        self.elapsed          = 0
         self.cnt_cname        = 0
         self.cnt_query1       = 0                  # regular queries
         self.cnt_query2       = 0                  # NS address queries
@@ -98,6 +99,7 @@ class Stats:
     def print_stats(self):
         """Print statistics"""
         print('\n### Statistics:')
+        print("Elapsed time: {:.3f} sec".format(self.elapsed))
         cnt_query_total = self.cnt_query1 + self.cnt_query2
         if not Prefs.BATCHFILE:
             print("Qname Delegation depth: %d" % self.delegation_depth)
@@ -760,13 +762,19 @@ if __name__ == '__main__':
     stats = Stats()
 
     if Prefs.BATCHFILE:
+        time_start = time.time()
         do_batchmode(infile=Prefs.BATCHFILE, cmdline=sys.argv)
+        stats.elapsed = time.time() - time_start
         if Prefs.STATS:
             stats.print_stats()
         sys.exit(0)
     else:
         query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
+
+        time_start = time.time()
         resolve_name(query, RootZone, addResults=query)
+        stats.elapsed = time.time() - time_start
+
         if Prefs.VERBOSE:
             print('')
         query.print_full_answer()
