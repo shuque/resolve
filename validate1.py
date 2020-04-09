@@ -32,6 +32,19 @@ HASHFUNC = {
 }
 
 
+class DNSKEYinfo:
+
+    def __init__(self, rrname, rr):
+        self.name = rrname
+        self.flags = rr.flags
+        self.algorithm = rr.algorithm
+        self.keytag = dns.dnssec.key_id(rr)
+        if self.algorithm in [5, 7, 8, 10]:
+            self.key = keydata_to_rsa(rr.key)
+        elif self.algorithm in [13, 14]:
+            self.key = keydata_to_ecc(self.algorithm, rr.key)
+
+
 def get_resolver(dnssec_ok=False, timeout=5):
     """return an appropriately configured Resolver object"""
     r = dns.resolver.Resolver()
@@ -88,21 +101,13 @@ def get_rrset(resolver, qname, qtype):
 
 def load_keys(rrset):
     """
-    return list of DNSKEY parameters from the given DNSKEY RRset:
-    (name, keytag, algorithm, key object)
+    return list of DNSKEYinfo class objects from the given DNSKEY RRset
+    parameters (name, keytag, algorithm, key object)
     """
 
     result = []
     for rr in rrset:
-        keytag = dns.dnssec.key_id(rr)
-        if rr.algorithm in [5, 7, 8, 10]:
-            key = keydata_to_rsa(rr.key)
-        elif rr.algorithm in [13, 14]:
-            key = keydata_to_ecc(rr.algorithm, rr.key)
-        else:
-            print("Can't decode key of algorithm {} yet.".format(rr.algorithm))
-            continue
-        result.append((rrset.name, rr.flags, keytag, rr.algorithm, key))
+        result.append(DNSKEYinfo(rrset.name, rr))
     return result
 
     
@@ -151,7 +156,13 @@ def validate(rrset, rrsigs, dnskey_list):
 
     for h, signature in get_sig_hashes(rrset, rrsigs):
 
-        for keyname, flags, keytag, algo, key in DNSSEC_KEYS:
+        for keyinfo in DNSSEC_KEYS:
+            keyname = keyinfo.name
+            flags = keyinfo.flags
+            keytag = keyinfo.keytag
+            algo = keyinfo.algorithm
+            key = keyinfo.key
+
             if isinstance(key, RSA.RsaKey):
                 verifier = pkcs1_15.new(key)
                 try:
@@ -186,8 +197,9 @@ if __name__ == '__main__':
 
     dnskey_rrset, _ = get_rrset(r, qname, dns.rdatatype.from_text('DNSKEY'))
     DNSSEC_KEYS = load_keys(dnskey_rrset)
-    for name, flags, keytag, algo, _ in DNSSEC_KEYS:
-        print("DNSKEY: {} {} {} {}".format(name, flags, keytag, algo))
+    for keyinfo in DNSSEC_KEYS:
+        print("DNSKEY: {} {} {} {}".format(
+            keyinfo.name, keyinfo.flags, keyinfo.keytag, keyinfo.algorithm))
 
     valid, valid_info = validate(soa_rrset, soa_rrsigs, DNSSEC_KEYS)
 
