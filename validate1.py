@@ -87,12 +87,14 @@ def get_rrset(resolver, qname, qtype):
 
 
 def load_keys(rrset):
-    """return list of DNSKEY parameters from the given DNSKEY RRset"""
+    """
+    return list of DNSKEY parameters from the given DNSKEY RRset:
+    (name, keytag, algorithm, key object)
+    """
 
     result = []
     for rr in rrset:
         keytag = dns.dnssec.key_id(rr)
-        print(rrset.name, rr.flags, keytag, rr.algorithm)
         if rr.algorithm in [5, 7, 8, 10]:
             key = keydata_to_rsa(rr.key)
         elif rr.algorithm in [13, 14]:
@@ -100,7 +102,7 @@ def load_keys(rrset):
         else:
             print("Can't decode key of algorithm {} yet.".format(rr.algorithm))
             continue
-        result.append((rrset.name, keytag, key))
+        result.append((rrset.name, rr.flags, keytag, rr.algorithm, key))
     return result
 
     
@@ -136,41 +138,66 @@ def get_sig_hashes(rrset, rrsigs):
         yield h, signature
 
 
-qname = dns.name.from_text(sys.argv[1])
-qtype = dns.rdatatype.from_text('SOA')
+def validate(rrset, rrsigs, dnskey_list):
+    """
+    validate given rrset signatures in 'rrsigs' against the list
+    of dnskey parameters.
+    Returns Verify result + list of verification data.
+    """
 
-r = get_resolver(dnssec_ok=True)
-soa_rrset, soa_rrsigs = get_rrset(r, qname, qtype)
-print(soa_rrset)
-dnskey_rrset, _ = get_rrset(r, qname, dns.rdatatype.from_text('DNSKEY'))
-DNSSEC_KEYS = load_keys(dnskey_rrset)
+    Verified = False
 
-Verified = False
+    verified_list = []                # list of (keytag, algo)
 
-for h, signature in get_sig_hashes(soa_rrset, soa_rrsigs):
+    for h, signature in get_sig_hashes(rrset, rrsigs):
 
-    for keyname, keytag, key in DNSSEC_KEYS:
-        if isinstance(key, RSA.RsaKey):
-            verifier = pkcs1_15.new(key)
-            try:
-                verifier.verify(h, signature)
-            except ValueError:
-                pass
-            else:
-                Verified = True
-                print("OK: RSA Signature, with keytag {}".format(keytag))
-        elif isinstance(key, ECC.EccKey):
-            verifier = DSS.new(key, 'fips-186-3')
-            try:
-                verifier.verify(h, signature)
-            except ValueError:
-                pass
-            else:
-                Verified = True
-                print("OK: ECC Signature, with keytag {}".format(keytag))
+        for keyname, flags, keytag, algo, key in DNSSEC_KEYS:
+            if isinstance(key, RSA.RsaKey):
+                verifier = pkcs1_15.new(key)
+                try:
+                    verifier.verify(h, signature)
+                except ValueError:
+                    pass
+                else:
+                    Verified = True
+                    verified_list.append((keytag, algo))
+            elif isinstance(key, ECC.EccKey):
+                verifier = DSS.new(key, 'fips-186-3')
+                try:
+                    verifier.verify(h, signature)
+                except ValueError:
+                    pass
+                else:
+                    Verified = True
+                    verified_list.append((keytag, algo))
 
-if Verified:
-    print("OK: Signature Verified")
-else:
-    print("FAIL: No Signature Verified with any DNSKEY")
+    return Verified, verified_list
+
+
+if __name__ == '__main__':
+
+
+    qname = dns.name.from_text(sys.argv[1])
+    qtype = dns.rdatatype.from_text('SOA')
+
+    r = get_resolver(dnssec_ok=True)
+    soa_rrset, soa_rrsigs = get_rrset(r, qname, qtype)
+    print(soa_rrset)
+
+    dnskey_rrset, _ = get_rrset(r, qname, dns.rdatatype.from_text('DNSKEY'))
+    DNSSEC_KEYS = load_keys(dnskey_rrset)
+    for name, flags, keytag, algo, _ in DNSSEC_KEYS:
+        print("DNSKEY: {} {} {} {}".format(name, flags, keytag, algo))
+
+    valid, valid_info = validate(soa_rrset, soa_rrsigs, DNSSEC_KEYS)
+
+    if valid:
+        print("OK: Signature Verified")
+        for keytag, algo in valid_info:
+            print("     Good signature with keytag={} algo={}".format(
+                keytag, algo))
+        sys.exit(0)
+    else:
+        print("FAIL: No Signature Verified with any DNSKEY")
+        sys.exit(1)
 
