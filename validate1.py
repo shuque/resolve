@@ -79,17 +79,10 @@ def get_rrset(resolver, qname, qtype):
     """
     Query name and type; return answer RRset and signature RRset.
     """
-
     msg = resolver.query(qname, qtype).response
-    rrset = msg.get_rrset(msg.answer,
-                          qname,
-                          1,
-                          qtype)
-    rrsigs = msg.get_rrset(msg.answer,
-                           qname,
-                           1,
-                           dns.rdatatype.RRSIG,
-                           covers=qtype)
+    rrset = msg.get_rrset(msg.answer, qname, 1, qtype)
+    rrsigs = msg.get_rrset(msg.answer, qname, 1,
+                           dns.rdatatype.RRSIG, covers=qtype)
     return rrset, rrsigs
 
 
@@ -98,7 +91,8 @@ def load_keys(rrset):
 
     result = []
     for rr in rrset:
-        print(rrset.name, rr.flags, rr.protocol, rr.algorithm)
+        keytag = dns.dnssec.key_id(rr)
+        print(rrset.name, rr.flags, keytag, rr.algorithm)
         if rr.algorithm in [5, 7, 8, 10]:
             key = keydata_to_rsa(rr.key)
         elif rr.algorithm in [13, 14]:
@@ -106,8 +100,7 @@ def load_keys(rrset):
         else:
             print("Can't decode key of algorithm {} yet.".format(rr.algorithm))
             continue
-        print(key)
-        result.append((rrset.name, key))
+        result.append((rrset.name, keytag, key))
     return result
 
     
@@ -148,6 +141,7 @@ qtype = dns.rdatatype.from_text('SOA')
 
 r = get_resolver(dnssec_ok=True)
 soa_rrset, soa_rrsigs = get_rrset(r, qname, qtype)
+print(soa_rrset)
 dnskey_rrset, _ = get_rrset(r, qname, dns.rdatatype.from_text('DNSKEY'))
 DNSSEC_KEYS = load_keys(dnskey_rrset)
 
@@ -155,8 +149,7 @@ Verified = False
 
 for h, signature in get_sig_hashes(soa_rrset, soa_rrsigs):
 
-    for keyname, key in DNSSEC_KEYS:
-        print(keyname, type(key))
+    for keyname, keytag, key in DNSSEC_KEYS:
         if isinstance(key, RSA.RsaKey):
             verifier = pkcs1_15.new(key)
             try:
@@ -165,7 +158,7 @@ for h, signature in get_sig_hashes(soa_rrset, soa_rrsigs):
                 pass
             else:
                 Verified = True
-                break
+                print("OK: RSA Signature, with keytag {}".format(keytag))
         elif isinstance(key, ECC.EccKey):
             verifier = DSS.new(key, 'fips-186-3')
             try:
@@ -174,10 +167,10 @@ for h, signature in get_sig_hashes(soa_rrset, soa_rrsigs):
                 pass
             else:
                 Verified = True
-                break
-    else:
-        print("ERROR: Signature did note verify (which one?)")
+                print("OK: ECC Signature, with keytag {}".format(keytag))
 
 if Verified:
     print("OK: Signature Verified")
+else:
+    print("FAIL: No Signature Verified with any DNSKEY")
 
