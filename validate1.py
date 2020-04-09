@@ -9,7 +9,6 @@ Given a zone name, query its SOA RRset, and verify the SOA signature
 against the apex DNSKEY RRset.
 
 TODO:
-     - Check signature validity time
      - raise error if we don't have proper crypto library version
      - test suite to excercise misc error conditions.
      - generalized DNSSEC key dict for many names.
@@ -57,14 +56,6 @@ class DNSKEYinfo:
         else:
             raise ValueError("DNSKEY algorithm {} not supported".format(
                 self.algorithm))
-
-
-class SIGinfo:
-
-    def __init__(self, data_rrset, sig_rrset):
-        self.data = data_rrset
-        self.sigs = sig_rrset
-        pass
 
 
 def get_resolver(dnssec_ok=False, timeout=5):
@@ -174,7 +165,6 @@ def check_time(sig_rdata, skew=CLOCK_SKEW):
     """
 
     current_time = int(time.time() + 0.5)
-    print("DEBUG: ", sig_rdata.expiration-current_time)
     ok1 = (current_time >= sig_rdata.inception) or \
         (abs(sig_rdata.inception - current_time) <= skew)
     ok2 = (current_time <= sig_rdata.expiration) or \
