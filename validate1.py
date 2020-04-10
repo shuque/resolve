@@ -9,9 +9,11 @@ Given a zone name, query its SOA RRset, and verify the SOA signature
 against the apex DNSKEY RRset.
 
 TODO:
+     - return list of signature verification errors
      - raise error if we don't have proper crypto library version
      - test suite to excercise misc error conditions.
      - generalized DNSSEC key dict for many names.
+     - if multiple algos, make sure one sig of each validate.
 """
 
 import sys
@@ -26,6 +28,8 @@ import dns.dnssec
 from Crypto.PublicKey import RSA, ECC
 from Crypto.Signature import pkcs1_15, DSS
 from Crypto.Hash import SHA1, SHA256, SHA384, SHA512
+import nacl.encoding
+import nacl.signing
 
 
 # Tolerable clock skew for signatures in seconds
@@ -39,6 +43,7 @@ HASHFUNC = {
     10: SHA512,
     13: SHA256,
     14: SHA384,
+    15: SHA512,
 }
 
 
@@ -53,6 +58,8 @@ class DNSKEYinfo:
             self.key = keydata_to_rsa(rr.key)
         elif self.algorithm in [13, 14]:
             self.key = keydata_to_ecc(self.algorithm, rr.key)
+        elif self.algorithm in [15]:
+            self.key = keydata_to_eddsa(self.algorithm, rr.key)
         else:
             raise ValueError("DNSKEY algorithm {} not supported".format(
                 self.algorithm))
@@ -99,6 +106,13 @@ def keydata_to_ecc(algnum, keydata):
     x = int.from_bytes(keydata[0:point_length], byteorder='big')
     y = int.from_bytes(keydata[point_length:], byteorder='big')    
     return ECC.construct(curve=curve, point_x=x, point_y=y)
+
+
+def keydata_to_eddsa(algnum, keydata):
+    if algnum == 15:
+        return nacl.signing.VerifyKey(keydata)
+    else:
+        raise ValueError("Unknown EdDSA algorithm number {}".format(algnum))
 
 
 def get_rrset(resolver, qname, qtype):
@@ -179,11 +193,29 @@ def sig_covers_rrset(sigset, rrset):
     return (sigset.name == rrset.name) and (sigset.covers == rrset.rdtype)
 
 
-def validate(rrset, rrsigs, dnskey_list):
+def verify_sig(key, hashobject, signature):
+    """verify signature on data with given algorithm"""
+
+    if isinstance(key, RSA.RsaKey):
+        verifier = pkcs1_15.new(key)
+        verifier.verify(hashobject, signature)
+    elif isinstance(key, ECC.EccKey):
+        verifier = DSS.new(key, 'fips-186-3')
+        verifier.verify(hashobject, signature)
+    elif isinstance(key, nacl.signing.VerifyKey):
+        # doesn't work yet, debug ..
+        message = hashobject.digest()
+        _ = key.verify(message, signature)
+    else:
+        raise ValueError("Unknown key type: {}".format(type(key)))
+    return
+
+
+def validate_all(rrset, rrsigs, dnskey_list):
     """
-    validate given rrset signatures in 'rrsigs' against the list
-    of dnskey parameters.
+    Validate rrsigs for rrset with list of dnskeys.
     Returns Verify result + list of verification data.
+    Verify result is True if at least one of the signatures validates.
     """
 
     if not sig_covers_rrset(rrsigs, rrset):
@@ -193,16 +225,9 @@ def validate(rrset, rrsigs, dnskey_list):
     verified_list = []                # list of (keytag, algo)
 
     for h, signature, sig_rdata in get_sig_hashes(rrset, rrsigs):
-
         for keyinfo in DNSSEC_KEYS:
-            if isinstance(keyinfo.key, RSA.RsaKey):
-                verifier = pkcs1_15.new(keyinfo.key)
-            elif isinstance(keyinfo.key, ECC.EccKey):
-                verifier = DSS.new(keyinfo.key, 'fips-186-3')
-            else:
-                raise ValueError("Unknown key type")
             try:
-                verifier.verify(h, signature)
+                verify_sig(keyinfo.key, h, signature)
                 check_time(sig_rdata)
             except ValueError:
                 pass
@@ -237,7 +262,7 @@ if __name__ == '__main__':
             keyinfo.name, keyinfo.flags, keyinfo.keytag, keyinfo.algorithm))
     print('')
 
-    valid, valid_info = validate(soa_rrset, soa_rrsigs, DNSSEC_KEYS)
+    valid, valid_info = validate_all(soa_rrset, soa_rrsigs, DNSSEC_KEYS)
     if valid:
         print("OK: Signature Verified")
         for keyinfo in valid_info:
