@@ -143,9 +143,9 @@ def get_sig_hashes(rrset, rrsigs):
         h.update(wire_sig_rdata[0:18])                # RRSIG rdata upto signer
         h.update(sig_rdata.signer.to_digestable())    # RRSIG rdata signer
         if sig_rdata.labels < len(rrname) - 1:
-            # wildcard
-            suffix = rrname.split(sig_rdata.labels + 1)[1]
-            rrname = dns.name.from_text('*', suffix)
+            # construct wildcard name
+            labels = (b'*',) + rrname.labels[-(sig_rdata.labels+1):]
+            rrname = dns.name.Name(labels)
         rrname_wire = rrname.to_digestable()
         rrtype_wire = struct.pack('!H', rrset.rdtype)
         rrclass_wire = struct.pack('!H', rrset.rdclass)
@@ -174,12 +174,20 @@ def check_time(sig_rdata, skew=CLOCK_SKEW):
     raise ValueError("Error: Signature validity time is invalid")
 
 
+def sig_covers_rrset(sigset, rrset):
+    """does RRSIG set cover the RR set?"""
+    return (sigset.name == rrset.name) and (sigset.covers == rrset.rdtype)
+
+
 def validate(rrset, rrsigs, dnskey_list):
     """
     validate given rrset signatures in 'rrsigs' against the list
     of dnskey parameters.
     Returns Verify result + list of verification data.
     """
+
+    if not sig_covers_rrset(rrsigs, rrset):
+        raise ValueError("Signature doesn't correspond to RRset")
 
     Verified = False
     verified_list = []                # list of (keytag, algo)
