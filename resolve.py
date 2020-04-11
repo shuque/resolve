@@ -34,13 +34,11 @@ def get_ns_addrs(zone, message):
     """
     Populate nameserver addresses for zone from a given referral message.
 
-    Note: by default, we only save and use NS record addresses we can find
-    in the additional section of the referral. To be complete, we should
-    really explicitly resolve all non-glue NS addresses, but that would cause
-    a potentially large number of additional queries and corresponding latency
-    which are mostly unnecessary. This complete mode can be turned on with -n
-    (NSRESOLVE). If no NS addresses can be found in the additional section, we
-    of course resort to this complete mode.
+    By default, we only save and use NS record addresses we can find
+    in the additional section of the referral. To additonally resolve
+    all non-glue NS record addresses, we need to supply the -n (NSRESOLVE)
+    switch to this program. If no NS address records can be found in the
+    additional section of the referral, we switch to NSRESOLVE mode.
     """
 
     needsGlue = []
@@ -60,10 +58,6 @@ def get_ns_addrs(zone, message):
                     nsobj.install_ip(rr.address)
 
     if not zone.iplist() or Prefs.NSRESOLVE:
-        if Prefs.DEBUG:
-            print(">> DEBUG: Need to resolve Nameserver names from referral:")
-            for x in needToResolve:
-                print(">> DEBUG: {}".format(x))
         for name in needToResolve:
             nsobj = cache.get_ns(name)
             if nsobj.iplist:

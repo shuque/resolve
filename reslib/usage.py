@@ -3,13 +3,14 @@ import sys
 from reslib.version import VERSION
 from reslib.common import *
 
-PROGNAME   = os.path.basename(sys.argv[0])
+PROGNAME = os.path.basename(sys.argv[0])
 
 def usage(msg=None):
     if msg:
         print(msg)
     print("""
 {0} version {1}
+Perform iterative resolution of a DNS name, type, and class.
 
     Usage: {0} [-dmtvsnxez] <qname> [<qtype>] [<qclass>]
            {0} [-dmtvsnxez] -b <batchfile>
