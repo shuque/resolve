@@ -1,17 +1,21 @@
+"""
+Simplistic DNS cache.
+TODO: convert this to a more efficient tree data structure.
+"""
+
 import dns.name
 from reslib.hints import ROOTHINTS
 from reslib.zone import Zone
-from reslib.nameserver import NameServer
 
 
 def get_root_zone(cache):
     """populate the Root Zone object from hints file"""
-    z = Zone(dns.name.root, cache)
+    zone = Zone(dns.name.root, cache)
     for name, addr in ROOTHINTS:
         name = dns.name.from_text(name)
-        nsobj = z.install_ns(name, clobber=False)
+        nsobj = zone.install_ns(name, clobber=False)
         nsobj.install_ip(addr)
-    return z
+    return zone
 
 
 class Cache:

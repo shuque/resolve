@@ -1,3 +1,7 @@
+"""
+Zone class
+"""
+
 from reslib.nameserver import NameServer
 
 
@@ -11,6 +15,7 @@ class Zone:
         self.cache.install_zone(zone, self)
 
     def has_ns(self, ns):
+        """Does zone have specified nameserver?"""
         return ns in self.nslist
 
     def install_ns(self, nsname, clobber=False):
@@ -22,15 +27,18 @@ class Zone:
         return self.cache.get_ns(nsname)
 
     def iplist(self):
+        """Return list of nameserver addresses"""
         result = []
         for ns in self.nslist:
             result += self.cache.get_ns(ns).iplist
         return result
 
     def iplist_sorted_by_rtt(self):
+        """Return IP list sorted by observed RTT"""
         return sorted(self.iplist(), key=lambda ip: ip.rtt)
 
     def print_details(self):
+        """Print zone information"""
         print("ZONE: %s" % self.name)
         for nsname in self.nslist:
             nsobj = self.cache.get_ns(nsname)
@@ -40,14 +48,3 @@ class Zone:
 
     def __repr__(self):
         return "<Zone: %s>" % self.name
-
-
-def get_root_zone(cache):
-    """populate the Root Zone object from hints file"""
-    z = Zone(dns.name.root, cache)
-    for name, addr in ROOTHINTS:
-        name = dns.name.from_text(name)
-        nsobj = z.install_ns(name, clobber=False)
-        nsobj.install_ip(addr)
-    return z
-

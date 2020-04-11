@@ -1,3 +1,7 @@
+"""
+DNS Query class
+"""
+
 import dns.name
 import dns.rdatatype
 
@@ -29,6 +33,7 @@ class Query:
             print("\n".join([x.to_text() for x in self.full_answer_rrset]))
 
     def get_answer_ip_list(self):
+        """get list of answer IP addresses if any"""
         iplist = []
         for rrset in self.answer_rrset:
             if rrset.rdtype in [dns.rdatatype.A, dns.rdatatype.AAAA]:
@@ -50,5 +55,4 @@ class Query:
 
     def __repr__(self):
         return "<Query: %s,%s,%s>" % (self.qname, self.qtype, self.qclass)
-
 

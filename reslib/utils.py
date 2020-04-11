@@ -1,5 +1,9 @@
+"""
+Miscellaneous helper functions.
+"""
+
 import dns.resolver
-from reslib.common import *
+from reslib.common import Prefs
 
 
 def dprint(msg):

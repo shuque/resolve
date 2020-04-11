@@ -1,3 +1,7 @@
+"""
+DNSSEC functions.
+
+"""
 
 import time
 import struct
@@ -30,6 +34,8 @@ HASHFUNC = {
 
 
 class DNSKEYinfo:
+
+    """Class to hold a DNSKEY and associated information"""
 
     def __init__(self, rrname, rr):
         self.name = rrname
@@ -79,7 +85,7 @@ def keydata_to_ecc(algnum, keydata):
     else:
         raise ValueError("Invalid algorithm number {} for ECDSA".format(algnum))
     x = int.from_bytes(keydata[0:point_length], byteorder='big')
-    y = int.from_bytes(keydata[point_length:], byteorder='big')    
+    y = int.from_bytes(keydata[point_length:], byteorder='big')
     return ECC.construct(curve=curve, point_x=x, point_y=y)
 
 
@@ -101,7 +107,7 @@ def load_keys(rrset):
         result.append(DNSKEYinfo(rrset.name, rr))
     return result
 
-    
+
 def get_sig_inputs(rrset, rrsigs):
 
     """
@@ -204,5 +210,3 @@ def validate_all(rrset, rrsigs, dnskey_list):
                 Verified.append(keyinfo)
 
     return Verified, Failed
-
-

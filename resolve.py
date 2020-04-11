@@ -14,13 +14,7 @@ import getopt
 import time
 import random
 
-import dns.message
-import dns.query
-import dns.rdatatype
-import dns.rcode
-import dns.dnssec
-
-from reslib.common import *
+from reslib.common import Prefs, stats, cache, RootZone
 from reslib.usage import usage
 from reslib.query import Query
 from reslib.lookup import resolve_name

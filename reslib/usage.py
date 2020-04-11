@@ -1,13 +1,18 @@
+"""
+usage string function
+"""
+
 import os
 import sys
 from reslib.version import VERSION
-from reslib.common import *
+from reslib.common import Prefs
 
 PROGNAME = os.path.basename(sys.argv[0])
 
-def usage(msg=None):
-    if msg:
-        print(msg)
+def usage(message=None):
+    """Print usage string, preceded by optional message"""
+    if message:
+        print(message)
     print("""
 {0} version {1}
 Perform iterative resolution of a DNS name, type, and class.
