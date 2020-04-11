@@ -12,8 +12,8 @@ of 'IN' (Internet class) are used.
 Pre-requisites:  
 - Python 3
 - [dnspython module](http://www.dnspython.org/) (included with most Linux/*BSD distributions)
-- DNSSEC support (work in progress) requires additional modules:
-  - pycroptodome
+- DNSSEC support (in development) requires additional modules:
+  - pycryptodome
   - pynacl
 
 ```
