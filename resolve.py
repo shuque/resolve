@@ -13,108 +13,14 @@ Author: Shumon Huque <shuque - @ - gmail.com>
 import os, sys, getopt, time, random
 import dns.message, dns.query, dns.rdatatype, dns.rcode, dns.dnssec
 
+from reslib.common import *
+from reslib.usage import usage
+from reslib.hints import ROOTHINTS
+from reslib.stats import Stats
 
-PROGNAME   = os.path.basename(sys.argv[0])
-VERSION    = "0.15"
-
-TIMEOUT    = 3                            # Query timeout in seconds
-RETRIES    = 2                            # Number of retries per server
-RETRY      = 1                            # of full list (not implemented yet)
-MAX_CNAME  = 10                           # Max #CNAME indirections
-MAX_QUERY  = 300                          # Max number of queries
-MAX_DELEG  = 75                           # Max number of delegations
-
-
-# root server names and addresses
-ROOTHINTS = [
-    ("a.root-servers.net.", "198.41.0.4"),
-    ("a.root-servers.net.", "2001:503:ba3e::2:30"),
-    ("b.root-servers.net.", "192.228.79.201"),
-    ("b.root-servers.net.", "2001:500:200::b"),
-    ("c.root-servers.net.", "192.33.4.12"),
-    ("c.root-servers.net.", "2001:500:2::c"),
-    ("d.root-servers.net.", "199.7.91.13"),
-    ("d.root-servers.net.", "2001:500:2d::d"),
-    ("e.root-servers.net.", "192.203.230.10"),
-    ("e.root-servers.net.", "2001:500:a8::e"),
-    ("f.root-servers.net.", "192.5.5.241"),
-    ("f.root-servers.net.", "2001:500:2f::f"),
-    ("g.root-servers.net.", "192.112.36.4"),
-    ("g.root-servers.net.", "2001:500:12::d0d"),
-    ("h.root-servers.net.", "198.97.190.53"),
-    ("h.root-servers.net.", "2001:500:1::53"),
-    ("i.root-servers.net.", "192.36.148.17"),
-    ("i.root-servers.net.", "2001:7fe::53"),
-    ("j.root-servers.net.", "192.58.128.30"),
-    ("j.root-servers.net.", "2001:503:c27::2:30"),
-    ("k.root-servers.net.", "193.0.14.129"),
-    ("k.root-servers.net.", "2001:7fd::1"),
-    ("l.root-servers.net.", "199.7.83.42"),
-    ("l.root-servers.net.", "2001:500:9f::42"),
-    ("m.root-servers.net.", "2001:dc3::35"),
-    ("m.root-servers.net.", "202.12.27.33"),
-]
 
 # RootZone object
 RootZone   = None                         # Populated by get_root_zone()
-
-
-class Prefs:
-    """Preferences"""
-    DEBUG      = False                    # -d: Print debugging output?
-    MINIMIZE   = False                    # -m: Do qname minimization?
-    TCPONLY    = False                    # -t: Use TCP only
-    VERBOSE    = False                    # -v: Trace query->zone path
-    VIOLATE    = False                    # -x: ENT nxdomain workaround
-    STATS      = False                    # -s: Print statistics
-    NSRESOLVE  = False                    # -n: Resolve all NS addresses
-    PAYLOAD    = 1460                     # -e: no EDNS; set to None
-    DNSSEC_OK  = False                    # -z: set DO=1 EDNS flag
-    BATCHFILE  = None                     # -b: batch file mode
-
-
-class Stats:
-    """Statistics counters"""
-
-    def __init__(self):
-        self.elapsed          = 0
-        self.cnt_cname        = 0
-        self.cnt_query1       = 0                  # regular queries
-        self.cnt_query2       = 0                  # NS address queries
-        self.cnt_fail         = 0
-        self.cnt_tcp          = 0
-        self.cnt_tcp_fallback = 0
-        self.cnt_deleg        = 0
-        self.delegation_depth = 0
-
-    def update_query(self, query, tcp=False):
-        """update query counts"""
-        if tcp:
-            self.cnt_tcp += 1
-        if query.is_nsquery:
-            self.cnt_query2 += 1
-        else:
-            self.cnt_query1 += 1
-
-    def print_stats(self):
-        """Print statistics"""
-        print('\n### Statistics:')
-        print("Elapsed time: {:.3f} sec".format(self.elapsed))
-        cnt_query_total = self.cnt_query1 + self.cnt_query2
-        if not Prefs.BATCHFILE:
-            print("Qname Delegation depth: %d" % self.delegation_depth)
-        print("Number of delegations traversed: %d" % self.cnt_deleg)
-        print("Number of queries performed (regular): %d" % self.cnt_query1)
-        print("Number of queries performed:(nsaddr)   %d" % self.cnt_query2)
-        if self.cnt_tcp:
-            print("Number of TCP queries: %d" % self.cnt_tcp)
-        if self.cnt_tcp_fallback:
-            print("Number of TCP fallbacks: %d" % self.cnt_tcp_fallback)
-        if self.cnt_fail:
-            print("Number of queries failed: %d (%.2f%%)" %
-                  (self.cnt_fail, (100.0 * self.cnt_fail/cnt_query_total)))
-        if self.cnt_cname:
-            print("Number of CNAME indirections: %d" % self.cnt_cname)
 
 
 class Cache:
@@ -158,32 +64,6 @@ class Cache:
         for nsname, nsobj in self.NSDict.items():
             ipstring_list = " ".join([x.addr for x in nsobj.iplist])
             print("%s %s" % (nsname, ipstring_list))
-
-
-def usage(msg=None):
-    if msg:
-        print(msg)
-    print("""
-{0} version {1}
-
-    Usage: {0} [-dmtvsnxez] <qname> [<qtype>] [<qclass>]
-           {0} [-dmtvsnxez] -b <batchfile>
-
-     -d: print debugging output
-     -m: do qname minimization
-     -t: use TCP only
-     -v: verbose - trace query & zone path
-     -s: print summary statistics
-     -n: resolve all non-glue NS addresses in referrals
-     -x: workaround NXDOMAIN on empty non-terminals
-     -e: don't use EDNS0 (default is EDNS0 with payload={2})
-     -z: set DNSSEC_OK flag (default is do not)
-     -b <batchfile>: batch file mode
-
-When using -b, <batchfile> contains one (space separated) query name, type, 
-class per line.
-    """.format(PROGNAME, VERSION, Prefs.PAYLOAD))
-    sys.exit(1)
 
 
 def dprint(msg):
