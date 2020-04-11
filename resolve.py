@@ -27,22 +27,7 @@ from reslib.zone import Zone
 from reslib.nameserver import NameServer
 from reslib.query import Query
 from reslib.stats import Stats
-from reslib.utils import dprint
-
-
-def is_authoritative(msg):
-    """Does DNS message have Authoritative Answer (AA) flag set?"""
-    return msg.flags & dns.flags.AA == dns.flags.AA
-
-
-def is_truncated(msg):
-    """Does DNS message have truncated (TC) flag set?"""
-    return msg.flags & dns.flags.TC == dns.flags.TC
-
-
-def is_referral(msg):
-    """Is the DNS response message a referral?"""
-    return (msg.rcode() == 0) and (not is_authoritative(msg)) and msg.authority
+from reslib.utils import *
 
 
 def get_ns_addrs(zone, message):
@@ -107,7 +92,7 @@ def process_referral(message, query):
         return None
 
     zonename = rrset.name
-    if Prefs.DEBUG or (Prefs.VERBOSE and not query.quiet):
+    if Prefs.VERBOSE and not query.quiet:
         print(">>        [Got Referral to zone: %s in %.3f s]" % \
               (zonename, query.elapsed_last))
 
@@ -119,7 +104,7 @@ def process_referral(message, query):
 
     get_ns_addrs(zone, message)
 
-    if Prefs.DEBUG or (Prefs.VERBOSE and not query.quiet):
+    if Prefs.VERBOSE and not query.quiet:
         zone.print_details()
 
     return zone
@@ -135,7 +120,7 @@ def process_answer(response, query, addResults=None):
     if query.qname != query.orig_qname:
         return
 
-    if Prefs.DEBUG or (Prefs.VERBOSE and not query.quiet):
+    if Prefs.VERBOSE and not query.quiet:
         print(">>        [Got answer in  %.3f s]" % query.elapsed_last)
 
     if not response.answer:
@@ -180,7 +165,6 @@ def process_answer(response, query, addResults=None):
                 final_alias = cname_dict[final_alias]
             else:
                 break
-        dprint("CNAME found, resolving canonical name %s" % final_alias)
         cname_query = Query(final_alias, query.qtype, query.qclass,
                             Prefs.MINIMIZE)
         if addResults:
@@ -274,7 +258,7 @@ def send_query_zone(query, zone):
 
     response = None
 
-    if Prefs.DEBUG or (Prefs.VERBOSE and not query.quiet):
+    if Prefs.VERBOSE and not query.quiet:
         print("\n>> Query: %s %s %s at zone %s" % \
                (query.qname, query.qtype, query.qclass, zone.name))
 
@@ -290,7 +274,7 @@ def send_query_zone(query, zone):
         if stats.cnt_query1 + stats.cnt_query2 >= MAX_QUERY:
             print("ERROR: Max number of queries (%d) exceeded." % MAX_QUERY)
             return None
-        if Prefs.DEBUG or (Prefs.VERBOSE and not query.quiet):
+        if Prefs.VERBOSE and not query.quiet:
             print(">>   Send to zone %s at address %s" % (zone.name, nsaddr.addr))
         response = send_query(msg, nsaddr, query, newid=True)
         if response:
@@ -486,7 +470,7 @@ if __name__ == '__main__':
         resolve_name(query, RootZone, addResults=query)
         stats.elapsed = time.time() - time_start
 
-        if Prefs.DEBUG or (Prefs.VERBOSE and not query.quiet):
+        if Prefs.VERBOSE and not query.quiet:
             print('')
         query.print_full_answer()
 

@@ -18,4 +18,19 @@ def get_resolver(dnssec_ok=False, timeout=5):
     if dnssec_ok:
         r.use_edns(edns=0, ednsflags=dns.flags.DO, payload=4096)
     return r
-                                    
+
+
+def is_authoritative(msg):
+    """Does DNS message have Authoritative Answer (AA) flag set?"""
+    return msg.flags & dns.flags.AA == dns.flags.AA
+
+
+def is_truncated(msg):
+    """Does DNS message have truncated (TC) flag set?"""
+    return msg.flags & dns.flags.TC == dns.flags.TC
+
+
+def is_referral(msg):
+    """Is the DNS response message a referral?"""
+    return (msg.rcode() == 0) and (not is_authoritative(msg)) and msg.authority
+
