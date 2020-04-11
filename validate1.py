@@ -15,7 +15,7 @@ import dns.name
 import dns.rdatatype
 
 from reslib.dnssec import *
-from reslib.utils import get_resolver
+from reslib.utils import get_resolver, get_rrset
 
 
 def print_results(verified, failed):
@@ -59,8 +59,7 @@ if __name__ == '__main__':
     dnskey_rrset, _ = get_rrset(r, qname, dns.rdatatype.from_text('DNSKEY'))
     DNSSEC_KEYS = load_keys(dnskey_rrset)
     for keyinfo in DNSSEC_KEYS:
-        print("DNSKEY: {} {} {} {}".format(
-            keyinfo.name, keyinfo.flags, keyinfo.keytag, keyinfo.algorithm))
+        keyinfo.print()
     print('')
 
     verified, failed = validate_all(soa_rrset, soa_rrsigs, DNSSEC_KEYS)

@@ -46,6 +46,10 @@ class DNSKEYinfo:
             raise ValueError("DNSKEY algorithm {} not supported".format(
                 self.algorithm))
 
+    def print(self):
+        print("DNSKEY: {} {} {} {}".format(
+            self.name, self.flags, self.keytag, self.algorithm))
+
 
 def _to_wire(record):
     s = BytesIO()
@@ -84,17 +88,6 @@ def keydata_to_eddsa(algnum, keydata):
         return nacl.signing.VerifyKey(keydata)
     else:
         raise ValueError("Unknown EdDSA algorithm number {}".format(algnum))
-
-
-def get_rrset(resolver, qname, qtype):
-    """
-    Query name and type; return answer RRset and signature RRset.
-    """
-    msg = resolver.query(qname, qtype).response
-    rrset = msg.get_rrset(msg.answer, qname, 1, qtype)
-    rrsigs = msg.get_rrset(msg.answer, qname, 1,
-                           dns.rdatatype.RRSIG, covers=qtype)
-    return rrset, rrsigs
 
 
 def load_keys(rrset):

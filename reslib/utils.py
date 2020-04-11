@@ -20,6 +20,17 @@ def get_resolver(dnssec_ok=False, timeout=5):
     return r
 
 
+def get_rrset(resolver, qname, qtype):
+    """
+    Query name and type; return answer RRset and signature RRset.
+    """
+    msg = resolver.query(qname, qtype).response
+    rrset = msg.get_rrset(msg.answer, qname, 1, qtype)
+    rrsigs = msg.get_rrset(msg.answer, qname, 1,
+                           dns.rdatatype.RRSIG, covers=qtype)
+    return rrset, rrsigs
+
+
 def is_authoritative(msg):
     """Does DNS message have Authoritative Answer (AA) flag set?"""
     return msg.flags & dns.flags.AA == dns.flags.AA
@@ -33,4 +44,3 @@ def is_truncated(msg):
 def is_referral(msg):
     """Is the DNS response message a referral?"""
     return (msg.rcode() == 0) and (not is_authoritative(msg)) and msg.authority
-
