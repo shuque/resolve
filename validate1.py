@@ -43,7 +43,7 @@ HASHFUNC = {
     10: SHA512,
     13: SHA256,
     14: SHA384,
-    15: SHA512,
+    15: None,
 }
 
 
@@ -138,24 +138,25 @@ def load_keys(rrset):
     return result
 
     
-def get_sig_hashes(rrset, rrsigs):
+def get_sig_inputs(rrset, rrsigs):
 
     """
-    For given rrset and rrsig set, calculate the signature hash to be
-    verified for each signature in the rrsig set. Yield one at a time.
+    For given rrset and rrsig set, calculate the signature input for
+    each for each signature in the rrsig set. Yield one at a time.
     From RFC4034, this is: hash(RRSIG_RDATA | RR(1) | RR(2)... ), where
-    RRSIG_RDATA is the rdata minus the actual signature field.
+    RRSIG_RDATA is the rdata minus the actual signature field. Note
+    that EdDSA (as used in DNSSEC) does not use a hash function, so
+    just the raw wire format data is the signature input.
     """
 
     rrname = rrset.name
 
     for sig_rdata in rrsigs.to_rdataset():
-        alg = sig_rdata.algorithm
+        indata = b''
         signature = sig_rdata.signature
         wire_sig_rdata = _to_wire(sig_rdata)
-        h = HASHFUNC[alg].new()
-        h.update(wire_sig_rdata[0:18])                # RRSIG rdata upto signer
-        h.update(sig_rdata.signer.to_digestable())    # RRSIG rdata signer
+        indata += wire_sig_rdata[0:18]                # rdata upto signer
+        indata += sig_rdata.signer.to_digestable()    # rdata signer
         if sig_rdata.labels < len(rrname) - 1:
             # construct wildcard name
             labels = (b'*',) + rrname.labels[-(sig_rdata.labels+1):]
@@ -165,11 +166,16 @@ def get_sig_hashes(rrset, rrsigs):
         rrclass_wire = struct.pack('!H', rrset.rdclass)
         origttl_wire = struct.pack('!I', sig_rdata.original_ttl)
         for rr in sorted(soa_rrset.to_rdataset()):
-            h.update(rrname_wire + rrtype_wire + rrclass_wire + origttl_wire)
+            indata += (rrname_wire + rrtype_wire + rrclass_wire + origttl_wire)
             rrdata = rr.to_digestable()
             rrlen = struct.pack('!H', len(rrdata))
-            h.update(rrlen + rrdata)
-        yield h, signature, sig_rdata
+            indata += (rrlen + rrdata)
+        if HASHFUNC[sig_rdata.algorithm] is not None:
+            hashed = HASHFUNC[sig_rdata.algorithm].new()
+            hashed.update(indata)
+            yield hashed, signature, sig_rdata
+        else:
+            yield indata, signature, sig_rdata
 
 
 def check_time(sig_rdata, skew=CLOCK_SKEW):
@@ -193,19 +199,17 @@ def sig_covers_rrset(sigset, rrset):
     return (sigset.name == rrset.name) and (sigset.covers == rrset.rdtype)
 
 
-def verify_sig(key, hashobject, signature):
+def verify_sig(key, sig_input, signature):
     """verify signature on data with given algorithm"""
 
     if isinstance(key, RSA.RsaKey):
         verifier = pkcs1_15.new(key)
-        verifier.verify(hashobject, signature)
+        verifier.verify(sig_input, signature)
     elif isinstance(key, ECC.EccKey):
         verifier = DSS.new(key, 'fips-186-3')
-        verifier.verify(hashobject, signature)
+        verifier.verify(sig_input, signature)
     elif isinstance(key, nacl.signing.VerifyKey):
-        # doesn't work yet, debug ..
-        message = hashobject.digest()
-        _ = key.verify(message, signature)
+        _ = key.verify(sig_input, signature)
     else:
         raise ValueError("Unknown key type: {}".format(type(key)))
     return
@@ -224,10 +228,10 @@ def validate_all(rrset, rrsigs, dnskey_list):
     Verified = False
     verified_list = []                # list of (keytag, algo)
 
-    for h, signature, sig_rdata in get_sig_hashes(rrset, rrsigs):
+    for sig_input, signature, sig_rdata in get_sig_inputs(rrset, rrsigs):
         for keyinfo in DNSSEC_KEYS:
             try:
-                verify_sig(keyinfo.key, h, signature)
+                verify_sig(keyinfo.key, sig_input, signature)
                 check_time(sig_rdata)
             except ValueError:
                 pass
