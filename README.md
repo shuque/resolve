@@ -12,9 +12,13 @@ of 'IN' (Internet class) are used.
 Pre-requisites:  
 - Python 3
 - [dnspython module](http://www.dnspython.org/) (included with most Linux/*BSD distributions)
+- DNSSEC support (work in progress) requires additional modules:
+  - pycroptodome
+  - pynacl
 
 ```
-resolve.py version 0.15
+resolve.py version 0.20
+Perform iterative resolution of a DNS name, type, and class.
 
 Usage: resolve.py [-dmtsnxez] <qname> [<qtype>] [<qclass>]
        resolve.py [-dmtsnxez] -b <batchfile>
@@ -27,7 +31,7 @@ Usage: resolve.py [-dmtsnxez] <qname> [<qtype>] [<qclass>]
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
      -e: don't use EDNS0 (default is EDNS0 with payload=1460)
-     -z: set DNSSEC_OK flag (default is do not)
+     -z: use DNSSEC (default is no; work in progress)
      -b <batchfile>: batch file mode
 
 When using -b, <batchfile> contains one (space separated) query name, type,

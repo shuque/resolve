@@ -104,7 +104,7 @@ def make_query(qname, qtype, qclass):
     msg = dns.message.make_query(qname,
                                  qtype,
                                  rdclass=qclass,
-                                 want_dnssec=Prefs.DNSSEC_OK,
+                                 want_dnssec=Prefs.DNSSEC,
                                  payload=Prefs.PAYLOAD)
     msg.flags &= ~dns.flags.RD
     return msg

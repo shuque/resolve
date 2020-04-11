@@ -62,7 +62,7 @@ def process_args(arguments):
         elif opt == "-e":
             Prefs.PAYLOAD = None
         elif opt == "-z":
-            Prefs.DNSSEC_OK = True
+            Prefs.DNSSEC = True
         elif opt == "-b":
             Prefs.BATCHFILE = optval
 

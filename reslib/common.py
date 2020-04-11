@@ -23,7 +23,7 @@ class Prefs:
     STATS = False                    # -s: Print statistics
     NSRESOLVE = False                # -n: Resolve all NS addresses
     PAYLOAD = 1460                   # -e: no EDNS; set to None
-    DNSSEC_OK = False                # -z: set DO=1 EDNS flag
+    DNSSEC = False                   # -z: use DNSSEC (work in progress)
     BATCHFILE = None                 # -b: batch file mode
 
 
