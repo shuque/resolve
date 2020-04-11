@@ -2,75 +2,31 @@
 
 """
 resolve.py
-
-Perform an iterative resolution of a DNS name, type, class,
-starting from the root DNS servers.
+Perform iterative resolution of a DNS name, type, class.
 
 Author: Shumon Huque <shuque - @ - gmail.com>
-
 """
 
-import os, sys, getopt, time, random
-import dns.message, dns.query, dns.rdatatype, dns.rcode, dns.dnssec
+
+import os
+import sys
+import getopt
+import time
+import random
+
+import dns.message
+import dns.query
+import dns.rdatatype
+import dns.rcode
+import dns.dnssec
 
 from reslib.common import *
 from reslib.usage import usage
-from reslib.hints import ROOTHINTS
+from reslib.cache import Cache, get_root_zone
+from reslib.zone import Zone
+from reslib.nameserver import NameServer
 from reslib.stats import Stats
-
-
-# RootZone object
-RootZone   = None                         # Populated by get_root_zone()
-
-
-class Cache:
-    """Cache of Zone & NameServer objects"""
-
-    def __init__(self):
-        self.ZoneDict = {}               # dns.name.Name -> Zone
-        self.NSDict = {}                 # dns.name.Name -> NameServer
-
-    def get_ns(self, nsname):
-        if nsname in self.NSDict:
-            return self.NSDict[nsname]
-        return None
-
-    def get_zone(self, zonename):
-        if zonename in self.ZoneDict:
-            return self.ZoneDict[zonename]
-        return None
-
-    def install_ns(self, nsname, nsobj):
-        self.NSDict[nsname] = nsobj
-
-    def install_zone(self, zonename, zoneobj):
-        self.ZoneDict[zonename] = zoneobj
-
-    def closest_zone(self, name):
-        """given query name, find closest enclosing zone object in Cache"""
-        for z in reversed(sorted(self.ZoneDict.keys())):
-            if name.is_subdomain(z):
-                return self.get_zone(z)
-        return None
-
-    def dump(self):
-        """Dump zone and NS cache contents - for debugging"""
-        print("---------------------------- Zone Cache ----------------")
-        for zname, zobj in self.ZoneDict.items():
-            print("Zone: %s" % zname)
-            for ns in zobj.nslist:
-                print("    NS: %s" % self.NSDict[ns].name)
-        print("---------------------------- NS   Cache ----------------")
-        for nsname, nsobj in self.NSDict.items():
-            ipstring_list = " ".join([x.addr for x in nsobj.iplist])
-            print("%s %s" % (nsname, ipstring_list))
-
-
-def dprint(msg):
-    """Print debugging message if DEBUG flag is set"""
-    if Prefs.DEBUG:
-        print(">> DEBUG: %s" % msg)
-    return
+from reslib.utils import dprint
 
 
 class Query:
@@ -121,89 +77,6 @@ class Query:
 
     def __repr__(self):
         return "<Query: %s,%s,%s>" % (self.qname, self.qtype, self.qclass)
-
-
-class IPaddress:
-    """IPaddress class"""
-
-    def __init__(self, ip):
-        self.addr = ip
-        self.addrtype = None
-        self.rtt = float('inf')                    # RTT for UDP
-        self.query_count = 0
-
-    def __repr__(self):
-        return "<IPaddress: %s>" % self.addr
-
-
-class NameServer:
-    """NameServer class"""
-
-    def __init__(self, name):
-        self.name = name                           # dns.name.Name
-        self.iplist = []                           # list of IPaddress
-
-    def has_ip(self, ipstring):
-        return ipstring in [x.addr for x in self.iplist]
-
-    def install_ip(self, ipstring):
-        if not self.has_ip(ipstring):
-            self.iplist.append(IPaddress(ipstring))
-        return
-
-    def __repr__(self):
-        return "<NS: %s>" % self.name
-
-
-class Zone:
-    """Zone class"""
-
-    def __init__(self, zone, cache):
-        self.name = zone                           # dns.name.Name
-        self.cache = cache                         # Cache class
-        self.nslist = []                           # list of dns.name.Name
-        self.cache.install_zone(zone, self)
-
-    def has_ns(self, ns):
-        return ns in self.nslist
-
-    def install_ns(self, nsname, clobber=False):
-        """Install a nameserver record for this zone"""
-        if nsname not in self.nslist:
-            self.nslist.append(nsname)
-        if clobber or (cache.get_ns(nsname) is None):
-            self.cache.install_ns(nsname, NameServer(nsname))
-        return self.cache.get_ns(nsname)
-
-    def iplist(self):
-        result = []
-        for ns in self.nslist:
-            result += self.cache.get_ns(ns).iplist
-        return result
-
-    def iplist_sorted_by_rtt(self):
-        return sorted(self.iplist(), key=lambda ip: ip.rtt)
-
-    def print_details(self):
-        print("ZONE: %s" % self.name)
-        for nsname in self.nslist:
-            nsobj = self.cache.get_ns(nsname)
-            addresses = [x.addr for x in nsobj.iplist]
-            print("%s %s %s" % (self.name, nsobj.name, addresses))
-        return
-
-    def __repr__(self):
-        return "<Zone: %s>" % self.name
-
-
-def get_root_zone(cache):
-    """populate the Root Zone object from hints file"""
-    z = Zone(dns.name.root, cache)
-    for name, addr in ROOTHINTS:
-        name = dns.name.from_text(name)
-        nsobj = z.install_ns(name, clobber=False)
-        nsobj.install_ip(addr)
-    return z
 
 
 def is_authoritative(msg):
