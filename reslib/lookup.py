@@ -1,8 +1,9 @@
-import os
-import sys
-import getopt
+"""
+Main setup of functions to perform iterative DNS resolution.
+
+"""
+
 import time
-import random
 
 import dns.message
 import dns.query
@@ -10,13 +11,11 @@ import dns.rdatatype
 import dns.rcode
 import dns.dnssec
 
-from reslib.common import *
-from reslib.usage import usage
-from reslib.cache import Cache, get_root_zone
+from reslib.common import Prefs, cache, stats, \
+    MAX_CNAME, MAX_QUERY, MAX_DELEG
 from reslib.zone import Zone
-from reslib.nameserver import NameServer
 from reslib.query import Query
-from reslib.utils import *
+from reslib.utils import make_query, send_query, is_referral
 
 
 def get_ns_addrs(zone, message):
@@ -64,8 +63,9 @@ def get_ns_addrs(zone, message):
 
 
 def process_referral(message, query):
-
-    """Process referral. Returns a zone object for the referred zone"""
+    """
+    Process referral. Returns a zone object for the referred zone.
+    """
 
     for rrset in message.authority:
         if rrset.rdtype == dns.rdatatype.NS:
@@ -94,8 +94,9 @@ def process_referral(message, query):
 
 
 def process_answer(response, query, addResults=None):
-
-    """Process answer section, chasing aliases when needed"""
+    """
+    Process answer section, chasing aliases when needed.
+    """
 
     cname_dict = {}              # dict of alias -> target
 
@@ -159,8 +160,9 @@ def process_answer(response, query, addResults=None):
 
 
 def process_response(response, query, addResults=None):
-
-    """process a DNS response. Returns rcode, answer message, zone referral"""
+    """
+    Process a DNS response. Returns rcode, answer message, zone referral.
+    """
 
     rc = None
     ans = None
@@ -185,7 +187,9 @@ def process_response(response, query, addResults=None):
 
 
 def send_query_zone(query, zone):
-    """send DNS query to nameservers of given zone"""
+    """
+    Send DNS query to nameservers of given zone
+    """
 
     response = None
 
@@ -223,8 +227,10 @@ def send_query_zone(query, zone):
 
 
 def resolve_name(query, zone, inPath=True, addResults=None):
-    """resolve a DNS query. addResults is an optional Query object to
-    which the answer results are to be added."""
+    """
+    Resolve a DNS query. addResults is an optional Query object to
+    which the answer results are to be added.
+    """
 
     curr_zone = zone
     repeatZone = False
@@ -270,4 +276,3 @@ def resolve_name(query, zone, inPath=True, addResults=None):
         print("ERROR: Max levels of delegation (%d) reached." % MAX_DELEG)
 
     return
-
