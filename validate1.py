@@ -9,7 +9,7 @@ Given a zone name, query its SOA RRset, and verify the SOA signature
 against the apex DNSKEY RRset.
 
 TODO:
-     - return list of signature verification errors
+     - Signature class
      - raise error if we don't have proper crypto library version
      - test suite to excercise misc error conditions.
      - generalized DNSSEC key dict for many names.
@@ -142,10 +142,10 @@ def get_sig_inputs(rrset, rrsigs):
 
     """
     For given rrset and rrsig set, calculate the signature input for
-    each for each signature in the rrsig set. Yield one at a time.
+    for each signature in the rrsig set. Yield one at a time.
     From RFC4034, this is: hash(RRSIG_RDATA | RR(1) | RR(2)... ), where
-    RRSIG_RDATA is the rdata minus the actual signature field. Note
-    that EdDSA (as used in DNSSEC) does not use a hash function, so
+    RRSIG_RDATA is the rdata minus the actual signature field. However,
+    note that EdDSA (as used in DNSSEC) does not use a hash function, so
     just the raw wire format data is the signature input.
     """
 
@@ -155,10 +155,9 @@ def get_sig_inputs(rrset, rrsigs):
         indata = b''
         signature = sig_rdata.signature
         wire_sig_rdata = _to_wire(sig_rdata)
-        indata += wire_sig_rdata[0:18]                # rdata upto signer
-        indata += sig_rdata.signer.to_digestable()    # rdata signer
+        indata += wire_sig_rdata[0:18]
+        indata += sig_rdata.signer.to_digestable()
         if sig_rdata.labels < len(rrname) - 1:
-            # construct wildcard name
             labels = (b'*',) + rrname.labels[-(sig_rdata.labels+1):]
             rrname = dns.name.Name(labels)
         rrname_wire = rrname.to_digestable()
@@ -218,28 +217,50 @@ def verify_sig(key, sig_input, signature):
 def validate_all(rrset, rrsigs, dnskey_list):
     """
     Validate rrsigs for rrset with list of dnskeys.
-    Returns Verify result + list of verification data.
-    Verify result is True if at least one of the signatures validates.
+    Returns 2 lists of keys: Verified and Failed. Failed also
+    includes verification errors.
     """
 
     if not sig_covers_rrset(rrsigs, rrset):
         raise ValueError("Signature doesn't correspond to RRset")
 
-    Verified = False
-    verified_list = []                # list of (keytag, algo)
+    Verified = []                     # list of (key)
+    Failed = []                       # list of (key, error)
 
     for sig_input, signature, sig_rdata in get_sig_inputs(rrset, rrsigs):
         for keyinfo in DNSSEC_KEYS:
+            if keyinfo.keytag != sig_rdata.key_tag:
+                continue
             try:
                 verify_sig(keyinfo.key, sig_input, signature)
                 check_time(sig_rdata)
-            except ValueError:
-                pass
+            except Exception as e:
+                Failed.append((keyinfo, e))
             else:
-                Verified = True
-                verified_list.append(keyinfo)
+                Verified.append(keyinfo)
 
-    return Verified, verified_list
+    return Verified, Failed
+
+
+def print_results(verified, failed):
+    """Print signature verification results"""
+
+    if verified:
+        print("OK: Signature Verified")
+        for keyinfo in verified:
+            print("    Good signature with keytag={} algo={}".format(
+                keyinfo.keytag, keyinfo.algorithm))
+        if failed:
+            print("FAILURES:")
+            for keyinfo, error in failed:
+                print("    keytag={} algo={} error={}".format(
+                    keyinfo.keytag, keyinfo.algorithm, error))
+    else:
+        print("FAIL: No Signature Verified with any DNSKEY")
+        for keyinfo, error in failed:
+            print("    keytag={} algo={} error={}".format(
+                keyinfo.keytag, keyinfo.algorithm, error))
+    return
 
 
 if __name__ == '__main__':
@@ -266,14 +287,9 @@ if __name__ == '__main__':
             keyinfo.name, keyinfo.flags, keyinfo.keytag, keyinfo.algorithm))
     print('')
 
-    valid, valid_info = validate_all(soa_rrset, soa_rrsigs, DNSSEC_KEYS)
-    if valid:
-        print("OK: Signature Verified")
-        for keyinfo in valid_info:
-            print("    Good signature with keytag={} algo={}".format(
-                keyinfo.keytag, keyinfo.algorithm))
+    verified, failed = validate_all(soa_rrset, soa_rrsigs, DNSSEC_KEYS)
+    print_results(verified, failed)
+    if verified:
         sys.exit(0)
     else:
-        print("FAIL: No Signature Verified with any DNSKEY")
         sys.exit(1)
-
