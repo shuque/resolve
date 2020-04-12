@@ -1,15 +1,13 @@
 """
 DNSSEC functions.
-
 """
 
 import time
 import struct
 from io import BytesIO
-import dns.resolver
 import dns.rcode
+import dns.rdata
 import dns.rdatatype
-import dns.flags
 import dns.dnssec
 from Crypto.PublicKey import RSA, ECC
 from Crypto.Signature import pkcs1_15, DSS
@@ -17,6 +15,7 @@ from Crypto.Hash import SHA1, SHA256, SHA384, SHA512
 import nacl.encoding
 import nacl.signing
 
+from reslib.root import RootKeyData
 
 # Tolerable clock skew for signatures in seconds
 CLOCK_SKEW = 300
@@ -33,8 +32,19 @@ HASHFUNC = {
 }
 
 
-class DNSKEYinfo:
+class ZoneKeys:
+    """Zone to DNSSEC Keys mapping class"""
 
+    def __init__(self):
+        # dict of dns.name.Name: list(DNSKEYinfo)
+        self.data = {}
+        self.install(dns.name.root, [get_root_key()])
+
+    def install(self, zone, keys):
+        self.data[zone] = keys
+
+
+class DNSKEYinfo:
     """Class to hold a DNSKEY and associated information"""
 
     def __init__(self, rrname, rr):
@@ -55,6 +65,14 @@ class DNSKEYinfo:
     def print(self):
         print("DNSKEY: {} {} {} {}".format(
             self.name, self.flags, self.keytag, self.algorithm))
+
+
+def get_root_key():
+    """Get root key/trust anchor"""
+    rdata = dns.rdata.from_text(dns.rdataclass.from_text('IN'),
+                                dns.rdatatype.from_text('DNSKEY'),
+                                RootKeyData)
+    return DNSKEYinfo(dns.name.root, rdata)
 
 
 def _to_wire(record):
@@ -210,3 +228,7 @@ def validate_all(rrset, rrsigs, dnskey_list):
                 Verified.append(keyinfo)
 
     return Verified, Failed
+
+
+# Instantiate zone_keys at module level
+zone_keys = ZoneKeys()
