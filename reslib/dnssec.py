@@ -167,18 +167,14 @@ def get_sig_inputs(rrset, rrsigs):
 
 def check_time(sig_rdata, skew=CLOCK_SKEW):
     """
-    Check that current time is within signature validity period, plus
-    minus an acceptable clock skew.
+    Check that current time is within signature validity period,
+    modulo an allowable clock skew interval.
     """
-
     current_time = int(time.time() + 0.5)
-    ok1 = (current_time >= sig_rdata.inception) or \
-        (abs(sig_rdata.inception - current_time) <= skew)
-    ok2 = (current_time <= sig_rdata.expiration) or \
-        (abs(current_time - sig_rdata.expiration) <= skew)
-    if ok1 and ok2:
-        return
-    raise ValueError("Error: Signature validity time is invalid")
+    if current_time < (sig_rdata.inception - skew):
+        raise ValueError("Signature inception too far in the future")
+    if current_time > (sig_rdata.expiration + skew):
+        raise ValueError("Signature has expired")
 
 
 def sig_covers_rrset(sigset, rrset):
