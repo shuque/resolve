@@ -27,6 +27,13 @@ class Query:
         self.answer_rrset = []
         self.full_answer_rrset = []
 
+    def set_quiet(self, action=True):
+        """
+        quiet=True prevents the query from printing trace information
+        when VERBOSE mode is set.
+        """
+        self.quiet = action
+
     def print_full_answer(self):
         """Print full set of answer records including aliases"""
         if self.full_answer_rrset:

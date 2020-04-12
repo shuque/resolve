@@ -11,8 +11,7 @@ import dns.rdatatype
 import dns.rcode
 import dns.dnssec
 
-from reslib.common import Prefs, cache, stats, \
-    MAX_CNAME, MAX_QUERY, MAX_DELEG
+from reslib.common import Prefs, cache, stats
 from reslib.zone import Zone
 from reslib.query import Query
 from reslib.utils import make_query, send_query, is_referral
@@ -138,8 +137,9 @@ def process_answer(response, query, addResults=None):
             cname = rrset[0].target
             cname_dict[rrset.name] = rrset[0].target
             stats.cnt_cname += 1
-            if stats.cnt_cname >= MAX_CNAME:
-                print("ERROR: Too many (%d) CNAME indirections." % MAX_CNAME)
+            if stats.cnt_cname >= Prefs.MAX_CNAME:
+                print("ERROR: Too many ({}) CNAME indirections.".format(
+                    Prefs.MAX_CNAME))
                 return
 
     if cname_dict:
@@ -206,8 +206,9 @@ def send_query_zone(query, zone):
 
     time_start = time.time()
     for nsaddr in nsaddr_list:
-        if stats.cnt_query1 + stats.cnt_query2 >= MAX_QUERY:
-            print("ERROR: Max number of queries (%d) exceeded." % MAX_QUERY)
+        if stats.cnt_query1 + stats.cnt_query2 >= Prefs.MAX_QUERY:
+            print("ERROR: Max number of queries ({}) exceeded.".format(
+                Prefs.MAX_QUERY))
             return None
         if Prefs.VERBOSE and not query.quiet:
             print(">>   Send to zone %s at address %s" % (zone.name, nsaddr.addr))
@@ -235,7 +236,7 @@ def resolve_name(query, zone, inPath=True, addResults=None):
     curr_zone = zone
     repeatZone = False
 
-    while stats.cnt_deleg < MAX_DELEG:
+    while stats.cnt_deleg < Prefs.MAX_DELEG:
 
         if query.minimize:
             if repeatZone:
@@ -272,7 +273,8 @@ def resolve_name(query, zone, inPath=True, addResults=None):
                 break
             curr_zone = referral
 
-    if stats.cnt_deleg >= MAX_DELEG:
-        print("ERROR: Max levels of delegation (%d) reached." % MAX_DELEG)
+    if stats.cnt_deleg >= Prefs.MAX_DELEG:
+        print("ERROR: Max levels of delegation ({}) reached.".format(
+            Prefs.MAX_DELEG))
 
     return

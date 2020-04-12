@@ -5,7 +5,7 @@ Miscellaneous helper functions.
 import time
 import random
 import dns.resolver
-from reslib.common import Prefs, stats, TIMEOUT, RETRIES
+from reslib.common import Prefs, stats
 
 
 def dprint(msg):
@@ -52,7 +52,7 @@ def get_rrset(resolver, qname, qtype):
     return rrset, rrsigs
 
 
-def send_query_tcp(msg, nsaddr, query, timeout=TIMEOUT):
+def send_query_tcp(msg, nsaddr, query, timeout=Prefs.TIMEOUT):
     """Send query over TCP"""
     res = None
     stats.update_query(query, tcp=True)
@@ -63,7 +63,8 @@ def send_query_tcp(msg, nsaddr, query, timeout=TIMEOUT):
     return res
 
 
-def send_query_udp(msg, nsaddr, query, timeout=TIMEOUT, retries=RETRIES):
+def send_query_udp(msg, nsaddr, query,
+                   timeout=Prefs.TIMEOUT, retries=Prefs.RETRIES):
     """Send query over UDP"""
     gotresponse = False
     res = None
@@ -80,8 +81,8 @@ def send_query_udp(msg, nsaddr, query, timeout=TIMEOUT, retries=RETRIES):
     return res
 
 
-def send_query(msg, nsaddr, query, timeout=TIMEOUT, retries=RETRIES,
-               newid=False):
+def send_query(msg, nsaddr, query,
+               timeout=Prefs.TIMEOUT, retries=Prefs.RETRIES, newid=False):
     """send DNS query to specified address"""
     res = None
     if newid:

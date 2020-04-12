@@ -8,6 +8,7 @@ from io import BytesIO
 import dns.rcode
 import dns.rdata
 import dns.rdatatype
+import dns.rdataclass
 import dns.dnssec
 from Crypto.PublicKey import RSA, ECC
 from Crypto.Signature import pkcs1_15, DSS
@@ -15,7 +16,11 @@ from Crypto.Hash import SHA1, SHA256, SHA384, SHA512
 import nacl.encoding
 import nacl.signing
 
-from reslib.root import RootKeyData
+from reslib.root import ROOTHINTS, RootKeyData
+from reslib.common import Prefs, RootZone
+from reslib.query import Query
+from reslib.lookup import send_query_zone
+
 
 # Tolerable clock skew for signatures in seconds
 CLOCK_SKEW = 300
@@ -32,16 +37,34 @@ HASHFUNC = {
 }
 
 
-class ZoneKeys:
-    """Zone to DNSSEC Keys mapping class"""
+class KeyCache:
+    """
+    Zone to DNSSEC Keys mapping class.
+    Ideally, we'd store keys in the common global Cache, but separating
+    makes it easier to run this library without DNSSEC on platforms do
+    not have the required crypto libraries installed.
+    """
 
     def __init__(self):
         # dict of dns.name.Name: list(DNSKEYinfo)
         self.data = {}
         self.install(dns.name.root, [get_root_key()])
 
-    def install(self, zone, keys):
-        self.data[zone] = keys
+    def install(self, zone, keylist):
+        """install (zone -> keylist) into dictionary"""
+        self.data[zone] = keylist
+
+    def get_keys(self, zone):
+        """obtain key list for given zone"""
+        if zone in self.data:
+            return self.data[zone]
+        return None
+
+    def print(self):
+        """Print high level contents of keycache"""
+        print("### Key Cache:")
+        for item in self.data:
+            print("{}: {}".format(item, self.data[item]))
 
 
 class DNSKEYinfo:
@@ -62,9 +85,9 @@ class DNSKEYinfo:
             raise ValueError("DNSKEY algorithm {} not supported".format(
                 self.algorithm))
 
-    def print(self):
-        print("DNSKEY: {} {} {} {}".format(
-            self.name, self.flags, self.keytag, self.algorithm))
+    def __repr__(self):
+        return "<DNSKEYinfo: {} {} {} {}>".format(
+            self.name, self.flags, self.keytag, self.algorithm)
 
 
 def get_root_key():
@@ -82,6 +105,7 @@ def _to_wire(record):
 
 
 def keydata_to_rsa(keydata):
+    """Convert raw keydata into an RSA key object"""
     if keydata[0] == '\x00':   # exponent field is 3 octets
         elen, = struct.unpack('!H', keydata[1:3])
     else:                     # exponent field is 1 octet
@@ -94,6 +118,7 @@ def keydata_to_rsa(keydata):
 
 
 def keydata_to_ecc(algnum, keydata):
+    """Convert raw keydata into an ECC key object"""
     if algnum == 13:
         point_length = 32
         curve = 'p256'
@@ -108,6 +133,7 @@ def keydata_to_ecc(algnum, keydata):
 
 
 def keydata_to_eddsa(algnum, keydata):
+    """Convert raw keydata into an EdDSA key object"""
     if algnum == 15:
         return nacl.signing.VerifyKey(keydata)
     else:
@@ -226,5 +252,38 @@ def validate_all(rrset, rrsigs, dnskey_list):
     return Verified, Failed
 
 
-# Instantiate zone_keys at module level
-zone_keys = ZoneKeys()
+# Instantiate key cache at module level
+key_cache = KeyCache()
+
+
+def get_root_keyset():
+    """
+    Query root DNSKEY RRset, authenticate it with current trust
+    anchor and install the authenticated set in the KeyCache.
+    """
+
+    if not Prefs.DNSSEC:
+        raise ValueError("DNSSEC Preference is not set")
+
+    qname = dns.name.root
+    qtype = dns.rdatatype.from_text('DNSKEY')
+    qclass = dns.rdataclass.from_text('IN')
+    query = Query(qname, qtype, qclass)
+    query.set_quiet(True)
+
+    msg = send_query_zone(query, RootZone)
+    dnskey_rrset = msg.get_rrset(msg.answer, qname, 1, qtype)
+    dnskey_rrsigs = msg.get_rrset(msg.answer, qname, 1,
+                                  dns.rdatatype.RRSIG, covers=qtype)
+
+    if dnskey_rrsigs is None:
+        raise ValueError("No signatures found for root DNSKEY set!")
+
+    verified, failed = validate_all(dnskey_rrset, dnskey_rrsigs,
+                                    key_cache.get_keys(dns.name.root))
+    if not verified:
+        raise ValueError("Couldn't validate root DNSKEY RRset: {}".format(
+            failed))
+
+    key_cache.install(dns.name.root, load_keys(dnskey_rrset))
+    return

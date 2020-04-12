@@ -59,7 +59,7 @@ if __name__ == '__main__':
     dnskey_rrset, _ = get_rrset(r, qname, dns.rdatatype.from_text('DNSKEY'))
     DNSSEC_KEYS = load_keys(dnskey_rrset)
     for keyinfo in DNSSEC_KEYS:
-        keyinfo.print()
+        print(keyinfo)
     print('')
 
     verified, failed = validate_all(soa_rrset, soa_rrsigs, DNSSEC_KEYS)
