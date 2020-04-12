@@ -26,6 +26,7 @@ class Query:
         self.cname_chain = []
         self.answer_rrset = []
         self.full_answer_rrset = []
+        self.dnssec_status = False
 
     def set_quiet(self, action=True):
         """
@@ -62,4 +63,3 @@ class Query:
 
     def __repr__(self):
         return "<Query: %s,%s,%s>" % (self.qname, self.qtype, self.qclass)
-

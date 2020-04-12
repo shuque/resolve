@@ -1,5 +1,5 @@
 """
-Main setup of functions to perform iterative DNS resolution.
+Main suite of functions to perform iterative DNS resolution.
 
 """
 
@@ -11,21 +11,23 @@ import dns.rdatatype
 import dns.rcode
 import dns.dnssec
 
-from reslib.common import Prefs, cache, stats
+from reslib.common import Prefs, cache, stats, RootZone
 from reslib.zone import Zone
 from reslib.query import Query
 from reslib.utils import make_query, send_query, is_referral
+from reslib.dnssec import key_cache, load_keys, validate_all, \
+    ds_rrset_matches_dnskey
 
 
-def get_ns_addrs(zone, message):
+def get_ns_addrs(zone, additional):
     """
-    Populate nameserver addresses for zone from a given referral message.
+    Populate nameserver addresses for zone from the additional section
+    of a given referral message.
 
-    By default, we only save and use NS record addresses we can find
-    in the additional section of the referral. To additonally resolve
-    all non-glue NS record addresses, we need to supply the -n (NSRESOLVE)
-    switch to this program. If no NS address records can be found in the
-    additional section of the referral, we switch to NSRESOLVE mode.
+    To additionally resolve all non-glue NS record addresses, we need to
+    supply the -n (NSRESOLVE) switch to this program. If no NS address
+    records can be found in the additional section of the referral, we
+    switch to NSRESOLVE mode.
     """
 
     needsGlue = []
@@ -34,7 +36,7 @@ def get_ns_addrs(zone, message):
             needsGlue.append(nsname)
     needToResolve = list(set(zone.nslist) - set(needsGlue))
 
-    for rrset in message.additional:
+    for rrset in additional:
         if rrset.rdtype in [dns.rdatatype.A, dns.rdatatype.AAAA]:
             name = rrset.name
             for rr in rrset:
@@ -61,31 +63,69 @@ def get_ns_addrs(zone, message):
     return
 
 
+def install_zone_in_cache(zonename, ns_rrset, ds_rrset, additional):
+    """
+    Install zone entry and associated info in global cache. Return
+    zone object.
+    """
+    zone = cache.get_zone(zonename)
+    if zone is None:
+        zone = Zone(zonename, cache)
+        for rr in ns_rrset:
+            _ = zone.install_ns(rr.target)
+        if ds_rrset:
+            zone.install_ds(ds_rrset.to_rdataset())
+    get_ns_addrs(zone, additional)
+    return zone
+
+
 def process_referral(message, query):
     """
     Process referral. Returns a zone object for the referred zone.
+    The zone object is populated with the nameserver names, addresses,
+    and if present, authenticated DS RRset data.
     """
+
+    ns_rrset = ds_rrset = ds_rrsigs = None
 
     for rrset in message.authority:
         if rrset.rdtype == dns.rdatatype.NS:
-            break
-    else:
+            if ns_rrset is None:
+                ns_rrset = rrset
+            else:
+                raise ValueError("Multiple NS RRset found in referral")
+        elif rrset.rdtype == dns.rdatatype.DS:
+            if ds_rrset is None:
+                ds_rrset = rrset
+            else:
+                raise ValueError("Multiple DS RRset found in referral")
+        elif rrset.rdtype == dns.rdatatype.RRSIG:
+            if rrset.covers == dns.rdatatype.DS:
+                if ds_rrsigs is None:
+                    ds_rrsigs = rrset
+                else:
+                    raise ValueError("Multiple DS RRSIG sets found in referral")
+
+    if ns_rrset is None:
         print("ERROR: unable to find NS RRset in referral response")
         return None
 
-    zonename = rrset.name
+    zonename = ns_rrset.name
+    if ds_rrset:
+        if zonename != ds_rrset.name:
+            raise ValueError("DS didn't match NS in referral message")
+        if ds_rrsigs is None:
+            raise ValueError("DS RRset has no signatures")
+        ds_verified, _ = validate_all(ds_rrset, ds_rrsigs)
+        if not ds_verified:
+            raise ValueError("DS RRset failed to authenticate")
+
     if Prefs.VERBOSE and not query.quiet:
         print(">>        [Got Referral to zone: %s in %.3f s]" % \
               (zonename, query.elapsed_last))
 
-    zone = cache.get_zone(zonename)
-    if zone is None:
-        zone = Zone(zonename, cache)
-        for rr in rrset:
-            _ = zone.install_ns(rr.target)
-
-    get_ns_addrs(zone, message)
-
+    zone = install_zone_in_cache(zonename, ns_rrset, ds_rrset,
+                                 message.additional)
     if Prefs.VERBOSE and not query.quiet:
         zone.print_details()
 
@@ -100,6 +140,7 @@ def process_answer(response, query, addResults=None):
     cname_dict = {}              # dict of alias -> target
 
     # If minimizing, ignore answers for intermediate query names.
+    # TODO: for DNSSEC, authenticate thse intermediate answers too.
     if query.qname != query.orig_qname:
         return
 
@@ -227,6 +268,35 @@ def send_query_zone(query, zone):
     return response
 
 
+def match_ds(zone):
+    """
+    DS (Delegation Signer) processing: Authenticate the secure delegation
+    to the zone, by fetching its DNSKEY RRset, authenticating the self
+    signature on it, and matching one of the DNSKEYs to the (previously
+    authenticated) DS data in the zone object.
+    """
+
+    dnskey_rrset, dnskey_rrsigs = fetch_dnskey(zone)
+    if dnskey_rrsigs is None:
+        raise ValueError("No signatures found for root DNSKEY set!")
+
+    keylist = load_keys(dnskey_rrset)
+    key_cache.install(zone.name, keylist)
+
+    verified, failed = validate_all(dnskey_rrset, dnskey_rrsigs)
+    if not verified:
+        raise ValueError("Couldn't validate root DNSKEY RRset: {}".format(
+            failed))
+
+    for key in keylist:
+        if not key.sep_flag:
+            continue
+        if ds_rrset_matches_dnskey(zone.dslist, key):
+            zone.set_ds_verified(True)
+            return True
+    raise ValueError("DS RRset did not match DNSKEY RRset")
+
+
 def resolve_name(query, zone, inPath=True, addResults=None):
     """
     Resolve a DNS query. addResults is an optional Query object to
@@ -268,13 +338,55 @@ def resolve_name(query, zone, inPath=True, addResults=None):
             if inPath:
                 stats.delegation_depth += 1
             if not referral.name.is_subdomain(curr_zone.name):
-                print("ERROR: Upward referral: %s is not subdomain of %s" %
+                print("ERROR: referral: %s is not subdomain of %s" %
                       (referral.name, curr_zone.name))
                 break
             curr_zone = referral
+            if curr_zone.dslist:
+                match_ds(curr_zone)
 
     if stats.cnt_deleg >= Prefs.MAX_DELEG:
         print("ERROR: Max levels of delegation ({}) reached.".format(
             Prefs.MAX_DELEG))
 
+    return
+
+
+def fetch_dnskey(zone):
+    """
+    Fetch DNSKEY RRset and signatures from specified zone.
+    """
+
+    qname = zone.name
+    qtype = dns.rdatatype.from_text('DNSKEY')
+    qclass = dns.rdataclass.from_text('IN')
+    query = Query(qname, qtype, qclass)
+    query.set_quiet(True)
+
+    msg = send_query_zone(query, zone)
+    dnskey_rrset = msg.get_rrset(msg.answer, qname, 1, qtype)
+    dnskey_rrsigs = msg.get_rrset(msg.answer, qname, 1,
+                                  dns.rdatatype.RRSIG, covers=qtype)
+    if dnskey_rrsigs is None:
+        raise ValueError("No signatures found for root DNSKEY set!")
+    return dnskey_rrset, dnskey_rrsigs
+
+
+def initialize_dnssec():
+    """
+    Query root DNSKEY RRset, authenticate it with current trust
+    anchor and install the authenticated set in the KeyCache.
+    """
+
+    dnskey_rrset, dnskey_rrsigs = fetch_dnskey(RootZone)
+
+    if dnskey_rrsigs is None:
+        raise ValueError("No signatures found for root DNSKEY set!")
+
+    verified, failed = validate_all(dnskey_rrset, dnskey_rrsigs)
+    if not verified:
+        raise ValueError("Couldn't validate root DNSKEY RRset: {}".format(
+            failed))
+
+    key_cache.install(dns.name.root, load_keys(dnskey_rrset))
     return

@@ -16,10 +16,7 @@ from Crypto.Hash import SHA1, SHA256, SHA384, SHA512
 import nacl.encoding
 import nacl.signing
 
-from reslib.root import ROOTHINTS, RootKeyData
-from reslib.common import Prefs, RootZone
-from reslib.query import Query
-from reslib.lookup import send_query_zone
+from reslib.root import RootKeyData
 
 
 # Tolerable clock skew for signatures in seconds
@@ -34,6 +31,13 @@ HASHFUNC = {
     13: SHA256,
     14: SHA384,
     15: None,
+}
+
+# DS (Delegation Signer) Digest Algorithms
+DS_ALG = {
+    1: SHA1,
+    2: SHA256,
+    4: SHA384,
 }
 
 
@@ -73,8 +77,11 @@ class DNSKEYinfo:
     def __init__(self, rrname, rr):
         self.name = rrname
         self.flags = rr.flags
+        self.protocol = rr.protocol
         self.algorithm = rr.algorithm
+        self.rawkey = rr.key
         self.keytag = dns.dnssec.key_id(rr)
+        self.sep_flag = (self.flags & 0x01) == 0x01
         if self.algorithm in [5, 7, 8, 10]:
             self.key = keydata_to_rsa(rr.key)
         elif self.algorithm in [13, 14]:
@@ -145,7 +152,6 @@ def load_keys(rrset):
     return list of DNSKEYinfo class objects from the given DNSKEY RRset
     parameters (name, keytag, algorithm, key object)
     """
-
     result = []
     for rr in rrset:
         result.append(DNSKEYinfo(rrset.name, rr))
@@ -224,7 +230,7 @@ def verify_sig(key, sig_input, signature):
     return
 
 
-def validate_all(rrset, rrsigs, dnskey_list):
+def validate_all(rrset, rrsigs):
     """
     Validate rrsigs for rrset with list of dnskeys.
     Returns 2 lists of keys: Verified and Failed. Failed also
@@ -238,7 +244,11 @@ def validate_all(rrset, rrsigs, dnskey_list):
     Failed = []                       # list of (key, error)
 
     for sig_input, signature, sig_rdata in get_sig_inputs(rrset, rrsigs):
-        for keyinfo in dnskey_list:
+        keylist = key_cache.get_keys(sig_rdata.signer)
+        if keylist is None:
+            raise ValueError("No DNSSEC keys found for {}".format(
+                sig_rdata.signer))
+        for keyinfo in keylist:
             if keyinfo.keytag != sig_rdata.key_tag:
                 continue
             try:
@@ -252,38 +262,31 @@ def validate_all(rrset, rrsigs, dnskey_list):
     return Verified, Failed
 
 
+def ds_rrset_matches_dnskey(ds_list, dnskey):
+    """
+    digest = digest_algorithm( DNSKEY owner name | DNSKEY RDATA);
+      "|" denotes concatenation
+     DNSKEY RDATA = Flags | Protocol | Algorithm | Public Key.
+    """
+
+    preimage = (dnskey.name.to_digestable() +
+                struct.pack('!H', dnskey.flags) +
+                struct.pack('B', dnskey.protocol) +
+                struct.pack('B', dnskey.algorithm) +
+                dnskey.rawkey)
+    for ds in ds_list:
+        if ds.key_tag != dnskey.keytag:
+            continue
+        if ds.algorithm != dnskey.algorithm:
+            continue
+        if ds.digest_type not in DS_ALG:
+            continue
+        hashout = DS_ALG[ds.digest_type].new()
+        hashout.update(preimage)
+        if hashout.digest() == ds.digest:
+            return True
+    return False
+
+
 # Instantiate key cache at module level
 key_cache = KeyCache()
-
-
-def get_root_keyset():
-    """
-    Query root DNSKEY RRset, authenticate it with current trust
-    anchor and install the authenticated set in the KeyCache.
-    """
-
-    if not Prefs.DNSSEC:
-        raise ValueError("DNSSEC Preference is not set")
-
-    qname = dns.name.root
-    qtype = dns.rdatatype.from_text('DNSKEY')
-    qclass = dns.rdataclass.from_text('IN')
-    query = Query(qname, qtype, qclass)
-    query.set_quiet(True)
-
-    msg = send_query_zone(query, RootZone)
-    dnskey_rrset = msg.get_rrset(msg.answer, qname, 1, qtype)
-    dnskey_rrsigs = msg.get_rrset(msg.answer, qname, 1,
-                                  dns.rdatatype.RRSIG, covers=qtype)
-
-    if dnskey_rrsigs is None:
-        raise ValueError("No signatures found for root DNSKEY set!")
-
-    verified, failed = validate_all(dnskey_rrset, dnskey_rrsigs,
-                                    key_cache.get_keys(dns.name.root))
-    if not verified:
-        raise ValueError("Couldn't validate root DNSKEY RRset: {}".format(
-            failed))
-
-    key_cache.install(dns.name.root, load_keys(dnskey_rrset))
-    return

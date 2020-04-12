@@ -14,7 +14,8 @@ import sys
 import dns.name
 import dns.rdatatype
 
-from reslib.dnssec import *
+from reslib.common import Prefs
+from reslib.dnssec import key_cache, load_keys, validate_all
 from reslib.utils import get_resolver, get_rrset
 
 
@@ -42,6 +43,7 @@ def print_results(verified, failed):
 if __name__ == '__main__':
 
 
+    Prefs.DNSSEC = True
     qname = dns.name.from_text(sys.argv[1])
     qtype = dns.rdatatype.from_text('SOA')
 
@@ -57,12 +59,10 @@ if __name__ == '__main__':
     print('')
 
     dnskey_rrset, _ = get_rrset(r, qname, dns.rdatatype.from_text('DNSKEY'))
-    DNSSEC_KEYS = load_keys(dnskey_rrset)
-    for keyinfo in DNSSEC_KEYS:
-        print(keyinfo)
-    print('')
+    key_cache.install(qname, load_keys(dnskey_rrset))
+    key_cache.print()
 
-    verified, failed = validate_all(soa_rrset, soa_rrsigs, DNSSEC_KEYS)
+    verified, failed = validate_all(soa_rrset, soa_rrsigs)
     print_results(verified, failed)
     if verified:
         sys.exit(0)

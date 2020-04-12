@@ -17,7 +17,7 @@ import random
 from reslib.common import Prefs, stats, cache, RootZone
 from reslib.usage import usage
 from reslib.query import Query
-from reslib.lookup import resolve_name
+from reslib.lookup import resolve_name, initialize_dnssec
 from reslib.batch import batchmode
 
 
@@ -95,6 +95,9 @@ if __name__ == '__main__':
 
     random.seed(os.urandom(64))
     qname, qtype, qclass = process_args(sys.argv[1:])
+
+    if Prefs.DNSSEC:
+        initialize_dnssec()
 
     if Prefs.BATCHFILE:
         time_start = time.time()
