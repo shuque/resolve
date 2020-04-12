@@ -66,7 +66,7 @@ def process_args(arguments):
         elif opt == "-b":
             Prefs.BATCHFILE = optval
 
-    if (Prefs.PAYLOAD is None) and Prefs.DNSSEC_OK:
+    if (Prefs.PAYLOAD is None) and Prefs.DNSSEC:
         usage("Error: -e and -z are mutually incompatible.")
 
     if Prefs.BATCHFILE:
