@@ -13,8 +13,15 @@ Pre-requisites:
 - Python 3
 - [dnspython module](http://www.dnspython.org/) (included with most Linux/*BSD distributions)
 - DNSSEC support (in development) requires additional modules:
-  - pycryptodome
-  - pynacl
+  - [pycryptodome](https://www.pycryptodome.org/en/latest/)
+  - [pynacl](https://pypi.org/project/PyNaCl/)
+
+DNSSEC support is in the preliminary phases of development. The library
+routines to perform DNSSEC validation are written, but they haven't yet
+been fully integrated into the iterative resolution code. At the current
+time, it initializes the root trust anchor, and authenticates secure
+referrals down to the target zone. But doesn't yet authenticate the
+target answers, or perform authenticated denial of existence.
 
 ```
 resolve.py version 0.20
