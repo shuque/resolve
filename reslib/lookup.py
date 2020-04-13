@@ -252,7 +252,12 @@ def send_query_zone(query, zone):
         if Prefs.VERBOSE and not query.quiet:
             print(">>   Send to zone {} at address {}".format(
                 zone.name, nsaddr.addr))
-        response = send_query(msg, nsaddr, query, newid=True)
+        try:
+            response = send_query(msg, nsaddr, query, newid=True)
+        except OSError as e:
+            print("OSError {}: {}: {}".format(
+                e.errno, e.strerror, nsaddr.addr))
+            response = None
         if response:
             rc = response.rcode()
             if rc not in [dns.rcode.NOERROR, dns.rcode.NXDOMAIN]:
