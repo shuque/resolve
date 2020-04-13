@@ -9,6 +9,11 @@ DNS name, type, and class. If either type or class or both are omitted,
 then a  default type of 'A' (IPv4 address record), and a default class 
 of 'IN' (Internet class) are used.
 
+I often use this program to debug a variety of DNS configuration
+problems. I prefer it these days to "dig +trace", because the latter
+only resolves the exact name given to it, and does not follow CNAME
+and DNAME redirections, and also does not support qname minimization.
+
 Pre-requisites:  
 - Python 3
 - [dnspython module](http://www.dnspython.org/) (included with most Linux/*BSD distributions)
@@ -16,7 +21,7 @@ Pre-requisites:
   - [pycryptodome](https://www.pycryptodome.org/en/latest/)
   - [pynacl](https://pypi.org/project/PyNaCl/)
 
-DNSSEC support is in the preliminary phases of development. The library
+DNSSEC support is in development and not yet completed. The library
 routines to perform DNSSEC validation are written, but they haven't yet
 been fully integrated into the iterative resolution code. At the current
 time, it initializes the root trust anchor, and authenticates secure
@@ -27,11 +32,12 @@ Algorithm 16 is planned for the future.
 
 If you need to use a version without DNSSEC, because you haven't or don't
 want to install the pycryptodome and pynacl crypto libraries, you can
-install an earlier version of this module: v2.0 or v.15 should run fine
-without them.
+install an earlier version of this module: v0.15 or v0.20 should run fine
+without them. Just checkout the corresponding tags from this repo, or
+grab the release tarballs for those versions.
 
 ```
-resolve.py version 0.20
+resolve.py version 0.21
 Perform iterative resolution of a DNS name, type, and class.
 
 Usage: resolve.py [-dmtsnxez] <qname> [<qtype>] [<qclass>]
