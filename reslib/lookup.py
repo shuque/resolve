@@ -121,8 +121,8 @@ def process_referral(message, query):
             raise ValueError("DS RRset failed to authenticate")
 
     if Prefs.VERBOSE and not query.quiet:
-        print(">>        [Got Referral to zone: %s in %.3f s]" % \
-              (zonename, query.elapsed_last))
+        print(">>        [Got Referral to zone: {} in {:.3f} s]".format(
+            zonename, query.elapsed_last))
 
     zone = install_zone_in_cache(zonename, ns_rrset, ds_rrset,
                                  message.additional)
@@ -145,25 +145,22 @@ def process_answer(response, query, addResults=None):
         return
 
     if Prefs.VERBOSE and not query.quiet:
-        print(">>        [Got answer in  %.3f s]" % query.elapsed_last)
+        print(">>        [Got answer in {:.3f} s]".format(query.elapsed_last))
 
     if not response.answer:
         if not query.quiet:
-            print("ERROR: NODATA: %s of type %s not found" % \
-                  (query.qname, query.qtype))
+            print("ERROR: NODATA: {} of type {} not found".format(
+                query.qname,
+                dns.rdatatype.to_text(query.qtype)))
         return
 
     for rrset in response.answer:
-        if rrset.rdtype == dns.rdatatype.from_text(query.qtype) and \
-           rrset.name == query.qname:
+        if rrset.rdtype == query.qtype and rrset.name == query.qname:
             query.answer_rrset.append(rrset)
             if addResults:
                 addResults.full_answer_rrset.append(rrset)
             query.got_answer = True
         elif rrset.rdtype == dns.rdatatype.DNAME:
-            # Add DNAME record to results. Technically a good resolver should
-            # do DNAME->CNAME synthesis itself here, but we rely on the fact
-            # that almost all authorities provide the CNAMEs themselves.
             query.answer_rrset.append(rrset)
             if addResults:
                 addResults.full_answer_rrset.append(rrset)
@@ -222,28 +219,29 @@ def process_response(response, query, addResults=None):
             process_answer(response, query, addResults=addResults)
     elif rc == dns.rcode.NXDOMAIN:                       # NXDOMAIN
         if not query.quiet:
-            print("ERROR: NXDOMAIN: %s not found" % query.qname)
+            print("ERROR: NXDOMAIN: {} not found".format(query.qname))
 
     return (rc, referral)
 
 
 def send_query_zone(query, zone):
-    """
-    Send DNS query to nameservers of given zone
-    """
+    """Send DNS query to nameservers of given zone"""
 
     response = None
 
     if Prefs.VERBOSE and not query.quiet:
-        print("\n>> Query: %s %s %s at zone %s" % \
-               (query.qname, query.qtype, query.qclass, zone.name))
+        print("\n>> QUERY: {} {} {} at zone {}".format(
+            query.qname,
+            dns.rdatatype.to_text(query.qtype),
+            dns.rdataclass.to_text(query.qclass),
+            zone.name))
 
     msg = make_query(query.qname, query.qtype, query.qclass)
 
     nsaddr_list = zone.iplist_sorted_by_rtt()
     if not nsaddr_list:
-        print("ERROR: No nameserver addresses found for zone: %s." % zone.name)
-        return None
+        raise ValueError("No nameserver addresses found for zone: {}.".format(
+            zone.name))
 
     time_start = time.time()
     for nsaddr in nsaddr_list:
@@ -252,17 +250,20 @@ def send_query_zone(query, zone):
                 Prefs.MAX_QUERY))
             return None
         if Prefs.VERBOSE and not query.quiet:
-            print(">>   Send to zone %s at address %s" % (zone.name, nsaddr.addr))
+            print(">>   Send to zone {} at address {}".format(
+                zone.name, nsaddr.addr))
         response = send_query(msg, nsaddr, query, newid=True)
         if response:
             rc = response.rcode()
             if rc not in [dns.rcode.NOERROR, dns.rcode.NXDOMAIN]:
                 stats.cnt_fail += 1
-                print("WARNING: response %s from %s" % (dns.rcode.to_text(rc), nsaddr.addr))
+                print("WARNING: response {} from {}".format(
+                    dns.rcode.to_text(rc), nsaddr.addr))
             else:
                 break
     else:
-        print("ERROR: Queries to all servers for zone %s failed." % zone.name)
+        raise ValueError("Queries to all servers for zone {} failed.".format(
+            zone.name))
 
     query.elapsed_last = time.time() - time_start
     return response
@@ -294,7 +295,7 @@ def match_ds(zone):
         if ds_rrset_matches_dnskey(zone.dslist, key):
             zone.set_ds_verified(True)
             return True
-    raise ValueError("DS RRset did not match DNSKEY RRset")
+    raise ValueError("DS did not match DNSKEY for {}".format(zone.name))
 
 
 def resolve_name(query, zone, inPath=True, addResults=None):
@@ -338,8 +339,8 @@ def resolve_name(query, zone, inPath=True, addResults=None):
             if inPath:
                 stats.delegation_depth += 1
             if not referral.name.is_subdomain(curr_zone.name):
-                print("ERROR: referral: %s is not subdomain of %s" %
-                      (referral.name, curr_zone.name))
+                print("ERROR: referral: {} is not subdomain of {}".format(
+                    referral.name, curr_zone.name))
                 break
             curr_zone = referral
             if curr_zone.dslist:

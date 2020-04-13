@@ -50,11 +50,11 @@ class Zone:
 
     def print_details(self):
         """Print zone information"""
-        print("ZONE: %s" % self.name)
+        print("ZONE: {}".format(self.name))
         for nsname in self.nslist:
             nsobj = self.cache.get_ns(nsname)
             addresses = [x.addr for x in nsobj.iplist]
-            print("%s %s %s" % (self.name, nsobj.name, addresses))
+            print("{} {} {}".format(self.name, nsobj.name, addresses))
         for ds_data in self.dslist:
             print("DS: {} {} {} {}".format(
                 ds_data.key_tag,
@@ -63,4 +63,4 @@ class Zone:
                 hexlify(ds_data.digest).decode()))
 
     def __repr__(self):
-        return "<Zone: %s>" % self.name
+        return "<Zone: {}>".format(self.name)

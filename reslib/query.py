@@ -4,6 +4,7 @@ DNS Query class
 
 import dns.name
 import dns.rdatatype
+import dns.rdataclass
 
 
 class Query:
@@ -15,8 +16,14 @@ class Query:
         else:
             self.qname = dns.name.from_text(qname)
         self.orig_qname = self.qname
-        self.qtype = qtype
-        self.qclass = qclass
+        if isinstance(qtype, int):
+            self.qtype = qtype
+        else:
+            self.qtype = dns.rdatatype.from_text(qtype)
+        if isinstance(qclass, int):
+            self.qclass = qclass
+        else:
+            self.qclass = dns.rdataclass.from_text(qclass)
         self.minimize = minimize
         self.is_nsquery = is_nsquery
         self.quiet = False                # don't print query being issued
@@ -62,4 +69,4 @@ class Query:
         self.qname = dns.name.Name(self.orig_qname[-numLabels:])
 
     def __repr__(self):
-        return "<Query: %s,%s,%s>" % (self.qname, self.qtype, self.qclass)
+        return "<Query: {},{},{}>".format(self.qname, self.qtype, self.qclass)

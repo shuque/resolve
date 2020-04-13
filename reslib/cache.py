@@ -52,11 +52,11 @@ class Cache:
         """Dump zone and NS cache contents - for debugging"""
         print("---------------------------- Zone Cache ----------------")
         for zname, zobj in self.ZoneDict.items():
-            print("Zone: %s" % zname)
+            print("Zone: {}".format(zname))
             for ns in zobj.nslist:
-                print("    NS: %s" % self.NSDict[ns].name)
+                print("    NS: {}".format(self.NSDict[ns].name))
         print("---------------------------- NS   Cache ----------------")
         for nsname, nsobj in self.NSDict.items():
             ipstring_list = " ".join([x.addr for x in nsobj.iplist])
-            print("%s %s" % (nsname, ipstring_list))
+            print("{} {}".format(nsname, ipstring_list))
 

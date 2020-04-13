@@ -21,7 +21,14 @@ routines to perform DNSSEC validation are written, but they haven't yet
 been fully integrated into the iterative resolution code. At the current
 time, it initializes the root trust anchor, and authenticates secure
 referrals down to the target zone. But doesn't yet authenticate the
-target answers, or perform authenticated denial of existence.
+target answers, or perform authenticated denial of existence. It supports
+the most popular signing algorithms today: 5, 7, 8, 10, 13, 14, 15.
+Algorithm 16 is planned for the future.
+
+If you need to use a version without DNSSEC, because you haven't or don't
+want to install the pycryptodome and pynacl crypto libraries, you can
+install an earlier version of this module: v2.0 or v.15 should run fine
+without them.
 
 ```
 resolve.py version 0.20

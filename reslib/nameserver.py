@@ -10,7 +10,7 @@ class IPaddress:
         self.query_count = 0
 
     def __repr__(self):
-        return "<IPaddress: %s>" % self.addr
+        return "<IPaddress: {}>".format(self.addr)
 
 
 class NameServer:
@@ -29,5 +29,5 @@ class NameServer:
         return
 
     def __repr__(self):
-        return "<NS: %s>" % self.name
+        return "<NS: {}>".format(self.name)
 

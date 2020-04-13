@@ -28,14 +28,14 @@ def batchmode(cache, infile, info):
         elif len(parts) == 3:
             qname, qtype, qclass = parts
         else:
-            print("\nERROR input line %d: %s" % (linenum, line))
+            print("\nERROR input line {}: {}".format(linenum, line))
             continue
 
-        print("\n### INPUT: %s, %s, %s" % (qname, qtype, qclass))
+        print("\n### INPUT: {}, {}, {}".format(qname, qtype, qclass))
         query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
         starting_zone = cache.closest_zone(query.qname)
-        print("### Query: %s" % query)
-        print("### Starting at zone: %s" % starting_zone)
+        print("### Query: {}".format(query))
+        print("### Starting at zone: {}".format(starting_zone))
         resolve_name(query, starting_zone, addResults=query)
         if Prefs.VERBOSE:
             print('')

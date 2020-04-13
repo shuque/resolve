@@ -11,7 +11,7 @@ from reslib.common import Prefs, stats
 def dprint(msg):
     """Print debugging message if DEBUG flag is set"""
     if Prefs.DEBUG:
-        print(">> DEBUG: %s" % msg)
+        print(">> DEBUG: {}".format(msg))
     return
 
 
@@ -39,17 +39,6 @@ def get_resolver(dnssec_ok=False, timeout=5):
     if dnssec_ok:
         r.use_edns(edns=0, ednsflags=dns.flags.DO, payload=4096)
     return r
-
-
-def get_rrset(resolver, qname, qtype):
-    """
-    Query name and type; return answer RRset and signature RRset.
-    """
-    msg = resolver.query(qname, qtype).response
-    rrset = msg.get_rrset(msg.answer, qname, 1, qtype)
-    rrsigs = msg.get_rrset(msg.answer, qname, 1,
-                           dns.rdatatype.RRSIG, covers=qtype)
-    return rrset, rrsigs
 
 
 def send_query_tcp(msg, nsaddr, query, timeout=Prefs.TIMEOUT):
@@ -109,3 +98,23 @@ def make_query(qname, qtype, qclass):
                                  payload=Prefs.PAYLOAD)
     msg.flags &= ~dns.flags.RD
     return msg
+
+
+def get_rrset_from_section(message, section, qname, qtype):
+    """
+    From given DNS message/section return answer RRset and
+    signature RRset for specified qname and qtype.
+    """
+    rrset = message.get_rrset(section, qname, 1, qtype)
+    rrsigs = message.get_rrset(section, qname, 1,
+                               dns.rdatatype.RRSIG, covers=qtype)
+    return rrset, rrsigs
+
+
+def get_rrset(resolver, qname, qtype):
+    """
+    User resolver to query name and type. Return answer RRset and
+    signature RRset.
+    """
+    msg = resolver.query(qname, qtype).response
+    return get_rrset_from_section(msg, msg.answer, qname, qtype)
