@@ -54,7 +54,7 @@ class Zone:
         for nsname in self.nslist:
             nsobj = self.cache.get_ns(nsname)
             addresses = " ".join([x.addr for x in nsobj.iplist])
-            print("{} {} {}".format(self.name, nsobj.name, addresses))
+            print("NS: {} {}".format(nsobj.name, addresses))
         for ds_data in self.dslist:
             print("DS: {} {} {} {}".format(
                 ds_data.key_tag,
