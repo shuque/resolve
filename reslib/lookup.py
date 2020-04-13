@@ -133,9 +133,7 @@ def process_referral(message, query):
 
 
 def process_answer(response, query, addResults=None):
-    """
-    Process answer section, chasing aliases when needed.
-    """
+    """Process answer section, chasing aliases when needed."""
 
     cname_dict = {}              # dict of alias -> target
 
@@ -146,13 +144,6 @@ def process_answer(response, query, addResults=None):
 
     if Prefs.VERBOSE and not query.quiet:
         print(">>        [Got answer in {:.3f} s]".format(query.elapsed_last))
-
-    if not response.answer:
-        if not query.quiet:
-            print("ERROR: NODATA: {} of type {} not found".format(
-                query.qname,
-                dns.rdatatype.to_text(query.qtype)))
-        return
 
     for rrset in response.answer:
         if rrset.rdtype == query.qtype and rrset.name == query.qname:
@@ -199,35 +190,39 @@ def process_answer(response, query, addResults=None):
 
 def process_response(response, query, addResults=None):
     """
-    Process a DNS response. Returns rcode, answer message, zone referral.
+    Process a DNS response. Returns rcode & zone referral.
     """
 
-    rc = None
-    ans = None
     referral = None
+    query.rcode = response.rcode()
 
-    if not response:
-        return (rc, ans, referral)
-    rc = response.rcode()
-    query.rcode = rc
-    if rc == dns.rcode.NOERROR:
+    if query.rcode == dns.rcode.NOERROR:
         if is_referral(response):
             referral = process_referral(response, query)
             if not referral:
                 print("ERROR: processing referral")
+        elif not response.answer:                        # NODATA
+            if Prefs.VERBOSE and not query.quiet:
+                print(">>        [Got answer in {:.3f} s]".format(
+                    query.elapsed_last))
+            if not query.quiet:
+                print("ERROR: NODATA: {} of type {} not found".format(
+                    query.qname,
+                    dns.rdatatype.to_text(query.qtype)))
         else:                                            # Answer
             process_answer(response, query, addResults=addResults)
-    elif rc == dns.rcode.NXDOMAIN:                       # NXDOMAIN
+    elif query.rcode == dns.rcode.NXDOMAIN:              # NXDOMAIN
+        if Prefs.VERBOSE and not query.quiet:
+            print(">>        [Got answer in {:.3f} s]".format(
+                query.elapsed_last))
         if not query.quiet:
             print("ERROR: NXDOMAIN: {} not found".format(query.qname))
 
-    return (rc, referral)
+    return (query.rcode, referral)
 
 
 def send_query_zone(query, zone):
     """Send DNS query to nameservers of given zone"""
-
-    response = None
 
     if Prefs.VERBOSE and not query.quiet:
         print("\n>> QUERY: {} {} {} at zone {}".format(
@@ -244,11 +239,12 @@ def send_query_zone(query, zone):
             zone.name))
 
     time_start = time.time()
+
     for nsaddr in nsaddr_list:
+        response = None
         if stats.cnt_query1 + stats.cnt_query2 >= Prefs.MAX_QUERY:
-            print("ERROR: Max number of queries ({}) exceeded.".format(
+            raise ValueError("Max number of queries ({}) exceeded.".format(
                 Prefs.MAX_QUERY))
-            return None
         if Prefs.VERBOSE and not query.quiet:
             print(">>   Send to zone {} at address {}".format(
                 zone.name, nsaddr.addr))
@@ -257,13 +253,11 @@ def send_query_zone(query, zone):
         except OSError as e:
             print("OSError {}: {}: {}".format(
                 e.errno, e.strerror, nsaddr.addr))
-            response = None
         if response:
-            rc = response.rcode()
-            if rc not in [dns.rcode.NOERROR, dns.rcode.NXDOMAIN]:
+            if response.rcode() not in [dns.rcode.NOERROR, dns.rcode.NXDOMAIN]:
                 stats.cnt_fail += 1
                 print("WARNING: response {} from {}".format(
-                    dns.rcode.to_text(rc), nsaddr.addr))
+                    dns.rcode.to_text(response.rcode()), nsaddr.addr))
             else:
                 break
     else:
