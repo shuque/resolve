@@ -4,7 +4,7 @@ TODO: convert this to a more efficient tree data structure.
 """
 
 import dns.name
-from reslib.root import ROOTHINTS
+from reslib.hints import ROOTHINTS
 from reslib.zone import Zone
 
 

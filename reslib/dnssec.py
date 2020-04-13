@@ -16,7 +16,7 @@ from Crypto.Hash import SHA1, SHA256, SHA384, SHA512
 import nacl.encoding
 import nacl.signing
 
-from reslib.root import RootKeyData
+from reslib.rootkey import RootKeyData
 
 
 # Tolerable clock skew for signatures in seconds
@@ -281,8 +281,7 @@ def ds_rrset_matches_dnskey(ds_list, dnskey):
             continue
         if ds.digest_type not in DS_ALG:
             continue
-        hashout = DS_ALG[ds.digest_type].new()
-        hashout.update(preimage)
+        hashout = DS_ALG[ds.digest_type].new(data=preimage)
         if hashout.digest() == ds.digest:
             return True
     return False
