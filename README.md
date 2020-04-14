@@ -21,13 +21,10 @@ Pre-requisites:
   - [pycryptodome](https://www.pycryptodome.org/en/latest/)
   - [pynacl](https://pypi.org/project/PyNaCl/)
 
-DNSSEC support is in development and not yet completed. The library
-routines to perform DNSSEC validation are written, but they haven't yet
-been fully integrated into the iterative resolution code. At the current
-time, it initializes the root trust anchor, and authenticates secure
-referrals down to the target zone. But doesn't yet authenticate the
-target answers, or perform authenticated denial of existence. It supports
-the most popular signing algorithms today: 5, 7, 8, 10, 13, 14, 15.
+DNSSEC validation is still under development. A preliminary implementation
+of full chain authentication of positive answers is done, although some
+fine tuning is needed. Authenticated denial of existence is not yet implemented.
+The most popular signing algorithms are supported (5, 7, 8, 10, 13, 14, 15).
 Algorithm 16 is planned for the future.
 
 If you need to use a version without DNSSEC, because you haven't or don't
