@@ -14,6 +14,7 @@ import dns.dnssec
 from reslib.common import Prefs, cache, stats, RootZone
 from reslib.zone import Zone
 from reslib.query import Query
+from reslib.rrset import RRset
 from reslib.utils import make_query, send_query, is_referral
 from reslib.dnssec import key_cache, load_keys, validate_all, \
     ds_rrset_matches_dnskey
@@ -132,39 +133,74 @@ def process_referral(message, query):
     return zone
 
 
+def get_rrset_dict(section):
+    """get dict of RRset objects from given message section"""
+
+    rrset_dict = {}
+
+    for rrset in section:
+        if rrset.rdtype == dns.rdatatype.RRSIG:
+            if (rrset.name, rrset.covers) in rrset_dict:
+                r = rrset_dict[(rrset.name, rrset.covers)]
+                r.set_rrsig(rrset)
+            else:
+                r = RRset(rrset.name, rrset.covers, rrsig=rrset)
+                rrset_dict[(rrset.name, rrset.covers)] = r
+        else:
+            if (rrset.name, rrset.rdtype) in rrset_dict:
+                r = rrset_dict[(rrset.name, rrset.rdtype)]
+                r.set_rrset(rrset)
+            else:
+                r = RRset(rrset.name, rrset.rdtype, rrset=rrset)
+                rrset_dict[(rrset.name, rrset.rdtype)] = r
+
+    return rrset_dict
+
+
 def process_answer(response, query, addResults=None):
     """Process answer section, chasing aliases when needed."""
 
     cname_dict = {}              # dict of alias -> target
 
-    # If minimizing, ignore answers for intermediate query names.
-    # TODO: for DNSSEC, authenticate thse intermediate answers too.
+    # qname minimization (ignore); TODO: validate also?
     if query.qname != query.orig_qname:
         return
 
     if Prefs.VERBOSE and not query.quiet:
         print(">>        [Got answer in {:.3f} s]".format(query.elapsed_last))
 
-    for rrset in response.answer:
-        if rrset.rdtype == query.qtype and rrset.name == query.qname:
-            query.answer_rrset.append(rrset)
-            if addResults:
-                addResults.full_answer_rrset.append(rrset)
+    rrset_dict = get_rrset_dict(response.answer)
+    for key in rrset_dict:
+        rrname, rrtype = key
+        srrset = rrset_dict[key]
+        if srrset.rrsigs:
+            v, f = validate_all(srrset.rrset, srrset.rrsigs)
+            if v:
+                srrset.set_validated()
+                if Prefs.VERBOSE and not query.quiet:
+                    print("*Secure: {}".format(srrset.rrset))
+            else:
+                raise ValueError("Validation fail: {}".format(f))
+
+        if rrtype == query.qtype and rrname == query.qname:
             query.got_answer = True
-        elif rrset.rdtype == dns.rdatatype.DNAME:
-            query.answer_rrset.append(rrset)
+            query.answer_rrset.append(srrset.rrset)
             if addResults:
-                addResults.full_answer_rrset.append(rrset)
-            if Prefs.VERBOSE:
-                print(rrset.to_text())
-        elif rrset.rdtype == dns.rdatatype.CNAME:
-            query.answer_rrset.append(rrset)
+                addResults.full_answer_rrset.append(srrset.rrset)
+        elif rrtype == dns.rdatatype.DNAME:
+            query.answer_rrset.append(srrset.rrset)
             if addResults:
-                addResults.full_answer_rrset.append(rrset)
+                addResults.full_answer_rrset.append(srrset.rrset)
             if Prefs.VERBOSE:
-                print(rrset.to_text())
-            cname = rrset[0].target
-            cname_dict[rrset.name] = rrset[0].target
+                print(srrset.rrset.to_text())
+        elif rrtype == dns.rdatatype.CNAME:
+            query.answer_rrset.append(srrset.rrset)
+            if addResults:
+                addResults.full_answer_rrset.append(srrset.rrset)
+            if Prefs.VERBOSE:
+                print(srrset.rrset.to_text())
+            cname = srrset.rrset[0].target
+            cname_dict[srrset.rrset.name] = srrset.rrset[0].target
             stats.cnt_cname += 1
             if stats.cnt_cname >= Prefs.MAX_CNAME:
                 print("ERROR: Too many ({}) CNAME indirections.".format(

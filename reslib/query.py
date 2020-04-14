@@ -6,6 +6,7 @@ import dns.name
 import dns.rdatatype
 import dns.rdataclass
 
+from reslib.rrset import RRset
 
 class Query:
     """Query name class"""

@@ -37,7 +37,7 @@ without them. Just checkout the corresponding tags from this repo, or
 grab the release tarballs for those versions.
 
 ```
-resolve.py version 0.21
+resolve.py version 0.22
 Perform iterative resolution of a DNS name, type, and class.
 
 Usage: resolve.py [-dmtsnxez] <qname> [<qtype>] [<qclass>]
@@ -74,37 +74,40 @@ resolution path taken through the DNS hierarchy:
 ```
 $ resolve.py -v www.seas.upenn.edu. AAAA
 
->> Query: www.seas.upenn.edu. AAAA IN at zone .
+>> QUERY: www.seas.upenn.edu. AAAA IN at zone .
 >>   Send to zone . at address 198.41.0.4
->>        [Got Referral to zone: edu.]
+>>        [Got Referral to zone: edu. in 0.011 s]
 ZONE: edu.
-edu. b.edu-servers.net. ['192.33.14.30', '2001:503:231d::2:30']
-edu. f.edu-servers.net. ['192.35.51.30', '2001:503:d414::30']
-edu. i.edu-servers.net. ['192.43.172.30', '2001:503:39c1::30']
-edu. a.edu-servers.net. ['192.5.6.30', '2001:503:a83e::2:30']
-edu. g.edu-servers.net. ['192.42.93.30', '2001:503:eea3::30']
-edu. j.edu-servers.net. ['192.48.79.30', '2001:502:7094::30']
-edu. k.edu-servers.net. ['192.52.178.30', '2001:503:d2d::30']
-edu. m.edu-servers.net. ['192.55.83.30', '2001:501:b1f9::30']
-edu. l.edu-servers.net. ['192.41.162.30', '2001:500:d937::30']
-edu. h.edu-servers.net. ['192.54.112.30', '2001:502:8cc::30']
-edu. c.edu-servers.net. ['192.26.92.30', '2001:503:83eb::30']
-edu. e.edu-servers.net. ['192.12.94.30', '2001:502:1ca1::30']
-edu. d.edu-servers.net. ['192.31.80.30', '2001:500:856e::30']
+NS: a.edu-servers.net. 192.5.6.30 2001:503:a83e::2:30
+NS: b.edu-servers.net. 192.33.14.30 2001:503:231d::2:30
+NS: c.edu-servers.net. 192.26.92.30 2001:503:83eb::30
+NS: d.edu-servers.net. 192.31.80.30 2001:500:856e::30
+NS: e.edu-servers.net. 192.12.94.30 2001:502:1ca1::30
+NS: f.edu-servers.net. 192.35.51.30 2001:503:d414::30
+NS: g.edu-servers.net. 192.42.93.30 2001:503:eea3::30
+NS: h.edu-servers.net. 192.54.112.30 2001:502:8cc::30
+NS: i.edu-servers.net. 192.43.172.30 2001:503:39c1::30
+NS: j.edu-servers.net. 192.48.79.30 2001:502:7094::30
+NS: k.edu-servers.net. 192.52.178.30 2001:503:d2d::30
+NS: l.edu-servers.net. 192.41.162.30 2001:500:d937::30
+NS: m.edu-servers.net. 192.55.83.30 2001:501:b1f9::30
 
->> Query: www.seas.upenn.edu. AAAA IN at zone edu.
->>   Send to zone edu. at address 192.33.14.30
->>        [Got Referral to zone: upenn.edu.]
+>> QUERY: www.seas.upenn.edu. AAAA IN at zone edu.
+>>   Send to zone edu. at address 192.5.6.30
+>>        [Got Referral to zone: upenn.edu. in 0.078 s]
 ZONE: upenn.edu.
-upenn.edu. dns1.udel.edu. ['128.175.13.16']
-upenn.edu. dns2.udel.edu. ['128.175.13.17']
-upenn.edu. sns-pb.isc.org. []
-upenn.edu. adns2.upenn.edu. ['128.91.254.22', '2607:f470:1002::2:3']
-upenn.edu. adns1.upenn.edu. ['128.91.3.128', '2607:f470:1001::1:a']
-upenn.edu. adns3.upenn.edu. ['128.91.251.33', '2607:f470:1003::3:c']
+NS: dns1.udel.edu. 128.175.13.16
+NS: dns2.udel.edu. 128.175.13.17
+NS: adns2.upenn.edu. 128.91.254.22 2607:f470:1002::2:3
+NS: adns1.upenn.edu. 128.91.3.128 2607:f470:1001::1:a
+NS: adns3.upenn.edu. 128.91.251.33 2607:f470:1003::3:c
+NS: adns4.upenn.edu. 208.94.148.32 2600:1800:5::1:0
+NS: adns5.upenn.edu. 208.80.124.32 2600:1801:6::1:0
+NS: adns6.upenn.edu. 208.80.126.32 2600:1802:7::1:0
 
->> Query: www.seas.upenn.edu. AAAA IN at zone upenn.edu.
+>> QUERY: www.seas.upenn.edu. AAAA IN at zone upenn.edu.
 >>   Send to zone upenn.edu. at address 128.175.13.16
+>>        [Got answer in 0.013 s]
 
 www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
 ```
@@ -141,42 +144,47 @@ option:
 ```
 $ resolve.py -vm www.seas.upenn.edu. A
 
->> Query: edu. A IN at zone .
+>> QUERY: edu. AAAA IN at zone .
 >>   Send to zone . at address 198.41.0.4
->>        [Got Referral to zone: edu.]
+>>        [Got Referral to zone: edu. in 0.011 s]
 ZONE: edu.
-edu. b.edu-servers.net. ['192.33.14.30', '2001:503:231d::2:30']
-edu. f.edu-servers.net. ['192.35.51.30', '2001:503:d414::30']
-edu. i.edu-servers.net. ['192.43.172.30', '2001:503:39c1::30']
-edu. a.edu-servers.net. ['192.5.6.30', '2001:503:a83e::2:30']
-edu. g.edu-servers.net. ['192.42.93.30', '2001:503:eea3::30']
-edu. j.edu-servers.net. ['192.48.79.30', '2001:502:7094::30']
-edu. k.edu-servers.net. ['192.52.178.30', '2001:503:d2d::30']
-edu. m.edu-servers.net. ['192.55.83.30', '2001:501:b1f9::30']
-edu. l.edu-servers.net. ['192.41.162.30', '2001:500:d937::30']
-edu. h.edu-servers.net. ['192.54.112.30', '2001:502:8cc::30']
-edu. c.edu-servers.net. ['192.26.92.30', '2001:503:83eb::30']
-edu. e.edu-servers.net. ['192.12.94.30', '2001:502:1ca1::30']
-edu. d.edu-servers.net. ['192.31.80.30', '2001:500:856e::30']
+NS: a.edu-servers.net. 192.5.6.30 2001:503:a83e::2:30
+NS: b.edu-servers.net. 192.33.14.30 2001:503:231d::2:30
+NS: c.edu-servers.net. 192.26.92.30 2001:503:83eb::30
+NS: d.edu-servers.net. 192.31.80.30 2001:500:856e::30
+NS: e.edu-servers.net. 192.12.94.30 2001:502:1ca1::30
+NS: f.edu-servers.net. 192.35.51.30 2001:503:d414::30
+NS: g.edu-servers.net. 192.42.93.30 2001:503:eea3::30
+NS: h.edu-servers.net. 192.54.112.30 2001:502:8cc::30
+NS: i.edu-servers.net. 192.43.172.30 2001:503:39c1::30
+NS: j.edu-servers.net. 192.48.79.30 2001:502:7094::30
+NS: k.edu-servers.net. 192.52.178.30 2001:503:d2d::30
+NS: l.edu-servers.net. 192.41.162.30 2001:500:d937::30
+NS: m.edu-servers.net. 192.55.83.30 2001:501:b1f9::30
 
->> Query: upenn.edu. A IN at zone edu.
->>   Send to zone edu. at address 192.33.14.30
->>        [Got Referral to zone: upenn.edu.]
+>> QUERY: upenn.edu. AAAA IN at zone edu.
+>>   Send to zone edu. at address 192.5.6.30
+>>        [Got Referral to zone: upenn.edu. in 0.011 s]
 ZONE: upenn.edu.
-upenn.edu. dns1.udel.edu. ['128.175.13.16']
-upenn.edu. dns2.udel.edu. ['128.175.13.17']
-upenn.edu. sns-pb.isc.org. []
-upenn.edu. adns2.upenn.edu. ['128.91.254.22', '2607:f470:1002::2:3']
-upenn.edu. adns1.upenn.edu. ['128.91.3.128', '2607:f470:1001::1:a']
-upenn.edu. adns3.upenn.edu. ['128.91.251.33', '2607:f470:1003::3:c']
+NS: dns1.udel.edu. 128.175.13.16
+NS: dns2.udel.edu. 128.175.13.17
+NS: adns2.upenn.edu. 128.91.254.22 2607:f470:1002::2:3
+NS: adns1.upenn.edu. 128.91.3.128 2607:f470:1001::1:a
+NS: adns3.upenn.edu. 128.91.251.33 2607:f470:1003::3:c
+NS: adns4.upenn.edu. 208.94.148.32 2600:1800:5::1:0
+NS: adns5.upenn.edu. 208.80.124.32 2600:1801:6::1:0
+NS: adns6.upenn.edu. 208.80.126.32 2600:1802:7::1:0
 
->> Query: seas.upenn.edu. A IN at zone upenn.edu.
+>> QUERY: seas.upenn.edu. AAAA IN at zone upenn.edu.
 >>   Send to zone upenn.edu. at address 128.175.13.16
+>>        [Got answer in 0.012 s]
+ERROR: NODATA: seas.upenn.edu. of type AAAA not found
 
->> Query: www.seas.upenn.edu. A IN at zone upenn.edu.
+>> QUERY: www.seas.upenn.edu. AAAA IN at zone upenn.edu.
 >>   Send to zone upenn.edu. at address 128.175.13.16
+>>        [Got answer in 0.012 s]
 
-www.seas.upenn.edu. 600 IN A 158.130.68.91
+www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
 ```
 
 Some Content Delivery Networks (CDN) like Akamai and Cloudflare have 
@@ -200,7 +208,7 @@ queried or associated referral data).
 Attempted resolution of www.upenn.edu (on Akamai, January 2015):
 
 ```
-$ ./resolve.py -vm www.upenn.edu. A
+$ resolve.py -vm www.upenn.edu. A
 >> Query: edu. A IN at zone .
 >>        [Got Referral to zone: edu.]
 >> Query: upenn.edu. A IN at zone edu.
@@ -220,7 +228,7 @@ Repeating the query with -x (intermediate NXDOMAIN workaround) allows
 the program to proceed to the final answer:
 
 ```
-$ ./resolve.py -vmx www.upenn.edu
+$ resolve.py -vmx www.upenn.edu
 >> Query: edu. A IN at zone .
 >>        [Got Referral to zone: edu.]
 >> Query: upenn.edu. A IN at zone edu.
@@ -259,7 +267,7 @@ empty answer), and the final name www.ietf.org.cdn.cloudflare.net produces
 the answer records.
 
 ```
-$ ./resolve.py -vmx www.ietf.org
+$ resolve.py -vmx www.ietf.org
 >> Query: org. A IN at zone .
 >>        [Got Referral to zone: org.]
 >> Query: ietf.org. A IN at zone org.
