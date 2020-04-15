@@ -84,9 +84,11 @@ def send_query(msg, nsaddr, query,
 
 def make_query(qname, qtype, qclass):
     """Make DNS query message from qname/type/class"""
+    use_edns = False if Prefs.PAYLOAD == 0 else True
     msg = dns.message.make_query(qname,
                                  qtype,
                                  rdclass=qclass,
+                                 use_edns=use_edns,
                                  want_dnssec=Prefs.DNSSEC,
                                  payload=Prefs.PAYLOAD)
     msg.flags &= ~dns.flags.RD
@@ -102,12 +104,3 @@ def get_rrset_from_section(message, section, qname, qtype):
     rrsigs = message.get_rrset(section, qname, 1,
                                dns.rdatatype.RRSIG, covers=qtype)
     return rrset, rrsigs
-
-
-def get_rrset(resolver, qname, qtype):
-    """
-    User resolver to query name and type. Return answer RRset and
-    signature RRset.
-    """
-    msg = resolver.query(qname, qtype).response
-    return get_rrset_from_section(msg, msg.answer, qname, qtype)

@@ -122,7 +122,7 @@ def process_referral(message, query):
             raise ValueError("DS RRset failed to authenticate")
 
     if vprint_quiet(query):
-        print(">>        [Referral to zone: {} in {:.3f} s]".format(
+        print("#        [Referral to zone: {} in {:.3f} s]".format(
             zonename, query.elapsed_last))
 
     zone = install_zone_in_cache(zonename, ns_rrset, ds_rrset,

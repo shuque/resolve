@@ -13,7 +13,7 @@ def process_args(arguments):
     """Process all command line arguments"""
 
     try:
-        (options, args) = getopt.getopt(arguments, 'mtv:snxezcb:')
+        (options, args) = getopt.getopt(arguments, 'mtv:snxe:zcb:')
     except getopt.GetoptError:
         usage()
 
@@ -31,7 +31,7 @@ def process_args(arguments):
         elif opt == "-x":
             Prefs.VIOLATE = True
         elif opt == "-e":
-            Prefs.PAYLOAD = None
+            Prefs.PAYLOAD = int(optval)
         elif opt == "-z":
             Prefs.DNSSEC = True
         elif opt == "-c":
@@ -39,8 +39,8 @@ def process_args(arguments):
         elif opt == "-b":
             Prefs.BATCHFILE = optval
 
-    if (Prefs.PAYLOAD is None) and Prefs.DNSSEC:
-        usage("Error: -e and -z are mutually incompatible.")
+    if (Prefs.PAYLOAD == 0) and Prefs.DNSSEC:
+        usage("Error: DNSSEC (-z) requires EDNS (non zero -e)")
 
     if Prefs.BATCHFILE:
         if not args:

@@ -52,6 +52,7 @@ if __name__ == '__main__':
         if Prefs.STATS:
             stats.print_stats()
         if Prefs.DUMPCACHE:
+            print('')
             cache.dump()
             key_cache.dump()
         sys.exit(0)
@@ -70,6 +71,7 @@ if __name__ == '__main__':
             stats.print_stats()
 
         if Prefs.DUMPCACHE:
+            print('')
             cache.dump()
             key_cache.dump()
 

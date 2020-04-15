@@ -37,8 +37,8 @@ grab the release tarballs for those versions.
 resolve.py version 0.22
 Perform iterative resolution of a DNS name, type, and class.
 
-    Usage: resolve.py [-mtv:snxezc] <qname> [<qtype>] [<qclass>]
-           resolve.py [-mtv:snxezc] -b <batchfile>
+    Usage: resolve.py [-mtv:snxe:zc] <qname> [<qtype>] [<qclass>]
+           resolve.py [-mtv:snxe:zc] -b <batchfile>
 
      -m: do qname minimization
      -t: use TCP only
@@ -46,7 +46,7 @@ Perform iterative resolution of a DNS name, type, and class.
      -s: print summary statistics
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
-     -e: don't use EDNS0 (default is EDNS0 with payload=1460)
+     -e N: use EDNS0 buffer size N (default: 0; 0=disable EDNS)
      -z: use DNSSEC (default is no; work in progress)
      -c: dump zone/ns/key caches at end
      -b <batchfile>: batch file mode
@@ -65,15 +65,15 @@ $ resolve.py www.seas.upenn.edu. AAAA
 www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
 ```
 
-Here's the same lookup with the -v (verbose) switch to show the iterative
-resolution path taken through the DNS hierarchy:
+Here's the same lookup with the -v1 switch (increase verbosity level
+to 1) to show the iterative resolution path taken through the DNS
+hierarchy:
 
 ```
-$ resolve.py -v www.seas.upenn.edu. AAAA
+$ resolve.py -v1 www.seas.upenn.edu AAAA
 
->> QUERY: www.seas.upenn.edu. AAAA IN at zone .
->>   Send to zone . at address 198.41.0.4
->>        [Got Referral to zone: edu. in 0.011 s]
+# QUERY: www.seas.upenn.edu. AAAA IN at zone . address 198.41.0.4
+#        [Referral to zone: edu. in 0.012 s]
 ZONE: edu.
 NS: a.edu-servers.net. 192.5.6.30 2001:503:a83e::2:30
 NS: b.edu-servers.net. 192.33.14.30 2001:503:231d::2:30
@@ -89,9 +89,8 @@ NS: k.edu-servers.net. 192.52.178.30 2001:503:d2d::30
 NS: l.edu-servers.net. 192.41.162.30 2001:500:d937::30
 NS: m.edu-servers.net. 192.55.83.30 2001:501:b1f9::30
 
->> QUERY: www.seas.upenn.edu. AAAA IN at zone edu.
->>   Send to zone edu. at address 192.5.6.30
->>        [Got Referral to zone: upenn.edu. in 0.078 s]
+# QUERY: www.seas.upenn.edu. AAAA IN at zone edu. address 192.5.6.30
+#        [Referral to zone: upenn.edu. in 0.012 s]
 ZONE: upenn.edu.
 NS: dns1.udel.edu. 128.175.13.16
 NS: dns2.udel.edu. 128.175.13.17
@@ -102,10 +101,10 @@ NS: adns4.upenn.edu. 208.94.148.32 2600:1800:5::1:0
 NS: adns5.upenn.edu. 208.80.124.32 2600:1801:6::1:0
 NS: adns6.upenn.edu. 208.80.126.32 2600:1802:7::1:0
 
->> QUERY: www.seas.upenn.edu. AAAA IN at zone upenn.edu.
->>   Send to zone upenn.edu. at address 128.175.13.16
->>        [Got answer in 0.013 s]
+# QUERY: www.seas.upenn.edu. AAAA IN at zone upenn.edu. address 128.175.13.16
+#        [Got answer in 0.018 s]
 
+# ANSWER:
 www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
 ```
 
@@ -114,48 +113,50 @@ www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
 Use -z to turn on DNSSEC validation. Example output:
 
 ```
-$ resolve.py -vz www.huque.com. A
+ ./resolve.py -v1 -z www.huque.com. A
 
->> QUERY: www.huque.com. A IN at zone .
->>   Send to zone . at address 198.41.0.4
->>        [Got Referral to zone: com. in 0.014 s]
+# QUERY: www.huque.com. A IN at zone . address 198.41.0.4
+#        [Referral to zone: com. in 0.015 s]
 ZONE: com.
-NS: a.gtld-servers.net. 192.5.6.30 2001:503:a83e::2:30
-NS: b.gtld-servers.net. 192.33.14.30 2001:503:231d::2:30
-NS: c.gtld-servers.net. 192.26.92.30 2001:503:83eb::30
-NS: d.gtld-servers.net. 192.31.80.30 2001:500:856e::30
 NS: e.gtld-servers.net. 192.12.94.30 2001:502:1ca1::30
+NS: b.gtld-servers.net. 192.33.14.30 2001:503:231d::2:30
+NS: j.gtld-servers.net. 192.48.79.30 2001:502:7094::30
+NS: m.gtld-servers.net. 192.55.83.30 2001:501:b1f9::30
+NS: i.gtld-servers.net. 192.43.172.30 2001:503:39c1::30
 NS: f.gtld-servers.net. 192.35.51.30 2001:503:d414::30
+NS: a.gtld-servers.net. 192.5.6.30 2001:503:a83e::2:30
 NS: g.gtld-servers.net. 192.42.93.30 2001:503:eea3::30
 NS: h.gtld-servers.net. 192.54.112.30 2001:502:8cc::30
-NS: i.gtld-servers.net. 192.43.172.30 2001:503:39c1::30
-NS: j.gtld-servers.net. 192.48.79.30 2001:502:7094::30
-NS: k.gtld-servers.net. 192.52.178.30 2001:503:d2d::30
 NS: l.gtld-servers.net. 192.41.162.30 2001:500:d937::30
-NS: m.gtld-servers.net. 192.55.83.30 2001:501:b1f9::30
+NS: k.gtld-servers.net. 192.52.178.30 2001:503:d2d::30
+NS: c.gtld-servers.net. 192.26.92.30 2001:503:83eb::30
+NS: d.gtld-servers.net. 192.31.80.30 2001:500:856e::30
 DS: 30909 8 2 e2d3c916f6deeac73294e8268fb5885044a833fc5459588f4a9184cfc41a5766
+DNSKEY: com. 256 56311 8
+DNSKEY: com. 256 39844 8
+DNSKEY: com. 257 30909 8
 
->> QUERY: www.huque.com. A IN at zone com.
->>   Send to zone com. at address 192.5.6.30
->>        [Got Referral to zone: huque.com. in 0.008 s]
+# QUERY: www.huque.com. A IN at zone com. address 192.12.94.30
+#        [Referral to zone: huque.com. in 0.037 s]
 ZONE: huque.com.
 NS: adns2.upenn.edu. 128.91.254.22 2607:f470:1002::2:3
 NS: adns1.upenn.edu. 128.91.3.128 2607:f470:1001::1:a
 NS: adns3.upenn.edu. 128.91.251.33 2607:f470:1003::3:c
 DS: 40924 8 2 816524eb1c3b7d1315ae8330652dd17909c95de0533c1f2dc023bffedb1f5e9b
+DNSKEY: huque.com. 257 40924 8
+DNSKEY: huque.com. 256 14703 8
 
->> QUERY: www.huque.com. A IN at zone huque.com.
->>   Send to zone huque.com. at address 128.91.254.22
->>        [Got answer in 0.011 s]
-*Secure: www.huque.com. 300 IN CNAME cheetara.huque.com.
+# QUERY: www.huque.com. A IN at zone huque.com. address 128.91.254.22
+#        [Got answer in 0.011 s]
+SECURE: www.huque.com. 300 IN CNAME cheetara.huque.com.
 www.huque.com. 300 IN CNAME cheetara.huque.com.
-*Secure: cheetara.huque.com. 86400 IN A 50.116.63.23
+SECURE: cheetara.huque.com. 86400 IN A 50.116.63.23
 
->> QUERY: cheetara.huque.com. A IN at zone huque.com.
->>   Send to zone huque.com. at address 128.91.254.22
->>        [Got answer in 0.010 s]
-*Secure: cheetara.huque.com. 86400 IN A 50.116.63.23
+# QUERY: cheetara.huque.com. A IN at zone huque.com. address 128.91.254.22
+#        [Got answer in 0.010 s]
+SECURE: cheetara.huque.com. 86400 IN A 50.116.63.23
 
+# ANSWER:
 www.huque.com. 300 IN CNAME cheetara.huque.com.
 cheetara.huque.com. 86400 IN A 50.116.63.23
 ```
@@ -190,29 +191,27 @@ Here's an example run with qname minimization (-m) and the verbose (-v)
 option:
 
 ```
-$ resolve.py -vm www.seas.upenn.edu. A
+$ resolve.py -v1 -m www.seas.upenn.edu AAAA
 
->> QUERY: edu. AAAA IN at zone .
->>   Send to zone . at address 198.41.0.4
->>        [Got Referral to zone: edu. in 0.011 s]
+# QUERY: edu. AAAA IN at zone . address 198.41.0.4
+#        [Referral to zone: edu. in 0.011 s]
 ZONE: edu.
-NS: a.edu-servers.net. 192.5.6.30 2001:503:a83e::2:30
 NS: b.edu-servers.net. 192.33.14.30 2001:503:231d::2:30
-NS: c.edu-servers.net. 192.26.92.30 2001:503:83eb::30
-NS: d.edu-servers.net. 192.31.80.30 2001:500:856e::30
-NS: e.edu-servers.net. 192.12.94.30 2001:502:1ca1::30
 NS: f.edu-servers.net. 192.35.51.30 2001:503:d414::30
-NS: g.edu-servers.net. 192.42.93.30 2001:503:eea3::30
-NS: h.edu-servers.net. 192.54.112.30 2001:502:8cc::30
 NS: i.edu-servers.net. 192.43.172.30 2001:503:39c1::30
+NS: a.edu-servers.net. 192.5.6.30 2001:503:a83e::2:30
+NS: g.edu-servers.net. 192.42.93.30 2001:503:eea3::30
 NS: j.edu-servers.net. 192.48.79.30 2001:502:7094::30
 NS: k.edu-servers.net. 192.52.178.30 2001:503:d2d::30
-NS: l.edu-servers.net. 192.41.162.30 2001:500:d937::30
 NS: m.edu-servers.net. 192.55.83.30 2001:501:b1f9::30
+NS: l.edu-servers.net. 192.41.162.30 2001:500:d937::30
+NS: h.edu-servers.net. 192.54.112.30 2001:502:8cc::30
+NS: c.edu-servers.net. 192.26.92.30 2001:503:83eb::30
+NS: e.edu-servers.net. 192.12.94.30 2001:502:1ca1::30
+NS: d.edu-servers.net. 192.31.80.30 2001:500:856e::30
 
->> QUERY: upenn.edu. AAAA IN at zone edu.
->>   Send to zone edu. at address 192.5.6.30
->>        [Got Referral to zone: upenn.edu. in 0.011 s]
+# QUERY: upenn.edu. AAAA IN at zone edu. address 192.33.14.30
+#        [Referral to zone: upenn.edu. in 0.032 s]
 ZONE: upenn.edu.
 NS: dns1.udel.edu. 128.175.13.16
 NS: dns2.udel.edu. 128.175.13.17
@@ -223,15 +222,14 @@ NS: adns4.upenn.edu. 208.94.148.32 2600:1800:5::1:0
 NS: adns5.upenn.edu. 208.80.124.32 2600:1801:6::1:0
 NS: adns6.upenn.edu. 208.80.126.32 2600:1802:7::1:0
 
->> QUERY: seas.upenn.edu. AAAA IN at zone upenn.edu.
->>   Send to zone upenn.edu. at address 128.175.13.16
->>        [Got answer in 0.012 s]
+# QUERY: seas.upenn.edu. AAAA IN at zone upenn.edu. address 128.175.13.16
+#        [Got answer in 0.010 s]
 ERROR: NODATA: seas.upenn.edu. of type AAAA not found
 
->> QUERY: www.seas.upenn.edu. AAAA IN at zone upenn.edu.
->>   Send to zone upenn.edu. at address 128.175.13.16
->>        [Got answer in 0.012 s]
+# QUERY: www.seas.upenn.edu. AAAA IN at zone upenn.edu. address 128.175.13.16
+#        [Got answer in 0.013 s]
 
+# ANSWER:
 www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
 ```
 

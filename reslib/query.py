@@ -7,6 +7,8 @@ import dns.rdatatype
 import dns.rdataclass
 
 from reslib.rrset import RRset
+from reslib.common import Prefs
+
 
 class Query:
     """Query name class"""
@@ -46,6 +48,8 @@ class Query:
 
     def print_full_answer(self):
         """Print full set of answer records including aliases"""
+        if Prefs.VERBOSE:
+            print("# ANSWER:")
         if self.full_answer_rrset:
             print("\n".join([x.to_text() for x in self.full_answer_rrset]))
 

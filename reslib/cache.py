@@ -56,6 +56,9 @@ class Cache:
             print("Zone: {}".format(zname))
             for ns in zobj.nslist:
                 print("    NS: {}".format(self.NSDict[ns].name))
+            for ds in zobj.dslist:
+                print("    DS: {} {} {}".format(
+                    ds.key_tag, ds.algorithm, ds.digest_type))
         print("#### END: Zone Cache dump")
 
         print("#### Nameserver Cache dump")

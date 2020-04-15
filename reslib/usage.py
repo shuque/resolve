@@ -17,8 +17,8 @@ def usage(message=None):
 {0} version {1}
 Perform iterative resolution of a DNS name, type, and class.
 
-    Usage: {0} [-mtv:snxezc] <qname> [<qtype>] [<qclass>]
-           {0} [-mtv:snxezc] -b <batchfile>
+    Usage: {0} [-mtv:snxe:zc] <qname> [<qtype>] [<qclass>]
+           {0} [-mtv:snxe:zc] -b <batchfile>
 
      -m: do qname minimization
      -t: use TCP only
@@ -26,7 +26,7 @@ Perform iterative resolution of a DNS name, type, and class.
      -s: print summary statistics
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
-     -e: don't use EDNS0 (default is EDNS0 with payload={2})
+     -e N: use EDNS0 buffer size N (default: {2}; 0=disable EDNS)
      -z: use DNSSEC (default is no; work in progress)
      -c: dump zone/ns/key caches at end
      -b <batchfile>: batch file mode
