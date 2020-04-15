@@ -12,15 +12,11 @@ class RRset:
         self.rrname = rrname
         self.rrtype = rrtype
         self.validated = False
-        if rrset:
-            self.rrset = rrset
-            self.rrsigs = None
-        elif rrsig:
-            self.rrsigs = rrsig
-            self.rrset = None
+        self.rrset = rrset if rrset else None
+        self.rrsig = rrsig if rrsig else None
 
     def set_rrsig(self, rrsig):
-        self.rrsigs = rrsig
+        self.rrsig = rrsig
 
     def set_rrset(self, rrset):
         self.rrset = rrset

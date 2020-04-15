@@ -35,6 +35,7 @@ class Query:
         self.answer_rrset = []
         self.full_answer_rrset = []
         self.dnssec_status = False
+        self.responses = []               # list of full response messages
 
     def set_quiet(self, action=True):
         """

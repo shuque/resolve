@@ -42,21 +42,24 @@ class Cache:
         self.ZoneDict[zonename] = zoneobj
 
     def closest_zone(self, name):
-        """given query name, find closest enclosing zone object in Cache"""
+        """find closest enclosing zone object in Cache"""
         for z in reversed(sorted(self.ZoneDict.keys())):
             if name.is_subdomain(z):
                 return self.get_zone(z)
         return None
 
     def dump(self):
-        """Dump zone and NS cache contents - for debugging"""
-        print("---------------------------- Zone Cache ----------------")
+        """Dump contents of Cache"""
+
+        print("#### Zone Cache dump")
         for zname, zobj in self.ZoneDict.items():
             print("Zone: {}".format(zname))
             for ns in zobj.nslist:
                 print("    NS: {}".format(self.NSDict[ns].name))
-        print("---------------------------- NS   Cache ----------------")
+        print("#### END: Zone Cache dump")
+
+        print("#### Nameserver Cache dump")
         for nsname, nsobj in self.NSDict.items():
             ipstring_list = " ".join([x.addr for x in nsobj.iplist])
             print("{} {}".format(nsname, ipstring_list))
-
+        print("#### END: Nameserver Cache dump")

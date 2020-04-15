@@ -37,18 +37,18 @@ grab the release tarballs for those versions.
 resolve.py version 0.22
 Perform iterative resolution of a DNS name, type, and class.
 
-Usage: resolve.py [-dmtsnxez] <qname> [<qtype>] [<qclass>]
-       resolve.py [-dmtsnxez] -b <batchfile>
+    Usage: resolve.py [-mtv:snxezc] <qname> [<qtype>] [<qclass>]
+           resolve.py [-mtv:snxezc] -b <batchfile>
 
-     -d: print debugging output
      -m: do qname minimization
      -t: use TCP only
-     -v: verbose - trace query & zone path
+     -v N: verbosity level: 0,1,2 (0 default)
      -s: print summary statistics
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
      -e: don't use EDNS0 (default is EDNS0 with payload=1460)
      -z: use DNSSEC (default is no; work in progress)
+     -c: dump zone/ns/key caches at end
      -b <batchfile>: batch file mode
 
 When using -b, <batchfile> contains one (space separated) query name, type,
@@ -114,7 +114,7 @@ www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
 Use -z to turn on DNSSEC validation. Example output:
 
 ```
-$ ./resolve.py -vz www.huque.com. A
+$ resolve.py -vz www.huque.com. A
 
 >> QUERY: www.huque.com. A IN at zone .
 >>   Send to zone . at address 198.41.0.4

@@ -7,15 +7,15 @@ from reslib.cache import Cache, get_root_zone
 
 class Prefs:
     """Preferences"""
-    DEBUG = False                    # -d: Print debugging output?
     MINIMIZE = False                 # -m: Do qname minimization?
     TCPONLY = False                  # -t: Use TCP only
-    VERBOSE = False                  # -v: Trace query->zone path
+    VERBOSE = 0                      # -v N: Verbosity level (0 default; 1/2)
     VIOLATE = False                  # -x: ENT nxdomain workaround
     STATS = False                    # -s: Print statistics
     NSRESOLVE = False                # -n: Resolve all NS addresses
     PAYLOAD = 1460                   # -e: no EDNS; set to None
-    DNSSEC = False                   # -z: use DNSSEC (work in progress)
+    DNSSEC = False                   # -z: use DNSSEC
+    DUMPCACHE = False                # -c: dump zone/ns/key caches
     BATCHFILE = None                 # -b: batch file mode
     TIMEOUT = 3                      # Query timeout in seconds
     RETRIES = 2                      # Number of retries per server

@@ -8,11 +8,15 @@ import dns.resolver
 from reslib.common import Prefs, stats
 
 
-def dprint(msg):
-    """Print debugging message if DEBUG flag is set"""
-    if Prefs.DEBUG:
-        print(">> DEBUG: {}".format(msg))
-    return
+def vprint_quiet(query):
+    if Prefs.VERBOSE > 1:
+        return True
+    else:
+        return Prefs.VERBOSE and not query.quiet
+
+
+def vprint(query):
+    return Prefs.VERBOSE
 
 
 def is_authoritative(msg):
@@ -28,17 +32,6 @@ def is_truncated(msg):
 def is_referral(msg):
     """Is the DNS response message a referral?"""
     return (msg.rcode() == 0) and (not is_authoritative(msg)) and msg.authority
-
-
-def get_resolver(dnssec_ok=False, timeout=5):
-    """return an appropriately configured Resolver object"""
-    r = dns.resolver.Resolver()
-    # Set query flags to RD=1, AD=1, CD=1: # binary 0000 0001 0011 0000
-    r.set_flags(0x0130)
-    r.lifetime = timeout
-    if dnssec_ok:
-        r.use_edns(edns=0, ednsflags=dns.flags.DO, payload=4096)
-    return r
 
 
 def send_query_tcp(msg, nsaddr, query, timeout=Prefs.TIMEOUT):

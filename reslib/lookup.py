@@ -15,7 +15,7 @@ from reslib.common import Prefs, cache, stats, RootZone
 from reslib.zone import Zone
 from reslib.query import Query
 from reslib.rrset import RRset
-from reslib.utils import make_query, send_query, is_referral
+from reslib.utils import vprint_quiet, make_query, send_query, is_referral
 from reslib.dnssec import key_cache, load_keys, validate_all, \
     ds_rrset_matches_dnskey
 
@@ -121,13 +121,13 @@ def process_referral(message, query):
         if not ds_verified:
             raise ValueError("DS RRset failed to authenticate")
 
-    if Prefs.VERBOSE and not query.quiet:
-        print(">>        [Got Referral to zone: {} in {:.3f} s]".format(
+    if vprint_quiet(query):
+        print(">>        [Referral to zone: {} in {:.3f} s]".format(
             zonename, query.elapsed_last))
 
     zone = install_zone_in_cache(zonename, ns_rrset, ds_rrset,
                                  message.additional)
-    if Prefs.VERBOSE and not query.quiet:
+    if vprint_quiet(query):
         zone.print_details()
 
     return zone
@@ -157,6 +157,37 @@ def get_rrset_dict(section):
     return rrset_dict
 
 
+def validate_rrset(srrset, query):
+    """Validate signed RRset object"""
+
+    # If we don't have the signer's DNSKEY, we have to fetch the
+    # DNSKEY and corresponding DS, authenticate, and cache it.
+    # One situation in which this can happen is if parent, child
+    # zones are on the same nameserver.
+    # TODO: add code here .
+    signer = srrset.rrsig[0].signer
+    if not key_cache.has_key(signer):
+        if Prefs.VERBOSE:
+            print("FETCH: NS, DNSKEY, DS for {}".format(signer))
+        signer_zone = get_zone(signer)
+        ds_rrset, ds_rrsigs = fetch_ds(signer,
+                                       cache.closest_zone(signer))
+        ds_verified, _ = validate_all(ds_rrset, ds_rrsigs)
+        if not ds_verified:
+            raise ValueError("DS RRset failed to authenticate")
+        signer_zone.install_ds(ds_rrset.to_rdataset())
+        match_ds(signer_zone)
+        return
+
+    verified, failed = validate_all(srrset.rrset, srrset.rrsig)
+    if verified:
+        srrset.set_validated()
+        if vprint_quiet(query):
+            print("SECURE: {}".format(srrset.rrset))
+    else:
+        raise ValueError("Validation fail: {}".format(failed))
+
+
 def process_answer(response, query, addResults=None):
     """Process answer section, chasing aliases when needed."""
 
@@ -166,21 +197,16 @@ def process_answer(response, query, addResults=None):
     if query.qname != query.orig_qname:
         return
 
-    if Prefs.VERBOSE and not query.quiet:
-        print(">>        [Got answer in {:.3f} s]".format(query.elapsed_last))
+    if vprint_quiet(query):
+        print("#        [Got answer in {:.3f} s]".format(query.elapsed_last))
 
     rrset_dict = get_rrset_dict(response.answer)
+
     for key in rrset_dict:
         rrname, rrtype = key
         srrset = rrset_dict[key]
-        if srrset.rrsigs:
-            v, f = validate_all(srrset.rrset, srrset.rrsigs)
-            if v:
-                srrset.set_validated()
-                if Prefs.VERBOSE and not query.quiet:
-                    print("*Secure: {}".format(srrset.rrset))
-            else:
-                raise ValueError("Validation fail: {}".format(f))
+        if srrset.rrsig:
+            validate_rrset(srrset, query)
 
         if rrtype == query.qtype and rrname == query.qname:
             query.got_answer = True
@@ -238,8 +264,8 @@ def process_response(response, query, addResults=None):
             if not referral:
                 print("ERROR: processing referral")
         elif not response.answer:                        # NODATA
-            if Prefs.VERBOSE and not query.quiet:
-                print(">>        [Got answer in {:.3f} s]".format(
+            if vprint_quiet(query):
+                print("#        [Got answer in {:.3f} s]".format(
                     query.elapsed_last))
             if not query.quiet:
                 print("ERROR: NODATA: {} of type {} not found".format(
@@ -248,8 +274,8 @@ def process_response(response, query, addResults=None):
         else:                                            # Answer
             process_answer(response, query, addResults=addResults)
     elif query.rcode == dns.rcode.NXDOMAIN:              # NXDOMAIN
-        if Prefs.VERBOSE and not query.quiet:
-            print(">>        [Got answer in {:.3f} s]".format(
+        if vprint_quiet(query):
+            print("#        [Got answer in {:.3f} s]".format(
                 query.elapsed_last))
         if not query.quiet:
             print("ERROR: NXDOMAIN: {} not found".format(query.qname))
@@ -257,15 +283,19 @@ def process_response(response, query, addResults=None):
     return (query.rcode, referral)
 
 
+def print_query_trace(query, zone, address):
+    """Print query trace"""
+    print("\n# QUERY: {} {} {} at zone {} address {}".format(
+        query.qname,
+        dns.rdatatype.to_text(query.qtype),
+        dns.rdataclass.to_text(query.qclass),
+        zone.name,
+        address))
+    return
+
+
 def send_query_zone(query, zone):
     """Send DNS query to nameservers of given zone"""
-
-    if Prefs.VERBOSE and not query.quiet:
-        print("\n>> QUERY: {} {} {} at zone {}".format(
-            query.qname,
-            dns.rdatatype.to_text(query.qtype),
-            dns.rdataclass.to_text(query.qclass),
-            zone.name))
 
     msg = make_query(query.qname, query.qtype, query.qclass)
 
@@ -281,9 +311,8 @@ def send_query_zone(query, zone):
         if stats.cnt_query1 + stats.cnt_query2 >= Prefs.MAX_QUERY:
             raise ValueError("Max number of queries ({}) exceeded.".format(
                 Prefs.MAX_QUERY))
-        if Prefs.VERBOSE and not query.quiet:
-            print(">>   Send to zone {} at address {}".format(
-                zone.name, nsaddr.addr))
+        if vprint_quiet(query):
+            print_query_trace(query, zone, nsaddr.addr)
         try:
             response = send_query(msg, nsaddr, query, newid=True)
         except OSError as e:
@@ -304,7 +333,7 @@ def send_query_zone(query, zone):
     return response
 
 
-def match_ds(zone):
+def match_ds(zone, referring_query=None):
     """
     DS (Delegation Signer) processing: Authenticate the secure delegation
     to the zone, by fetching its DNSKEY RRset, authenticating the self
@@ -318,9 +347,14 @@ def match_ds(zone):
 
     keylist = load_keys(dnskey_rrset)
     key_cache.install(zone.name, keylist)
+    if referring_query and Prefs.VERBOSE and not referring_query.quiet:
+        for key in keylist:
+            print("DNSKEY: {} {} {} {}".format(
+                key.name, key.flags, key.keytag, key.algorithm))
 
     verified, failed = validate_all(dnskey_rrset, dnskey_rrsigs)
     if not verified:
+        # TODO: remove dnskey from key cache?
         raise ValueError("Couldn't validate root DNSKEY RRset: {}".format(
             failed))
 
@@ -352,6 +386,7 @@ def resolve_name(query, zone, inPath=True, addResults=None):
                 query.set_minimized(curr_zone)
 
         response = send_query_zone(query, curr_zone)
+        query.responses.append(response)
         if not response:
             return
 
@@ -379,13 +414,74 @@ def resolve_name(query, zone, inPath=True, addResults=None):
                 break
             curr_zone = referral
             if curr_zone.dslist:
-                match_ds(curr_zone)
+                match_ds(curr_zone, referring_query=query)
 
     if stats.cnt_deleg >= Prefs.MAX_DELEG:
         print("ERROR: Max levels of delegation ({}) reached.".format(
             Prefs.MAX_DELEG))
 
     return
+
+
+def get_zone(zonename):
+    """
+    Get zone object for given zonename, from cache, if present.
+    If not present, query nameservers and addresses for the zone,
+    create a new zone object and return it.
+    """
+
+    zone = cache.get_zone(zonename)
+    if zone:
+        return zone
+
+    qtype = dns.rdatatype.from_text('NS')
+    qclass = dns.rdataclass.from_text('IN')
+    query = Query(zonename, qtype, qclass)
+    query.set_quiet(True)
+    msg = send_query_zone(query, cache.closest_zone(query.qname))
+
+    zone = Zone(zonename, cache)
+    ns_rrset = msg.get_rrset(msg.answer, zonename, qclass, qtype)
+
+    for ns_rr in ns_rrset:
+        _ = zone.install_ns(ns_rr.target)
+        nsobj = cache.get_ns(ns_rr.target)
+        if nsobj:
+            continue
+        print("DEBUG: creating nameserver {}".format(ns_rr.target))
+        nsobj = Nameserver(ns_rr.target)
+        for addrtype in ['A', 'AAAA']:
+            query = Query(ns_rr.target, addrtype, 'IN',
+                          minimize=Prefs.MINIMIZE,
+                          is_nsquery=True)
+            query.quiet = True
+            resolve_name(query, cache.closest_zone(query.qname),
+                         inPath=False)
+            for ip in query.get_answer_ip_list():
+                nsobj.install_ip(ip)
+
+    return zone
+
+
+def fetch_ds(subzone, zone):
+    """
+    Fetch DS RRset and signatures for specified subzone from zone.
+    """
+
+    qname = subzone
+    qtype = dns.rdatatype.from_text('DS')
+    qclass = dns.rdataclass.from_text('IN')
+    query = Query(qname, qtype, qclass)
+    query.set_quiet(True)
+
+    msg = send_query_zone(query, zone)
+    ds_rrset = msg.get_rrset(msg.answer, qname, qclass, qtype)
+    ds_rrsigs = msg.get_rrset(msg.answer, qname, qclass,
+                               dns.rdatatype.RRSIG, covers=qtype)
+    if ds_rrsigs is None:
+        raise ValueError("No signatures found for {} DS set!".format(
+            subzone))
+    return ds_rrset, ds_rrsigs
 
 
 def fetch_dnskey(zone):
@@ -400,8 +496,8 @@ def fetch_dnskey(zone):
     query.set_quiet(True)
 
     msg = send_query_zone(query, zone)
-    dnskey_rrset = msg.get_rrset(msg.answer, qname, 1, qtype)
-    dnskey_rrsigs = msg.get_rrset(msg.answer, qname, 1,
+    dnskey_rrset = msg.get_rrset(msg.answer, qname, qclass, qtype)
+    dnskey_rrsigs = msg.get_rrset(msg.answer, qname, qclass,
                                   dns.rdatatype.RRSIG, covers=qtype)
     if dnskey_rrsigs is None:
         raise ValueError("No signatures found for root DNSKEY set!")

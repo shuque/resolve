@@ -58,6 +58,10 @@ class KeyCache:
         """install (zone -> keylist) into dictionary"""
         self.data[zone] = keylist
 
+    def has_key(self, zone):
+        """do we have keys for given zone"""
+        return zone in self.data
+
     def get_keys(self, zone):
         """obtain key list for given zone"""
         if zone in self.data:
@@ -69,6 +73,15 @@ class KeyCache:
         print("### Key Cache:")
         for item in self.data:
             print("{}: {}".format(item, self.data[item]))
+
+    def dump(self):
+        """Dump entire cache in summary form"""
+        print("#### Key Cache dump")
+        for zone in self.data:
+            print("ZONE: {}".format(zone))
+            for key in self.data[zone]:
+                print("      {}".format(key))
+        print("#### END: Key Cache dump")
 
 
 class DNSKEYinfo:
