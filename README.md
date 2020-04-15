@@ -113,7 +113,7 @@ www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
 Use -z to turn on DNSSEC validation. Example output:
 
 ```
- ./resolve.py -v1 -z www.huque.com. A
+$ resolve.py -v1 -z www.huque.com. A
 
 # QUERY: www.huque.com. A IN at zone . address 198.41.0.4
 #        [Referral to zone: com. in 0.015 s]

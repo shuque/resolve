@@ -168,7 +168,7 @@ def validate_rrset(srrset, query):
     signer = srrset.rrsig[0].signer
     if not key_cache.has_key(signer):
         if Prefs.VERBOSE:
-            print("FETCH: NS, DNSKEY, DS for {}".format(signer))
+            print("# FETCH: NS/DS/DNSKEY for {}".format(signer))
         signer_zone = get_zone(signer)
         ds_rrset, ds_rrsigs = fetch_ds(signer,
                                        cache.closest_zone(signer))
@@ -177,13 +177,13 @@ def validate_rrset(srrset, query):
             raise ValueError("DS RRset failed to authenticate")
         signer_zone.install_ds(ds_rrset.to_rdataset())
         match_ds(signer_zone)
-        return
 
     verified, failed = validate_all(srrset.rrset, srrset.rrsig)
     if verified:
         srrset.set_validated()
         if vprint_quiet(query):
-            print("SECURE: {}".format(srrset.rrset))
+            for line in srrset.rrset.to_text().split('\n'):
+                print("SECURE: {}".format(line))
     else:
         raise ValueError("Validation fail: {}".format(failed))
 
