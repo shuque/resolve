@@ -39,12 +39,11 @@ def get_ns_addrs(zone, additional):
 
     for rrset in additional:
         if rrset.rdtype in [dns.rdatatype.A, dns.rdatatype.AAAA]:
-            name = rrset.name
+            if not zone.has_ns(rrset.name):
+                continue
             for rr in rrset:
-                if not zone.has_ns(name):
-                    continue
-                if (not Prefs.NSRESOLVE) or (name in needsGlue):
-                    nsobj = cache.get_ns(name)
+                if (not Prefs.NSRESOLVE) or (rrset.name in needsGlue):
+                    nsobj = cache.get_ns(rrset.name)
                     nsobj.install_ip(rr.address)
 
     if not zone.iplist() or Prefs.NSRESOLVE:
@@ -163,15 +162,16 @@ def validate_rrset(srrset, query):
     # If we don't have the signer's DNSKEY, we have to fetch the
     # DNSKEY and corresponding DS, authenticate, and cache it.
     # One situation in which this can happen is if parent, child
-    # zones are on the same nameserver.
-    # TODO: add code here .
+    # zones are on the same nameserver. Another situation is when
+    # we need to lookup NS addresses from referrals which are in
+    # an offpath zone.
+
     signer = srrset.rrsig[0].signer
     if not key_cache.has_key(signer):
         if Prefs.VERBOSE:
             print("# FETCH: NS/DS/DNSKEY for {}".format(signer))
         signer_zone = get_zone(signer)
-        ds_rrset, ds_rrsigs = fetch_ds(signer,
-                                       cache.closest_zone(signer))
+        ds_rrset, ds_rrsigs = fetch_ds(signer)
         ds_verified, _ = validate_all(ds_rrset, ds_rrsigs)
         if not ds_verified:
             raise ValueError("DS RRset failed to authenticate")
@@ -448,7 +448,6 @@ def get_zone(zonename):
         nsobj = cache.get_ns(ns_rr.target)
         if nsobj:
             continue
-        print("DEBUG: creating nameserver {}".format(ns_rr.target))
         nsobj = Nameserver(ns_rr.target)
         for addrtype in ['A', 'AAAA']:
             query = Query(ns_rr.target, addrtype, 'IN',
@@ -463,24 +462,27 @@ def get_zone(zonename):
     return zone
 
 
-def fetch_ds(subzone, zone):
+def fetch_ds(zonename):
     """
-    Fetch DS RRset and signatures for specified subzone from zone.
+    Fetch DS RRset and signatures for specified zone. Note: DS has
+    to be queried in parent zone.
     """
 
-    qname = subzone
+    qname = zonename
     qtype = dns.rdatatype.from_text('DS')
     qclass = dns.rdataclass.from_text('IN')
     query = Query(qname, qtype, qclass)
     query.set_quiet(True)
 
-    msg = send_query_zone(query, zone)
+    startZone = cache.closest_zone(zonename.parent())
+
+    msg = send_query_zone(query, startZone)
     ds_rrset = msg.get_rrset(msg.answer, qname, qclass, qtype)
     ds_rrsigs = msg.get_rrset(msg.answer, qname, qclass,
                                dns.rdatatype.RRSIG, covers=qtype)
     if ds_rrsigs is None:
         raise ValueError("No signatures found for {} DS set!".format(
-            subzone))
+            zonename))
     return ds_rrset, ds_rrsigs
 
 

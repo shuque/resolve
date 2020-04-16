@@ -27,4 +27,4 @@ class RRset:
     def __repr__(self):
         return "<RRset: {}/{}{}>".format(self.rrset.name,
                                          dns.rdatatype.to_text(self.rrtype),
-                                         " (signed)" if self.rrsigs else "")
+                                         " (signed)" if self.rrsig else "")
