@@ -436,7 +436,7 @@ def get_zone(zonename):
 
     qtype = dns.rdatatype.from_text('NS')
     qclass = dns.rdataclass.from_text('IN')
-    query = Query(zonename, qtype, qclass)
+    query = Query(zonename, qtype, qclass, minimize=Prefs.MINIMIZE)
     query.set_quiet(True)
     msg = send_query_zone(query, cache.closest_zone(query.qname))
 
@@ -450,8 +450,7 @@ def get_zone(zonename):
             continue
         nsobj = Nameserver(ns_rr.target)
         for addrtype in ['A', 'AAAA']:
-            query = Query(ns_rr.target, addrtype, 'IN',
-                          minimize=Prefs.MINIMIZE,
+            query = Query(ns_rr.target, addrtype, 'IN', minimize=Prefs.MINIMIZE,
                           is_nsquery=True)
             query.quiet = True
             resolve_name(query, cache.closest_zone(query.qname),
@@ -471,7 +470,7 @@ def fetch_ds(zonename):
     qname = zonename
     qtype = dns.rdatatype.from_text('DS')
     qclass = dns.rdataclass.from_text('IN')
-    query = Query(qname, qtype, qclass)
+    query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
     query.set_quiet(True)
 
     startZone = cache.closest_zone(zonename.parent())
@@ -479,7 +478,7 @@ def fetch_ds(zonename):
     msg = send_query_zone(query, startZone)
     ds_rrset = msg.get_rrset(msg.answer, qname, qclass, qtype)
     ds_rrsigs = msg.get_rrset(msg.answer, qname, qclass,
-                               dns.rdatatype.RRSIG, covers=qtype)
+                              dns.rdatatype.RRSIG, covers=qtype)
     if ds_rrsigs is None:
         raise ValueError("No signatures found for {} DS set!".format(
             zonename))
@@ -494,7 +493,7 @@ def fetch_dnskey(zone):
     qname = zone.name
     qtype = dns.rdatatype.from_text('DNSKEY')
     qclass = dns.rdataclass.from_text('IN')
-    query = Query(qname, qtype, qclass)
+    query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
     query.set_quiet(True)
 
     msg = send_query_zone(query, zone)
