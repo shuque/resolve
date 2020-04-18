@@ -41,12 +41,12 @@ earlier versions:
 resolve.py version 0.22
 Perform iterative resolution of a DNS name, type, and class.
 
-    Usage: resolve.py [-mtv:snxe:zc] <qname> [<qtype>] [<qclass>]
-           resolve.py [-mtv:snxe:zc] -b <batchfile>
+    Usage: resolve.py [Options] <qname> [<qtype>] [<qclass>]
+           resolve.py [Options] -b <batchfile>
 
+     -v N: verbosity level: 0,1,2 (0 default)
      -m: do qname minimization
      -t: use TCP only
-     -v N: verbosity level: 0,1,2 (0 default)
      -s: print summary statistics
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals

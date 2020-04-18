@@ -13,7 +13,8 @@ from reslib.common import Prefs
 class Query:
     """Query name class"""
 
-    def __init__(self, qname, qtype, qclass, minimize=False, is_nsquery=False):
+    def __init__(self, qname, qtype, qclass, minimize=Prefs.MINIMIZE,
+                 is_nsquery=False):
         if isinstance(qname, dns.name.Name):
             self.qname = qname
         else:

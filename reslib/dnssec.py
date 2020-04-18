@@ -50,7 +50,7 @@ class KeyCache:
     """
 
     def __init__(self):
-        # dict of dns.name.Name: list(DNSKEYinfo)
+        # dict of dns.name.Name: list(DNSKEY)
         self.data = {}
         self.install(dns.name.root, [get_root_key()])
 
@@ -84,7 +84,7 @@ class KeyCache:
         print("#### END: Key Cache dump")
 
 
-class DNSKEYinfo:
+class DNSKEY:
     """Class to hold a DNSKEY and associated information"""
 
     def __init__(self, rrname, rr):
@@ -106,7 +106,7 @@ class DNSKEYinfo:
                 self.algorithm))
 
     def __repr__(self):
-        return "<DNSKEYinfo: {} {} {} {}>".format(
+        return "<DNSKEY: {} {} {} {}>".format(
             self.name, self.flags, self.keytag, self.algorithm)
 
 
@@ -115,7 +115,7 @@ def get_root_key():
     rdata = dns.rdata.from_text(dns.rdataclass.from_text('IN'),
                                 dns.rdatatype.from_text('DNSKEY'),
                                 RootKeyData)
-    return DNSKEYinfo(dns.name.root, rdata)
+    return DNSKEY(dns.name.root, rdata)
 
 
 def _to_wire(record):
@@ -162,12 +162,12 @@ def keydata_to_eddsa(algnum, keydata):
 
 def load_keys(rrset):
     """
-    return list of DNSKEYinfo class objects from the given DNSKEY RRset
+    return list of DNSKEY class objects from the given DNSKEY RRset
     parameters (name, keytag, algorithm, key object)
     """
     result = []
     for rr in rrset:
-        result.append(DNSKEYinfo(rrset.name, rr))
+        result.append(DNSKEY(rrset.name, rr))
     return result
 
 
@@ -243,6 +243,33 @@ def verify_sig(key, sig_input, signature):
     return
 
 
+def check_dnskey_self_signature(rrset, rrsigs, keys):
+    """
+    Check self signature of given DNSKEY rrset. Return list of keys
+    that verified the signature.
+    """
+    Verified = []
+    Failed = []
+
+    for sig_input, signature, sig_rdata in get_sig_inputs(rrset, rrsigs):
+        for key in keys:
+            if key.keytag != sig_rdata.key_tag:
+                continue
+            try:
+                verify_sig(key.key, sig_input, signature)
+                check_time(sig_rdata)
+            except Exception as e:
+                Failed.append((key, e))
+            else:
+                Verified.append(key)
+
+    if not Verified:
+        raise ValueError("DNSKEY self signature failed to validate: {}".format(
+            rrset.name))
+
+    return Verified
+
+
 def validate_all(rrset, rrsigs):
     """
     Validate rrsigs for rrset with list of dnskeys.
@@ -261,16 +288,16 @@ def validate_all(rrset, rrsigs):
         if keylist is None:
             raise ValueError("No DNSSEC keys found for {}".format(
                 sig_rdata.signer))
-        for keyinfo in keylist:
-            if keyinfo.keytag != sig_rdata.key_tag:
+        for key in keylist:
+            if key.keytag != sig_rdata.key_tag:
                 continue
             try:
-                verify_sig(keyinfo.key, sig_input, signature)
+                verify_sig(key.key, sig_input, signature)
                 check_time(sig_rdata)
             except Exception as e:
-                Failed.append((keyinfo, e))
+                Failed.append((key, e))
             else:
-                Verified.append(keyinfo)
+                Verified.append(key)
 
     return Verified, Failed
 
@@ -278,8 +305,7 @@ def validate_all(rrset, rrsigs):
 def ds_rrset_matches_dnskey(ds_list, dnskey):
     """
     digest = digest_algorithm( DNSKEY owner name | DNSKEY RDATA);
-      "|" denotes concatenation
-     DNSKEY RDATA = Flags | Protocol | Algorithm | Public Key.
+    DNSKEY RDATA = Flags | Protocol | Algorithm | Public Key.
     """
 
     preimage = (dnskey.name.to_digestable() +

@@ -17,12 +17,13 @@ def usage(message=None):
 {0} version {1}
 Perform iterative resolution of a DNS name, type, and class.
 
-    Usage: {0} [-mtv:snxe:zc] <qname> [<qtype>] [<qclass>]
-           {0} [-mtv:snxe:zc] -b <batchfile>
+    Usage: {0} [Options] <qname> [<qtype>] [<qclass>]
+           {0} [Options] -b <batchfile>
 
+     Options:
+     -v N: verbosity level: 0,1,2 (0 default)
      -m: do qname minimization
      -t: use TCP only
-     -v N: verbosity level: 0,1,2 (0 default)
      -s: print summary statistics
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals

@@ -34,7 +34,7 @@ def main():
                   info="Command: {}".format(" ".join(sys.argv)))
         stats.elapsed = time.time() - time_start
         if Prefs.STATS:
-            stats.print_stats()
+            stats.print()
         if Prefs.DUMPCACHE:
             print('')
             cache.dump()
@@ -52,7 +52,7 @@ def main():
     query.print_full_answer()
 
     if Prefs.STATS:
-        stats.print_stats()
+        stats.print()
 
     if Prefs.DUMPCACHE:
         print('')

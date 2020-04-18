@@ -48,13 +48,11 @@ class Stats:
         else:
             self.cnt_query1 += 1
 
-    def print_stats(self):
+    def print(self):
         """Print statistics"""
         print('\n### Statistics:')
         print("Elapsed time: {:.3f} sec".format(self.elapsed))
         cnt_query_total = self.cnt_query1 + self.cnt_query2
-        if not Prefs.BATCHFILE:
-            print("Qname Delegation depth: {}".format(self.delegation_depth))
         print("Number of delegations traversed: {}".format(self.cnt_deleg))
         print("Number of queries (regular): {}".format(self.cnt_query1))
         print("Number of queries (nsaddr)   {}".format(self.cnt_query2))
