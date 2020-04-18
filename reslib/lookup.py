@@ -14,10 +14,12 @@ import dns.dnssec
 from reslib.common import Prefs, cache, stats, RootZone
 from reslib.zone import Zone
 from reslib.query import Query
+from reslib.nameserver import NameServer
 from reslib.rrset import RRset
-from reslib.utils import vprint_quiet, make_query_message, send_query, is_referral
-from reslib.dnssec import key_cache, load_keys, validate_all, \
-    ds_rrset_matches_dnskey, check_dnskey_self_signature
+from reslib.utils import (vprint_quiet, make_query_message, send_query,
+                          is_referral)
+from reslib.dnssec import (key_cache, load_keys, validate_all,
+                           ds_rrset_matches_dnskey, check_dnskey_self_signature)
 
 
 def get_ns_addrs(zone, additional):
@@ -428,12 +430,11 @@ def get_zone(zonename):
         nsobj = cache.get_ns(ns_rr.target)
         if nsobj:
             continue
-        nsobj = Nameserver(ns_rr.target)
+        nsobj = NameServer(ns_rr.target)
         for addrtype in ['A', 'AAAA']:
             query = Query(ns_rr.target, addrtype, 'IN', is_nsquery=True)
             query.quiet = True
-            resolve_name(query, cache.closest_zone(query.qname),
-                         inPath=False)
+            resolve_name(query, cache.closest_zone(query.qname))
             for ip in query.get_answer_ip_list():
                 nsobj.install_ip(ip)
 
@@ -478,6 +479,8 @@ def match_ds(zone, referring_query=None):
 
     keylist = load_keys(dnskey_rrset)
     sigkeys = check_dnskey_self_signature(dnskey_rrset, dnskey_rrsigs, keylist)
+
+    print("DEBUG: self sig keys:", sigkeys)
 
     if referring_query and Prefs.VERBOSE and not referring_query.quiet:
         for key in keylist:

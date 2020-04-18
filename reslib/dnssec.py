@@ -110,6 +110,15 @@ class DNSKEY:
             self.name, self.flags, self.keytag, self.algorithm)
 
 
+class Signature:
+    """Signature class"""
+
+    def __init__(self, rrset, sig_rdata, indata):
+        self.rrset = rrset
+        self.rdata = sig_rdata
+        self.indata = indata
+
+
 def get_root_key():
     """Get root key/trust anchor"""
     rdata = dns.rdata.from_text(dns.rdataclass.from_text('IN'),
@@ -171,25 +180,27 @@ def load_keys(rrset):
     return result
 
 
-def get_sig_inputs(rrset, rrsigs):
+def get_sig_info(rrset, rrsigs):
 
     """
-    For given rrset and rrsig set, calculate the signature input for
-    for each signature in the rrsig set. Yield one at a time.
-    From RFC4034, this is: hash(RRSIG_RDATA | RR(1) | RR(2)... ), where
-    RRSIG_RDATA is the rdata minus the actual signature field. However,
-    note that EdDSA (as used in DNSSEC) does not use a hash function, so
-    just the raw wire format data is the signature input.
-    """
+    For given rrset and rrsig set, for each rrsig, return a Signature
+    object, yielding them one at a time. The Signature object, contains
+    the rrset, rrsig rdata, and the calculated input for the signature
+    algorithm in question.
 
-    rrname = rrset.name
+    From RFC4034, Section 3.1.8.1, the signature input data is:
+    (RRSIG_RDATA | RR(1) | RR(2)... ), where RRSIG_RDATA is the rdata
+    minus the actual signature field. This input is then hashed for
+    most signature algorithms with the hash algorithm defined for that
+    algorithm, except for EdDSA (as used in DNSSEC) which just uses the
+    raw data as input.
+    """
 
     for sig_rdata in rrsigs.to_rdataset():
         indata = b''
-        signature = sig_rdata.signature
-        wire_sig_rdata = _to_wire(sig_rdata)
-        indata += wire_sig_rdata[0:18]
+        indata += _to_wire(sig_rdata)[0:18]
         indata += sig_rdata.signer.to_digestable()
+        rrname = rrset.name
         if sig_rdata.labels < len(rrname) - 1:
             labels = (b'*',) + rrname.labels[-(sig_rdata.labels+1):]
             rrname = dns.name.Name(labels)
@@ -205,9 +216,9 @@ def get_sig_inputs(rrset, rrsigs):
         if HASHFUNC[sig_rdata.algorithm] is not None:
             hashed = HASHFUNC[sig_rdata.algorithm].new()
             hashed.update(indata)
-            yield hashed, signature, sig_rdata
+            yield Signature(rrset, sig_rdata, hashed)
         else:
-            yield indata, signature, sig_rdata
+            yield Signature(rrset, sig_rdata, indata)
 
 
 def check_time(sig_rdata, skew=CLOCK_SKEW):
@@ -227,41 +238,58 @@ def sig_covers_rrset(sigset, rrset):
     return (sigset.name == rrset.name) and (sigset.covers == rrset.rdtype)
 
 
-def verify_sig(key, sig_input, signature):
+def verify_sig(key, sig):
     """verify signature on data with given algorithm"""
 
     if isinstance(key, RSA.RsaKey):
         verifier = pkcs1_15.new(key)
-        verifier.verify(sig_input, signature)
+        verifier.verify(sig.indata, sig.rdata.signature)
     elif isinstance(key, ECC.EccKey):
         verifier = DSS.new(key, 'fips-186-3')
-        verifier.verify(sig_input, signature)
+        verifier.verify(sig.indata, sig.rdata.signature)
     elif isinstance(key, nacl.signing.VerifyKey):
-        _ = key.verify(sig_input, signature)
+        _ = key.verify(sig.indata, sig.rdata.signature)
     else:
         raise ValueError("Unknown key type: {}".format(type(key)))
     return
+
+
+def verify_sig_with_keys(sig, keys):
+    """
+    Verify signature object against given list of DNSKEYs.
+    Return 2 lists of keys that verified, and that failed.
+    """
+
+    Verified = []
+    Failed = []
+
+    for key in keys:
+        if key.keytag != sig.rdata.key_tag:
+            continue
+        try:
+            verify_sig(key.key, sig)
+            check_time(sig.rdata)
+        except Exception as e:
+            Failed.append((key, e))
+        else:
+            Verified.append(key)
+
+    return Verified, Failed
 
 
 def check_dnskey_self_signature(rrset, rrsigs, keys):
     """
     Check self signature of given DNSKEY rrset. Return list of keys
     that verified the signature.
+    Returns list of keys that verifiably sign the DNSKEY rrset.
+    Raises exception if no key verifies.
     """
-    Verified = []
-    Failed = []
 
-    for sig_input, signature, sig_rdata in get_sig_inputs(rrset, rrsigs):
-        for key in keys:
-            if key.keytag != sig_rdata.key_tag:
-                continue
-            try:
-                verify_sig(key.key, sig_input, signature)
-                check_time(sig_rdata)
-            except Exception as e:
-                Failed.append((key, e))
-            else:
-                Verified.append(key)
+    Verified = []
+
+    for sig in get_sig_info(rrset, rrsigs):
+        v, _ = verify_sig_with_keys(sig, keys)
+        Verified += v
 
     if not Verified:
         raise ValueError("DNSKEY self signature failed to validate: {}".format(
@@ -280,31 +308,24 @@ def validate_all(rrset, rrsigs):
     if not sig_covers_rrset(rrsigs, rrset):
         raise ValueError("Signature doesn't correspond to RRset")
 
-    Verified = []                     # list of (key)
-    Failed = []                       # list of (key, error)
+    Verified = []
+    Failed = []
 
-    for sig_input, signature, sig_rdata in get_sig_inputs(rrset, rrsigs):
-        keylist = key_cache.get_keys(sig_rdata.signer)
+    for sig in get_sig_info(rrset, rrsigs):
+        keylist = key_cache.get_keys(sig.rdata.signer)
         if keylist is None:
             raise ValueError("No DNSSEC keys found for {}".format(
-                sig_rdata.signer))
-        for key in keylist:
-            if key.keytag != sig_rdata.key_tag:
-                continue
-            try:
-                verify_sig(key.key, sig_input, signature)
-                check_time(sig_rdata)
-            except Exception as e:
-                Failed.append((key, e))
-            else:
-                Verified.append(key)
+                sig.rdata.signer))
+        v, f = verify_sig_with_keys(sig, keylist)
+        Verified += v
+        Failed += f
 
     return Verified, Failed
 
 
 def ds_rrset_matches_dnskey(ds_list, dnskey):
     """
-    digest = digest_algorithm( DNSKEY owner name | DNSKEY RDATA);
+    ds_ digest = digest_algorithm( DNSKEY owner name | DNSKEY RDATA);
     DNSKEY RDATA = Flags | Protocol | Algorithm | Public Key.
     """
 
