@@ -118,6 +118,38 @@ class Signature:
         self.rdata = sig_rdata
         self.indata = indata
 
+    def verify(self, key):
+        """
+        Verify signature with specified key. Raises a crypto key
+        specific exception on failure.
+        """
+        if isinstance(key, RSA.RsaKey):
+            verifier = pkcs1_15.new(key)
+            verifier.verify(self.indata, self.rdata.signature)
+        elif isinstance(key, ECC.EccKey):
+            verifier = DSS.new(key, 'fips-186-3')
+            verifier.verify(self.indata, self.rdata.signature)
+        elif isinstance(key, nacl.signing.VerifyKey):
+            _ = key.verify(self.indata, self.rdata.signature)
+        else:
+            raise ValueError("Unknown key type: {}".format(type(key)))
+
+    def check_time(self, skew=CLOCK_SKEW):
+        """
+        Check that current time is within signature validity period,
+        modulo an allowable clock skew interval.
+        """
+        current_time = int(time.time() + 0.5)
+        if current_time < (self.rdata.inception - skew):
+            raise ValueError("Signature inception too far in the future")
+        if current_time > (self.rdata.expiration + skew):
+            raise ValueError("Signature has expired")
+
+    def __repr__(self):
+        return "<Signature: {}/{}/{} {} {}>".format(
+            self.rrset.name, self.rrset.rdtype, self.rrset.rdclass,
+            self.rdata.key_tag, self.rdata.algorithm)
+
 
 def get_root_key():
     """Get root key/trust anchor"""
@@ -221,19 +253,7 @@ def get_sig_info(rrset, rrsigs):
             yield Signature(rrset, sig_rdata, indata)
 
 
-def check_time(sig_rdata, skew=CLOCK_SKEW):
-    """
-    Check that current time is within signature validity period,
-    modulo an allowable clock skew interval.
-    """
-    current_time = int(time.time() + 0.5)
-    if current_time < (sig_rdata.inception - skew):
-        raise ValueError("Signature inception too far in the future")
-    if current_time > (sig_rdata.expiration + skew):
-        raise ValueError("Signature has expired")
-
-
-def sig_covers_rrset(sigset, rrset):
+def sigset_covers_rrset(sigset, rrset):
     """does RRSIG set cover the RR set?"""
     return (sigset.name == rrset.name) and (sigset.covers == rrset.rdtype)
 
@@ -267,8 +287,8 @@ def verify_sig_with_keys(sig, keys):
         if key.keytag != sig.rdata.key_tag:
             continue
         try:
-            verify_sig(key.key, sig)
-            check_time(sig.rdata)
+            sig.verify(key.key)
+            sig.check_time()
         except Exception as e:
             Failed.append((key, e))
         else:
@@ -279,10 +299,9 @@ def verify_sig_with_keys(sig, keys):
 
 def check_dnskey_self_signature(rrset, rrsigs, keys):
     """
-    Check self signature of given DNSKEY rrset. Return list of keys
-    that verified the signature.
-    Returns list of keys that verifiably sign the DNSKEY rrset.
-    Raises exception if no key verifies.
+    Check self signature of given DNSKEY rrset. Return list of DNSKEY keys
+    that verified the signature. Returns list of keys that verifiably sign
+    the DNSKEY rrset. Raises exception if no key verifies.
     """
 
     Verified = []
@@ -300,13 +319,10 @@ def check_dnskey_self_signature(rrset, rrsigs, keys):
 
 def validate_all(rrset, rrsigs):
     """
-    Validate rrsigs for rrset with list of dnskeys.
-    Returns 2 lists of keys: Verified and Failed. Failed also
-    includes verification errors.
+    Validate rrsigs for rrset with the already authenticated global cache
+    of keys in key_cache. Returns 2 lists of keys: Verified and Failed.
+    Failed also includes verification errors.
     """
-
-    if not sig_covers_rrset(rrsigs, rrset):
-        raise ValueError("Signature doesn't correspond to RRset")
 
     Verified = []
     Failed = []
@@ -325,6 +341,8 @@ def validate_all(rrset, rrsigs):
 
 def ds_rrset_matches_dnskey(ds_list, dnskey):
     """
+    Check that DS RRset includes at least one DS record whose digest
+    field corresponds to the DNSKEY.
     ds_ digest = digest_algorithm( DNSKEY owner name | DNSKEY RDATA);
     DNSKEY RDATA = Flags | Protocol | Algorithm | Public Key.
     """
