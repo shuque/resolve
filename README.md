@@ -44,6 +44,7 @@ Perform iterative resolution of a DNS name, type, and class.
     Usage: resolve.py [Options] <qname> [<qtype>] [<qclass>]
            resolve.py [Options] -b <batchfile>
 
+     Options:
      -v N: verbosity level: 0,1,2 (0 default)
      -m: do qname minimization
      -t: use TCP only
