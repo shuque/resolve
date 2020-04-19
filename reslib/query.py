@@ -7,6 +7,7 @@ import dns.rdatatype
 import dns.rdataclass
 
 from reslib.common import Prefs
+from reslib.exception import ResError
 
 
 class Query:
@@ -45,6 +46,14 @@ class Query:
         when VERBOSE mode is set.
         """
         self.quiet = action
+
+    def add_to_full_answer(self, srrset):
+        """add rrset to full answer set"""
+        names_and_types = [(x.rrset.name, x.rrset.rdtype) for x in
+                           self.full_answer_rrset]
+        if (srrset.rrname, srrset.rrtype) in names_and_types:
+            raise ResError("RRset answer loop detected: {}".format(srrset.rrset))
+        self.full_answer_rrset.append(srrset)
 
     def print_full_answer(self):
         """

@@ -239,30 +239,33 @@ def process_answer(response, query, addResults=None):
             query.got_answer = True
             query.answer_rrset.append(srrset)
             if addResults:
-                addResults.full_answer_rrset.append(srrset)
+                addResults.add_to_full_answer(srrset)
         elif rrtype == dns.rdatatype.DNAME:
             query.answer_rrset.append(srrset)
             if addResults:
-                addResults.full_answer_rrset.append(srrset)
+                addResults.add_to_full_answer(srrset)
             if Prefs.VERBOSE:
                 print(srrset.rrset.to_text())
         elif rrtype == dns.rdatatype.CNAME:
             query.answer_rrset.append(srrset)
             if addResults:
-                addResults.full_answer_rrset.append(srrset)
+                addResults.add_to_full_answer(srrset)
             if Prefs.VERBOSE:
                 print(srrset.rrset.to_text())
             cname = srrset.rrset[0].target
             cname_dict[srrset.rrset.name] = srrset.rrset[0].target
             stats.cnt_cname += 1
             if stats.cnt_cname >= Prefs.MAX_CNAME:
-                print("ERROR: Too many ({}) CNAME indirections.".format(
+                raise ResError("Too many ({}) CNAME indirections.".format(
                     Prefs.MAX_CNAME))
-                return
 
+    seen = []
     if cname_dict:
         final_alias = response.question[0].name
         while True:
+            if final_alias in seen:
+                raise ResError("CNAME loop detected: {}".format(final_alias))
+            seen.append(final_alias)
             if final_alias in cname_dict:
                 final_alias = cname_dict[final_alias]
             else:
