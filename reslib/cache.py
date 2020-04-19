@@ -22,17 +22,21 @@ class Cache:
     """Cache of Zone & NameServer objects"""
 
     def __init__(self):
+        self.reset()
+
+    def reset(self):
+        """Initialize/empty caches"""
         self.ZoneDict = {}               # dns.name.Name -> Zone
         self.NSDict = {}                 # dns.name.Name -> NameServer
-
-    def get_ns(self, nsname):
-        if nsname in self.NSDict:
-            return self.NSDict[nsname]
-        return None
 
     def get_zone(self, zonename):
         if zonename in self.ZoneDict:
             return self.ZoneDict[zonename]
+        return None
+
+    def get_ns(self, nsname):
+        if nsname in self.NSDict:
+            return self.NSDict[nsname]
         return None
 
     def install_ns(self, nsname, nsobj):
