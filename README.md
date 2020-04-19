@@ -84,7 +84,7 @@ na21-chx.my.salesforce.com. 120 IN A 96.43.152.168
 na21-chx.my.salesforce.com. 120 IN A 96.43.152.40
 ```
 
-Here's the same lookup with the -v1 switch (increase verbosity level
+Here's the first lookup with the -v1 switch (increase verbosity level
 to 1) to show the iterative resolution path taken through the DNS
 hierarchy:
 
@@ -196,11 +196,11 @@ Traceback (most recent call last):
     sys.exit(main())
   File "/home/shuque/git/resolve/reslib/main.py", line 47, in main
     resolve_name(query, RootZone, addResults=query)
-  File "/home/shuque/git/resolve/reslib/lookup.py", line 415, in resolve_name
+  File "/home/shuque/git/resolve/reslib/lookup.py", line 416, in resolve_name
     match_ds(curr_zone, referring_query=query)
-  File "/home/shuque/git/resolve/reslib/lookup.py", line 516, in match_ds
-    raise ValueError("DS did not match DNSKEY for {}".format(zone.name))
-ValueError: DS did not match DNSKEY for dnssec-failed.org.
+  File "/home/shuque/git/resolve/reslib/lookup.py", line 517, in match_ds
+    raise ResError("DS did not match DNSKEY for {}".format(zone.name))
+reslib.exception.ResError: DS did not match DNSKEY for dnssec-failed.org.
 ```
 
 Querying a record with an intentionally bad signature, shows a
@@ -209,7 +209,6 @@ from the Root Canary project:
 
 ```
 $ resolve.py -v1 -z bogus.d2a15n3.rootcanary.net. A
-#####################################################################
 
 # QUERY: bogus.d2a15n3.rootcanary.net. A IN at zone . address 198.41.0.4
 #        [SECURE Referral to zone: net. in 0.015 s]
@@ -247,19 +246,19 @@ DNSKEY: rootcanary.net. 257 64786 8
 #        [Got answer in 0.106 s]
 # FETCH: NS/DS/DNSKEY for d2a15n3.rootcanary.net.
 Traceback (most recent call last):
-  File "../resolve.py", line 14, in <module>
+  File "./resolve.py", line 14, in <module>
     sys.exit(main())
   File "/home/shuque/git/resolve/reslib/main.py", line 47, in main
     resolve_name(query, RootZone, addResults=query)
-  File "/home/shuque/git/resolve/reslib/lookup.py", line 394, in resolve_name
+  File "/home/shuque/git/resolve/reslib/lookup.py", line 395, in resolve_name
     rc, referral = process_response(response, query, addResults=addResults)
-  File "/home/shuque/git/resolve/reslib/lookup.py", line 301, in process_response
+  File "/home/shuque/git/resolve/reslib/lookup.py", line 302, in process_response
     process_answer(response, query, addResults=addResults)     # Answer
-  File "/home/shuque/git/resolve/reslib/lookup.py", line 235, in process_answer
+  File "/home/shuque/git/resolve/reslib/lookup.py", line 236, in process_answer
     validate_rrset(srrset, query)
-  File "/home/shuque/git/resolve/reslib/lookup.py", line 212, in validate_rrset
-    raise ValueError("Validation fail: {}".format(failed))
-ValueError: Validation fail: [(<DNSKEY: d2a15n3.rootcanary.net. 257 50165 15>, BadSignatureError('Signature was forged or corrupt',))]
+  File "/home/shuque/git/resolve/reslib/lookup.py", line 213, in validate_rrset
+    raise ResError("Validation fail: {}".format(failed))
+reslib.exception.ResError: Validation fail: [(<DNSKEY: d2a15n3.rootcanary.net. 257 50165 15>, BadSignatureError('Signature was forged or corrupt',))]
 ```
 
 ### Batch mode

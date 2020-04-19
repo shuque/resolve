@@ -17,6 +17,7 @@ import nacl.encoding
 import nacl.signing
 
 from reslib.rootkey import RootKeyData
+from reslib.exception import ResError
 
 
 # Tolerable clock skew for signatures in seconds
@@ -103,7 +104,7 @@ class DNSKEY:
         elif self.algorithm in [15]:
             self.key = keydata_to_eddsa(self.algorithm, rr.key)
         else:
-            raise ValueError("DNSKEY algorithm {} not supported".format(
+            raise ResError("DNSKEY algorithm {} not supported".format(
                 self.algorithm))
 
     def __repr__(self):
@@ -133,7 +134,7 @@ class Signature:
         elif isinstance(key, nacl.signing.VerifyKey):
             _ = key.verify(self.indata, self.rdata.signature)
         else:
-            raise ValueError("Unknown key type: {}".format(type(key)))
+            raise ResError("Unknown key type: {}".format(type(key)))
 
     def check_time(self, skew=CLOCK_SKEW):
         """
@@ -142,9 +143,9 @@ class Signature:
         """
         current_time = int(time.time() + 0.5)
         if current_time < (self.rdata.inception - skew):
-            raise ValueError("Signature inception too far in the future")
+            raise ResError("Signature inception too far in the future")
         if current_time > (self.rdata.expiration + skew):
-            raise ValueError("Signature has expired")
+            raise ResError("Signature has expired")
 
     def __repr__(self):
         return "<Signature: {}/{}/{} {} {}>".format(
@@ -188,7 +189,7 @@ def keydata_to_ecc(algnum, keydata):
         point_length = 48
         curve = 'p384'
     else:
-        raise ValueError("Invalid algorithm number {} for ECDSA".format(algnum))
+        raise ResError("Invalid algorithm number {} for ECDSA".format(algnum))
     x = int.from_bytes(keydata[0:point_length], byteorder='big')
     y = int.from_bytes(keydata[point_length:], byteorder='big')
     return ECC.construct(curve=curve, point_x=x, point_y=y)
@@ -199,7 +200,7 @@ def keydata_to_eddsa(algnum, keydata):
     if algnum == 15:
         return nacl.signing.VerifyKey(keydata)
     else:
-        raise ValueError("Unknown EdDSA algorithm number {}".format(algnum))
+        raise ResError("Unknown EdDSA algorithm number {}".format(algnum))
 
 
 def load_keys(rrset):
@@ -296,7 +297,7 @@ def check_dnskey_self_signature(rrset, rrsigs, keys):
         Verified += v
 
     if not Verified:
-        raise ValueError("DNSKEY self signature failed to validate: {}".format(
+        raise ResError("DNSKEY self signature failed to validate: {}".format(
             rrset.name))
 
     return Verified
@@ -315,7 +316,7 @@ def validate_all(rrset, rrsigs):
     for sig in get_sig_info(rrset, rrsigs):
         keylist = key_cache.get_keys(sig.rdata.signer)
         if keylist is None:
-            raise ValueError("No DNSSEC keys found for {}".format(
+            raise ResError("No DNSSEC keys found for {}".format(
                 sig.rdata.signer))
         v, f = verify_sig_with_keys(sig, keylist)
         Verified += v

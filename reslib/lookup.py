@@ -12,6 +12,7 @@ import dns.rcode
 import dns.dnssec
 
 from reslib.common import Prefs, cache, stats, RootZone
+from reslib.exception import ResError
 from reslib.zone import Zone
 from reslib.query import Query
 from reslib.nameserver import NameServer
@@ -107,31 +108,31 @@ def process_referral(message, query):
             if ns_rrset is None:
                 ns_rrset = rrset
             else:
-                raise ValueError("Multiple NS RRset found in referral")
+                raise ResError("Multiple NS RRset found in referral")
         elif rrset.rdtype == dns.rdatatype.DS:
             if ds_rrset is None:
                 ds_rrset = rrset
             else:
-                raise ValueError("Multiple DS RRset found in referral")
+                raise ResError("Multiple DS RRset found in referral")
         elif rrset.rdtype == dns.rdatatype.RRSIG:
             if rrset.covers == dns.rdatatype.DS:
                 if ds_rrsigs is None:
                     ds_rrsigs = rrset
                 else:
-                    raise ValueError("Multiple DS RRSIG sets found in referral")
+                    raise ResError("Multiple DS RRSIG sets found in referral")
 
     if ns_rrset is None:
-        raise ValueError("Unable to find NS RRset in referral response")
+        raise ResError("Unable to find NS RRset in referral response")
 
     zonename = ns_rrset.name
     if key_cache.SecureSoFar and ds_rrset:
         if zonename != ds_rrset.name:
-            raise ValueError("DS didn't match NS in referral message")
+            raise ResError("DS didn't match NS in referral message")
         if ds_rrsigs is None:
-            raise ValueError("DS RRset has no signatures")
+            raise ResError("DS RRset has no signatures")
         ds_verified, _ = validate_all(ds_rrset, ds_rrsigs)
         if not ds_verified:
-            raise ValueError("DS RRset failed to authenticate")
+            raise ResError("DS RRset failed to authenticate")
     else:
         # TODO: authenticate lack of DS, if possible
         if not query.is_nsquery:
@@ -178,7 +179,7 @@ def get_ns_ds_dnskey(zonename):
     ds_rrset, ds_rrsigs = fetch_ds(zonename)
     ds_verified, _ = validate_all(ds_rrset, ds_rrsigs)
     if not ds_verified:
-        raise ValueError("DS RRset failed to authenticate")
+        raise ResError("DS RRset failed to authenticate")
     zone.install_ds(ds_rrset.to_rdataset())
     match_ds(zone)
     return
@@ -209,7 +210,7 @@ def validate_rrset(srrset, query):
             for line in srrset.rrset.to_text().split('\n'):
                 print("SECURE: {}".format(line))
     else:
-        raise ValueError("Validation fail: {}".format(failed))
+        raise ResError("Validation fail: {}".format(failed))
 
 
 def process_answer(response, query, addResults=None):
@@ -326,7 +327,7 @@ def print_query_trace(query, zone, address):
 def check_query_count_limit():
     """Check query count limit"""
     if stats.cnt_query1 + stats.cnt_query2 >= Prefs.MAX_QUERY:
-        raise ValueError("Max number of queries ({}) exceeded.".format(
+        raise ResError("Max number of queries ({}) exceeded.".format(
             Prefs.MAX_QUERY))
 
 
@@ -334,7 +335,7 @@ def get_zone_addresses(zone):
     """Return list of nameserver addresses for zone"""
     result = zone.iplist_sorted_by_rtt()
     if not result:
-        raise ValueError("No nameserver addresses found for zone: {}.".format(
+        raise ResError("No nameserver addresses found for zone: {}.".format(
             zone.name))
     return result
 
@@ -363,7 +364,7 @@ def send_query_zone(query, zone):
                 continue
             break
     else:
-        raise ValueError("Queries to all servers for zone {} failed.".format(
+        raise ResError("Queries to all servers for zone {} failed.".format(
             zone.name))
 
     query.elapsed_last = time.time() - time_start
@@ -477,10 +478,10 @@ def fetch_ds(zonename):
                               dns.rdatatype.RRSIG, covers=qtype)
 
     if ds_rrset is None:
-        raise ValueError("No DS RRset for {} found.".format(zonename))
+        raise ResError("No DS RRset for {} found.".format(zonename))
 
     if ds_rrsigs is None:
-        raise ValueError("No signatures found for {} DS set!".format(
+        raise ResError("No signatures found for {} DS set!".format(
             zonename))
     return ds_rrset, ds_rrsigs
 
@@ -495,7 +496,7 @@ def match_ds(zone, referring_query=None):
 
     dnskey_rrset, dnskey_rrsigs = fetch_dnskey(zone)
     if dnskey_rrsigs is None:
-        raise ValueError("No signatures found for root DNSKEY set!")
+        raise ResError("No signatures found for root DNSKEY set!")
 
     keylist = load_keys(dnskey_rrset)
     sigkeys = check_dnskey_self_signature(dnskey_rrset, dnskey_rrsigs, keylist)
@@ -513,7 +514,7 @@ def match_ds(zone, referring_query=None):
             key_cache.install(zone.name, keylist)
             return True
 
-    raise ValueError("DS did not match DNSKEY for {}".format(zone.name))
+    raise ResError("DS did not match DNSKEY for {}".format(zone.name))
 
 
 def fetch_dnskey(zone):
@@ -532,7 +533,7 @@ def fetch_dnskey(zone):
     dnskey_rrsigs = msg.get_rrset(msg.answer, qname, qclass,
                                   dns.rdatatype.RRSIG, covers=qtype)
     if dnskey_rrsigs is None:
-        raise ValueError("No signatures found for root DNSKEY set!")
+        raise ResError("No signatures found for root DNSKEY set!")
     return dnskey_rrset, dnskey_rrsigs
 
 
@@ -545,11 +546,11 @@ def initialize_dnssec():
     dnskey_rrset, dnskey_rrsigs = fetch_dnskey(RootZone)
 
     if dnskey_rrsigs is None:
-        raise ValueError("No signatures found for root DNSKEY set!")
+        raise ResError("No signatures found for root DNSKEY set!")
 
     verified, failed = validate_all(dnskey_rrset, dnskey_rrsigs)
     if not verified:
-        raise ValueError("Couldn't validate root DNSKEY RRset: {}".format(
+        raise ResError("Couldn't validate root DNSKEY RRset: {}".format(
             failed))
 
     key_cache.install(dns.name.root, load_keys(dnskey_rrset))
