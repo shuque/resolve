@@ -6,7 +6,6 @@ import dns.name
 import dns.rdatatype
 import dns.rdataclass
 
-from reslib.rrset import RRset
 from reslib.common import Prefs
 
 
@@ -48,16 +47,29 @@ class Query:
         self.quiet = action
 
     def print_full_answer(self):
-        """Print full set of answer records including aliases"""
+        """
+        Print full set of answer records including aliases. Report
+        security status if DNSSEC is being used.
+        """
         if Prefs.VERBOSE:
             print("# ANSWER:")
+        count = 0
+        secure_count = 0
         if self.full_answer_rrset:
-            print("\n".join([x.to_text() for x in self.full_answer_rrset]))
+            for x in self.full_answer_rrset:
+                count += 1
+                if x.validated:
+                    secure_count += 1
+                print(x.rrset.to_text())
+            if Prefs.VERBOSE and Prefs.DNSSEC:
+                print("# DNSSEC status: {}".format(
+                    "SECURE" if (secure_count == count) else "INSECURE"))
 
     def get_answer_ip_list(self):
         """get list of answer IP addresses if any"""
         iplist = []
-        for rrset in self.answer_rrset:
+        for srrset in self.answer_rrset:
+            rrset = srrset.rrset
             if rrset.rdtype in [dns.rdatatype.A, dns.rdatatype.AAAA]:
                 for rr in rrset:
                     iplist.append(rr.to_text())
@@ -76,4 +88,6 @@ class Query:
         self.qname = dns.name.Name(self.orig_qname[-numLabels:])
 
     def __repr__(self):
-        return "<Query: {},{},{}>".format(self.qname, self.qtype, self.qclass)
+        return "<Query: {},{},{}>".format(self.qname,
+                                          dns.rdatatype.to_text(self.qtype),
+                                          dns.rdataclass.to_text(self.qclass))

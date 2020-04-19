@@ -79,6 +79,20 @@ def install_zone_in_cache(zonename, ns_rrset, ds_rrset, additional):
     return zone
 
 
+def print_referral_trace(query, zonename, has_ds=False):
+    """
+    Print Referral trace: {secure/insecure, zone, response time}
+    """
+    if vprint_quiet(query):
+        if Prefs.DNSSEC:
+            ref_prefix = "SECURE " if has_ds else "INSECURE "
+        else:
+            ref_prefix = None
+        print("#        [{}Referral to zone: {} in {:.3f} s]".format(
+            ref_prefix if ref_prefix else "",
+            zonename, query.elapsed_last))
+
+
 def process_referral(message, query):
     """
     Process referral. Returns a zone object for the referred zone.
@@ -110,7 +124,7 @@ def process_referral(message, query):
         raise ValueError("Unable to find NS RRset in referral response")
 
     zonename = ns_rrset.name
-    if ds_rrset:
+    if key_cache.SecureSoFar and ds_rrset:
         if zonename != ds_rrset.name:
             raise ValueError("DS didn't match NS in referral message")
         if ds_rrsigs is None:
@@ -118,10 +132,12 @@ def process_referral(message, query):
         ds_verified, _ = validate_all(ds_rrset, ds_rrsigs)
         if not ds_verified:
             raise ValueError("DS RRset failed to authenticate")
+    else:
+        # TODO: authenticate lack of DS, if possible
+        if not query.is_nsquery:
+            key_cache.SecureSoFar = False
 
-    if vprint_quiet(query):
-        print("#        [Referral to zone: {} in {:.3f} s]".format(
-            zonename, query.elapsed_last))
+    print_referral_trace(query, zonename, ds_rrset)
 
     zone = install_zone_in_cache(zonename, ns_rrset, ds_rrset,
                                  message.additional)
@@ -215,24 +231,24 @@ def process_answer(response, query, addResults=None):
     for key in rrset_dict:
         rrname, rrtype = key
         srrset = rrset_dict[key]
-        if srrset.rrsig:
+        if key_cache.SecureSoFar and srrset.rrsig:
             validate_rrset(srrset, query)
 
         if rrtype == query.qtype and rrname == query.qname:
             query.got_answer = True
-            query.answer_rrset.append(srrset.rrset)
+            query.answer_rrset.append(srrset)
             if addResults:
-                addResults.full_answer_rrset.append(srrset.rrset)
+                addResults.full_answer_rrset.append(srrset)
         elif rrtype == dns.rdatatype.DNAME:
-            query.answer_rrset.append(srrset.rrset)
+            query.answer_rrset.append(srrset)
             if addResults:
-                addResults.full_answer_rrset.append(srrset.rrset)
+                addResults.full_answer_rrset.append(srrset)
             if Prefs.VERBOSE:
                 print(srrset.rrset.to_text())
         elif rrtype == dns.rdatatype.CNAME:
-            query.answer_rrset.append(srrset.rrset)
+            query.answer_rrset.append(srrset)
             if addResults:
-                addResults.full_answer_rrset.append(srrset.rrset)
+                addResults.full_answer_rrset.append(srrset)
             if Prefs.VERBOSE:
                 print(srrset.rrset.to_text())
             cname = srrset.rrset[0].target
@@ -459,6 +475,10 @@ def fetch_ds(zonename):
     ds_rrset = msg.get_rrset(msg.answer, qname, qclass, qtype)
     ds_rrsigs = msg.get_rrset(msg.answer, qname, qclass,
                               dns.rdatatype.RRSIG, covers=qtype)
+
+    if ds_rrset is None:
+        raise ValueError("No DS RRset for {} found.".format(zonename))
+
     if ds_rrsigs is None:
         raise ValueError("No signatures found for {} DS set!".format(
             zonename))
@@ -479,8 +499,6 @@ def match_ds(zone, referring_query=None):
 
     keylist = load_keys(dnskey_rrset)
     sigkeys = check_dnskey_self_signature(dnskey_rrset, dnskey_rrsigs, keylist)
-
-    print("DEBUG: self sig keys:", sigkeys)
 
     if referring_query and Prefs.VERBOSE and not referring_query.quiet:
         for key in keylist:
@@ -535,4 +553,5 @@ def initialize_dnssec():
             failed))
 
     key_cache.install(dns.name.root, load_keys(dnskey_rrset))
+    key_cache.SecureSoFar = True
     return

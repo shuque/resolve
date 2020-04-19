@@ -21,11 +21,11 @@ Pre-requisites:
   - [pycryptodome](https://www.pycryptodome.org/en/latest/)
   - [pynacl](https://pypi.org/project/PyNaCl/)
 
-DNSSEC validation is still under development. A preliminary implementation
-of full chain authentication of positive answers is done, although some
-fine tuning is needed. Authenticated denial of existence is not yet implemented.
-The most popular signing algorithms are supported (5, 7, 8, 10, 13, 14, 15).
-Algorithm 16 is planned for the future.
+DNSSEC validation is still under development. Full chain authentication of
+positive answers is implemented. The most popular signing algorithms are
+supported (RSASHA1, RSASHA1-NSEC3-SHA1, RSASHA256, RSASHA512, ECDSAP256SHA256,
+ECDSAP384SHA384, and ED25519. The main todo items are: DNAME processing,
+Authenticated Denial of Existence, and support for algorithm 16 (ED448).
 
 If you need to use a version without DNSSEC, because you haven't or don't
 want to install the pycryptodome and pynacl crypto libraries, you can
@@ -121,7 +121,7 @@ Use -z to turn on DNSSEC validation. Example output:
 $ resolve.py -v1 -z www.huque.com. A
 
 # QUERY: www.huque.com. A IN at zone . address 198.41.0.4
-#        [Referral to zone: com. in 0.015 s]
+#        [SECURE Referral to zone: com. in 0.014 s]
 ZONE: com.
 NS: e.gtld-servers.net. 192.12.94.30 2001:502:1ca1::30
 NS: b.gtld-servers.net. 192.33.14.30 2001:503:231d::2:30
@@ -142,17 +142,17 @@ DNSKEY: com. 256 39844 8
 DNSKEY: com. 257 30909 8
 
 # QUERY: www.huque.com. A IN at zone com. address 192.12.94.30
-#        [Referral to zone: huque.com. in 0.037 s]
+#        [SECURE Referral to zone: huque.com. in 0.063 s]
 ZONE: huque.com.
 NS: adns2.upenn.edu. 128.91.254.22 2607:f470:1002::2:3
 NS: adns1.upenn.edu. 128.91.3.128 2607:f470:1001::1:a
 NS: adns3.upenn.edu. 128.91.251.33 2607:f470:1003::3:c
 DS: 40924 8 2 816524eb1c3b7d1315ae8330652dd17909c95de0533c1f2dc023bffedb1f5e9b
-DNSKEY: huque.com. 257 40924 8
 DNSKEY: huque.com. 256 14703 8
+DNSKEY: huque.com. 257 40924 8
 
 # QUERY: www.huque.com. A IN at zone huque.com. address 128.91.254.22
-#        [Got answer in 0.011 s]
+#        [Got answer in 0.012 s]
 SECURE: www.huque.com. 300 IN CNAME cheetara.huque.com.
 www.huque.com. 300 IN CNAME cheetara.huque.com.
 SECURE: cheetara.huque.com. 86400 IN A 50.116.63.23
@@ -164,6 +164,7 @@ SECURE: cheetara.huque.com. 86400 IN A 50.116.63.23
 # ANSWER:
 www.huque.com. 300 IN CNAME cheetara.huque.com.
 cheetara.huque.com. 86400 IN A 50.116.63.23
+# DNSSEC status: SECURE
 ```
 
 ### Batch mode

@@ -52,6 +52,7 @@ class KeyCache:
     def __init__(self):
         # dict of dns.name.Name: list(DNSKEY)
         self.data = {}
+        self.SecureSoFar = False
         self.install(dns.name.root, [get_root_key()])
 
     def install(self, zone, keylist):
@@ -256,22 +257,6 @@ def get_sig_info(rrset, rrsigs):
 def sigset_covers_rrset(sigset, rrset):
     """does RRSIG set cover the RR set?"""
     return (sigset.name == rrset.name) and (sigset.covers == rrset.rdtype)
-
-
-def verify_sig(key, sig):
-    """verify signature on data with given algorithm"""
-
-    if isinstance(key, RSA.RsaKey):
-        verifier = pkcs1_15.new(key)
-        verifier.verify(sig.indata, sig.rdata.signature)
-    elif isinstance(key, ECC.EccKey):
-        verifier = DSS.new(key, 'fips-186-3')
-        verifier.verify(sig.indata, sig.rdata.signature)
-    elif isinstance(key, nacl.signing.VerifyKey):
-        _ = key.verify(sig.indata, sig.rdata.signature)
-    else:
-        raise ValueError("Unknown key type: {}".format(type(key)))
-    return
 
 
 def verify_sig_with_keys(sig, keys):
