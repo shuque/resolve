@@ -210,7 +210,8 @@ def validate_rrset(srrset, query):
             for line in srrset.rrset.to_text().split('\n'):
                 print("SECURE: {}".format(line))
     else:
-        raise ResError("Validation fail: {}".format(failed))
+        raise ResError("Validation fail: {}, keys={}".format(srrset.rrset,
+                                                             failed))
 
 
 def process_answer(response, query, addResults=None):
