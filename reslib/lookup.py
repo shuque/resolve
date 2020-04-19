@@ -231,7 +231,7 @@ def process_answer(response, query, addResults=None):
     for key in rrset_dict:
         rrname, rrtype = key
         srrset = rrset_dict[key]
-        if key_cache.SecureSoFar and srrset.rrsig:
+        if key_cache.SecureSoFar and srrset.rrsig and not query.is_nsquery:
             validate_rrset(srrset, query)
 
         if rrtype == query.qtype and rrname == query.qname:
@@ -444,7 +444,7 @@ def get_zone(zonename):
     for ns_rr in ns_rrset:
         _ = zone.install_ns(ns_rr.target)
         nsobj = cache.get_ns(ns_rr.target)
-        if nsobj:
+        if nsobj and nsobj.iplist:
             continue
         nsobj = NameServer(ns_rr.target)
         for addrtype in ['A', 'AAAA']:

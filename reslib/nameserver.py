@@ -1,4 +1,6 @@
-
+"""
+IPaddress and NameServer object classes.
+"""
 
 class IPaddress:
     """IPaddress class"""
@@ -21,13 +23,15 @@ class NameServer:
         self.iplist = []                           # list of IPaddress
 
     def has_ip(self, ipstring):
+        """Do we have the given IP address string"""
         return ipstring in [x.addr for x in self.iplist]
 
     def install_ip(self, ipstring):
+        """Install an IP address object for given IP string"""
         if not self.has_ip(ipstring):
             self.iplist.append(IPaddress(ipstring))
         return
 
     def __repr__(self):
-        return "<NS: {}>".format(self.name)
-
+        return "<NS: {}: {}>".format(self.name,
+                                     ",".join([x.addr for x in self.iplist]))

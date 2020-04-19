@@ -9,10 +9,13 @@ DNS name, type, and class. If either type or class or both are omitted,
 then a  default type of 'A' (IPv4 address record), and a default class 
 of 'IN' (Internet class) are used.
 
-I often use this program to debug a variety of DNS configuration
-problems. I prefer it these days to "dig +trace", because the latter
-only resolves the exact name given to it, and does not follow CNAME
-and DNAME redirections, and also does not support qname minimization.
+I often use this program to debug a variety of DNS configuration problems.
+I prefer it to "dig +trace", because the latter only resolves the exact
+name given to it and thus does not follow CNAME and DNAME redirections,
+does not support qname minimization, and does not perform DNSSEC validation.
+(The newer "delv" program that ships with ISC BIND, does do DNSSEC
+validation, but requires the help of a DNSSEC aware resolver, and does
+not perform iterative name resolution by itself).
 
 Pre-requisites:  
 - Python 3
@@ -24,7 +27,7 @@ Pre-requisites:
 DNSSEC validation is still under development. Full chain authentication of
 positive answers is implemented. The most popular signing algorithms are
 supported (RSASHA1, RSASHA1-NSEC3-SHA1, RSASHA256, RSASHA512, ECDSAP256SHA256,
-ECDSAP384SHA384, and ED25519. The main todo items are: DNAME processing,
+ECDSAP384SHA384, and ED25519). The main todo items are: DNAME processing,
 Authenticated Denial of Existence, and support for algorithm 16 (ED448).
 
 If you need to use a version without DNSSEC, because you haven't or don't
@@ -51,7 +54,7 @@ Perform iterative resolution of a DNS name, type, and class.
      -s: print summary statistics
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
-     -e N: use EDNS0 buffer size N (default: 0; 0=disable EDNS)
+     -e N: use EDNS0 buffer size N (default: 1460; 0=disable EDNS)
      -z: use DNSSEC (default is no; work in progress)
      -c: dump zone/ns/key caches at end
      -b <batchfile>: batch file mode
@@ -68,6 +71,17 @@ Here's a basic lookup of the IPv6 address of www.seas.upenn.edu:
 ```
 $ resolve.py www.seas.upenn.edu. AAAA
 www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
+```
+
+A more complicated answer involving a chain of aliases:
+
+```
+$ resolve.py fda.my.salesforce.com
+fda.my.salesforce.com. 300 IN CNAME na21.my.salesforce.com.
+na21.my.salesforce.com. 30 IN CNAME na21-chx.gia1.my.salesforce.com.
+na21-chx.gia1.my.salesforce.com. 30 IN CNAME na21-chx.my.salesforce.com.
+na21-chx.my.salesforce.com. 120 IN A 96.43.152.168
+na21-chx.my.salesforce.com. 120 IN A 96.43.152.40
 ```
 
 Here's the same lookup with the -v1 switch (increase verbosity level
@@ -165,6 +179,87 @@ SECURE: cheetara.huque.com. 86400 IN A 50.116.63.23
 www.huque.com. 300 IN CNAME cheetara.huque.com.
 cheetara.huque.com. 86400 IN A 50.116.63.23
 # DNSSEC status: SECURE
+```
+
+Another example of a record that fails DNSSEC validation. A response
+that resolves fine, but is insecure, reports "# DNSSEC status: INSECURE"
+at the end. A response that results in a validation failure, like the
+example below, will raise an exception describing details of the failure.
+In this case, the failure is due to an incorrect DS record in the
+parent zone, that does not match the DNSKEY RRset in the zone containing
+the answer.
+
+```
+$ resolve.py -z dnssec-failed.org. A
+Traceback (most recent call last):
+  File "./resolve.py", line 14, in <module>
+    sys.exit(main())
+  File "/home/shuque/git/resolve/reslib/main.py", line 47, in main
+    resolve_name(query, RootZone, addResults=query)
+  File "/home/shuque/git/resolve/reslib/lookup.py", line 415, in resolve_name
+    match_ds(curr_zone, referring_query=query)
+  File "/home/shuque/git/resolve/reslib/lookup.py", line 516, in match_ds
+    raise ValueError("DS did not match DNSKEY for {}".format(zone.name))
+ValueError: DS did not match DNSKEY for dnssec-failed.org.
+```
+
+Querying a record with an intentionally bad signature, shows a
+signature validation error. Here's output from such a bogus record
+from the Root Canary project:
+
+```
+$ resolve.py -v1 -z bogus.d2a15n3.rootcanary.net. A
+#####################################################################
+
+# QUERY: bogus.d2a15n3.rootcanary.net. A IN at zone . address 198.41.0.4
+#        [SECURE Referral to zone: net. in 0.015 s]
+ZONE: net.
+NS: e.gtld-servers.net. 192.12.94.30 2001:502:1ca1::30
+NS: f.gtld-servers.net. 192.35.51.30 2001:503:d414::30
+NS: m.gtld-servers.net. 192.55.83.30 2001:501:b1f9::30
+NS: i.gtld-servers.net. 192.43.172.30 2001:503:39c1::30
+NS: j.gtld-servers.net. 192.48.79.30 2001:502:7094::30
+NS: b.gtld-servers.net. 192.33.14.30 2001:503:231d::2:30
+NS: a.gtld-servers.net. 192.5.6.30 2001:503:a83e::2:30
+NS: c.gtld-servers.net. 192.26.92.30 2001:503:83eb::30
+NS: k.gtld-servers.net. 192.52.178.30 2001:503:d2d::30
+NS: h.gtld-servers.net. 192.54.112.30 2001:502:8cc::30
+NS: l.gtld-servers.net. 192.41.162.30 2001:500:d937::30
+NS: g.gtld-servers.net. 192.42.93.30 2001:503:eea3::30
+NS: d.gtld-servers.net. 192.31.80.30 2001:500:856e::30
+DS: 35886 8 2 7862b27f5f516ebe19680444d4ce5e762981931842c465f00236401d8bd973ee
+DNSKEY: net. 257 35886 8
+DNSKEY: net. 256 24512 8
+DNSKEY: net. 256 36059 8
+
+# QUERY: bogus.d2a15n3.rootcanary.net. A IN at zone net. address 192.12.94.30
+#        [SECURE Referral to zone: rootcanary.net. in 0.063 s]
+ZONE: rootcanary.net.
+NS: ns1.surfnet.nl.
+NS: ns2.surfnet.nl.
+NS: ns3.surfnet.nl.
+NS: ns1.zurich.surf.net. 195.176.255.9 2001:620:0:9::1103
+DS: 64786 8 2 5cd8f125f5487708121a497bd0b1079406add42002b3c195ee0669d2aeb763c9
+DNSKEY: rootcanary.net. 256 25188 8
+DNSKEY: rootcanary.net. 257 64786 8
+
+# QUERY: bogus.d2a15n3.rootcanary.net. A IN at zone rootcanary.net. address 195.176.255.9
+#        [Got answer in 0.106 s]
+# FETCH: NS/DS/DNSKEY for d2a15n3.rootcanary.net.
+Traceback (most recent call last):
+  File "../resolve.py", line 14, in <module>
+    sys.exit(main())
+  File "/home/shuque/git/resolve/reslib/main.py", line 47, in main
+    resolve_name(query, RootZone, addResults=query)
+  File "/home/shuque/git/resolve/reslib/lookup.py", line 394, in resolve_name
+    rc, referral = process_response(response, query, addResults=addResults)
+  File "/home/shuque/git/resolve/reslib/lookup.py", line 301, in process_response
+    process_answer(response, query, addResults=addResults)     # Answer
+  File "/home/shuque/git/resolve/reslib/lookup.py", line 235, in process_answer
+    validate_rrset(srrset, query)
+  File "/home/shuque/git/resolve/reslib/lookup.py", line 212, in validate_rrset
+    raise ValueError("Validation fail: {}".format(failed))
+ValueError: Validation fail: [(<DNSKEY: d2a15n3.rootcanary.net. 257 50165 15>, BadSignatureError('Signature was forged or corrupt',))]
 ```
 
 ### Batch mode
