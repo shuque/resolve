@@ -23,6 +23,22 @@ from reslib.exception import ResError
 # Tolerable clock skew for signatures in seconds
 CLOCK_SKEW = 300
 
+# DNSSEC algorithm number -> name
+ALG = {
+    1: "RSAMD5",
+    2: "DSA",
+    5: "RSASHA1",
+    6: "NSEC3-DSA",
+    7: "NSEC3-RSASHA1",
+    8: "RSASHA256",
+    10: "RSASHA512",
+    12: "ECC-GOST",
+    13: "ECDSA-P256",
+    14: "ECDSA-P384",
+    15: "ED25519",
+    16: "ED448",
+}
+
 # DNSSEC algorithm -> hash function
 HASHFUNC = {
     5: SHA1,
@@ -107,9 +123,17 @@ class DNSKEY:
             raise ResError("DNSKEY algorithm {} not supported".format(
                 self.algorithm))
 
+    def size(self):
+        """Return key size in bits"""
+        if isinstance(self.key, RSA.RsaKey):
+            return self.key.n.bit_length()
+        else:
+            return len(self.rawkey) * 8
+
     def __repr__(self):
-        return "<DNSKEY: {} {} {} {}>".format(
-            self.name, self.flags, self.keytag, self.algorithm)
+        return "DNSKEY: {} {} {} {} ({}) {}-bits".format(
+            self.name, self.flags, self.keytag,
+            ALG.get(self.algorithm, "Unknown"), self.algorithm, self.size())
 
 
 class Signature:
@@ -283,14 +307,15 @@ def verify_sig_with_keys(sig, keys):
     return Verified, Failed
 
 
-def check_dnskey_self_signature(rrset, rrsigs, keys):
+def check_self_signature(rrset, rrsigs):
     """
-    Check self signature of given DNSKEY rrset. Return list of DNSKEY keys
-    that verified the signature. Returns list of keys that verifiably sign
-    the DNSKEY rrset. Raises exception if no key verifies.
+    Check self signature of DNSKEY rrset. Raises exception on failure.
+    Returns list of DNSKEY keys in the rrset, and the list of the subset
+    of those keys that verifiably sign the DNSKEY rrset.
     """
 
     Verified = []
+    keys = load_keys(rrset)
 
     for sig in get_sig_info(rrset, rrsigs):
         v, _ = verify_sig_with_keys(sig, keys)
@@ -300,7 +325,7 @@ def check_dnskey_self_signature(rrset, rrsigs, keys):
         raise ResError("DNSKEY self signature failed to validate: {}".format(
             rrset.name))
 
-    return Verified
+    return keys, Verified
 
 
 def validate_all(rrset, rrsigs):

@@ -11,8 +11,8 @@ of 'IN' (Internet class) are used.
 
 I often use this program to debug a variety of DNS configuration problems.
 I prefer it to "dig +trace", because the latter only resolves the exact
-name given to it and thus does not follow CNAME and DNAME redirections,
-does not support qname minimization, and does not perform DNSSEC validation.
+name given to it and does not follow CNAME and DNAME redirections, does
+not support query name minimization, and does not perform DNSSEC validation.
 (The newer "delv" program that ships with ISC BIND, does do DNSSEC
 validation, but requires the help of a DNSSEC aware resolver, and does
 not perform iterative name resolution by itself).
@@ -39,6 +39,7 @@ earlier versions:
 - https://github.com/shuque/resolve/tree/v0.15
 - https://github.com/shuque/resolve/tree/v0.20
 
+### Usage
 
 ```
 resolve.py version 0.22
@@ -62,6 +63,23 @@ Perform iterative resolution of a DNS name, type, and class.
 When using -b, <batchfile> contains one (space separated) query name, type,
 class per line.
 ```
+
+### Installation
+
+To install system wide:
+
+* (as root) python3 setup.py install
+
+To install for your own account:
+
+* python3 setup.py install --user
+
+To install in a python virtual environment, just:
+
+* python3 setup.py install
+
+
+### Examples
 
 This program implements the normal iterative DNS resolution algorithm 
 described in the DNS protocol specifications.
@@ -132,52 +150,55 @@ www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
 Use -z to turn on DNSSEC validation. Example output:
 
 ```
-$ resolve.py -v1 -z www.huque.com. A
+$ resolve.py -v1 -z www.upenn.edu. A
 
-# QUERY: www.huque.com. A IN at zone . address 198.41.0.4
-#        [SECURE Referral to zone: com. in 0.014 s]
-ZONE: com.
-NS: e.gtld-servers.net. 192.12.94.30 2001:502:1ca1::30
-NS: b.gtld-servers.net. 192.33.14.30 2001:503:231d::2:30
-NS: j.gtld-servers.net. 192.48.79.30 2001:502:7094::30
-NS: m.gtld-servers.net. 192.55.83.30 2001:501:b1f9::30
-NS: i.gtld-servers.net. 192.43.172.30 2001:503:39c1::30
-NS: f.gtld-servers.net. 192.35.51.30 2001:503:d414::30
-NS: a.gtld-servers.net. 192.5.6.30 2001:503:a83e::2:30
-NS: g.gtld-servers.net. 192.42.93.30 2001:503:eea3::30
-NS: h.gtld-servers.net. 192.54.112.30 2001:502:8cc::30
-NS: l.gtld-servers.net. 192.41.162.30 2001:500:d937::30
-NS: k.gtld-servers.net. 192.52.178.30 2001:503:d2d::30
-NS: c.gtld-servers.net. 192.26.92.30 2001:503:83eb::30
-NS: d.gtld-servers.net. 192.31.80.30 2001:500:856e::30
-DS: 30909 8 2 e2d3c916f6deeac73294e8268fb5885044a833fc5459588f4a9184cfc41a5766
-DNSKEY: com. 256 56311 8
-DNSKEY: com. 256 39844 8
-DNSKEY: com. 257 30909 8
+# QUERY: www.upenn.edu. A IN at zone . address 198.41.0.4
+#        [SECURE Referral to zone: edu. in 0.013 s]
+ZONE: edu.
+NS: a.edu-servers.net. 192.5.6.30 2001:503:a83e::2:30
+NS: b.edu-servers.net. 192.33.14.30 2001:503:231d::2:30
+NS: c.edu-servers.net. 192.26.92.30 2001:503:83eb::30
+NS: d.edu-servers.net. 192.31.80.30 2001:500:856e::30
+NS: e.edu-servers.net. 192.12.94.30 2001:502:1ca1::30
+NS: f.edu-servers.net. 192.35.51.30 2001:503:d414::30
+NS: g.edu-servers.net. 192.42.93.30 2001:503:eea3::30
+NS: h.edu-servers.net. 192.54.112.30 2001:502:8cc::30
+NS: i.edu-servers.net. 192.43.172.30 2001:503:39c1::30
+NS: j.edu-servers.net. 192.48.79.30 2001:502:7094::30
+NS: k.edu-servers.net. 192.52.178.30 2001:503:d2d::30
+NS: l.edu-servers.net. 192.41.162.30 2001:500:d937::30
+NS: m.edu-servers.net. 192.55.83.30 2001:501:b1f9::30
+DS: 28065 8 2 4172496cde85534e51129040355bd04b1fcfebae996dfdde652006f6f8b2ce76
+DNSKEY: edu. 257 28065 RSASHA256 (8) 2048-bits
+DNSKEY: edu. 256 8663 RSASHA256 (8) 1280-bits
 
-# QUERY: www.huque.com. A IN at zone com. address 192.12.94.30
-#        [SECURE Referral to zone: huque.com. in 0.063 s]
-ZONE: huque.com.
+# QUERY: www.upenn.edu. A IN at zone edu. address 192.5.6.30
+#        [SECURE Referral to zone: upenn.edu. in 0.080 s]
+ZONE: upenn.edu.
+NS: dns1.udel.edu. 128.175.13.16
+NS: dns2.udel.edu. 128.175.13.17
 NS: adns2.upenn.edu. 128.91.254.22 2607:f470:1002::2:3
 NS: adns1.upenn.edu. 128.91.3.128 2607:f470:1001::1:a
 NS: adns3.upenn.edu. 128.91.251.33 2607:f470:1003::3:c
-DS: 40924 8 2 816524eb1c3b7d1315ae8330652dd17909c95de0533c1f2dc023bffedb1f5e9b
-DNSKEY: huque.com. 256 14703 8
-DNSKEY: huque.com. 257 40924 8
+NS: adns4.upenn.edu. 208.94.148.32 2600:1800:5::1:0
+NS: adns5.upenn.edu. 208.80.124.32 2600:1801:6::1:0
+NS: adns6.upenn.edu. 208.80.126.32 2600:1802:7::1:0
+DS: 10500 13 2 4629d71f8f9dd9ceac6a047041b161c9a7812406e449a80c0b319c3925b48c52
+DNSKEY: upenn.edu. 256 54481 ECDSA-P256 (13) 512-bits
+DNSKEY: upenn.edu. 257 10500 ECDSA-P256 (13) 512-bits
 
-# QUERY: www.huque.com. A IN at zone huque.com. address 128.91.254.22
-#        [Got answer in 0.012 s]
-SECURE: www.huque.com. 300 IN CNAME cheetara.huque.com.
-www.huque.com. 300 IN CNAME cheetara.huque.com.
-SECURE: cheetara.huque.com. 86400 IN A 50.116.63.23
-
-# QUERY: cheetara.huque.com. A IN at zone huque.com. address 128.91.254.22
-#        [Got answer in 0.010 s]
-SECURE: cheetara.huque.com. 86400 IN A 50.116.63.23
+# QUERY: www.upenn.edu. A IN at zone upenn.edu. address 128.175.13.16
+#        [Got answer in 0.016 s]
+SECURE: www.upenn.edu. 300 IN A 151.101.66.217
+SECURE: www.upenn.edu. 300 IN A 151.101.130.217
+SECURE: www.upenn.edu. 300 IN A 151.101.194.217
+SECURE: www.upenn.edu. 300 IN A 151.101.2.217
 
 # ANSWER:
-www.huque.com. 300 IN CNAME cheetara.huque.com.
-cheetara.huque.com. 86400 IN A 50.116.63.23
+www.upenn.edu. 300 IN A 151.101.66.217
+www.upenn.edu. 300 IN A 151.101.130.217
+www.upenn.edu. 300 IN A 151.101.194.217
+www.upenn.edu. 300 IN A 151.101.2.217
 # DNSSEC status: SECURE
 ```
 
@@ -211,7 +232,7 @@ from the Root Canary project:
 $ resolve.py -v1 -z bogus.d2a15n3.rootcanary.net. A
 
 # QUERY: bogus.d2a15n3.rootcanary.net. A IN at zone . address 198.41.0.4
-#        [SECURE Referral to zone: net. in 0.015 s]
+#        [SECURE Referral to zone: net. in 0.014 s]
 ZONE: net.
 NS: e.gtld-servers.net. 192.12.94.30 2001:502:1ca1::30
 NS: f.gtld-servers.net. 192.35.51.30 2001:503:d414::30
@@ -227,39 +248,39 @@ NS: l.gtld-servers.net. 192.41.162.30 2001:500:d937::30
 NS: g.gtld-servers.net. 192.42.93.30 2001:503:eea3::30
 NS: d.gtld-servers.net. 192.31.80.30 2001:500:856e::30
 DS: 35886 8 2 7862b27f5f516ebe19680444d4ce5e762981931842c465f00236401d8bd973ee
-DNSKEY: net. 257 35886 8
-DNSKEY: net. 256 24512 8
-DNSKEY: net. 256 36059 8
+DNSKEY: net. 257 35886 RSASHA256 (8) 2048-bits
+DNSKEY: net. 256 36059 RSASHA256 (8) 1280-bits
 
 # QUERY: bogus.d2a15n3.rootcanary.net. A IN at zone net. address 192.12.94.30
-#        [SECURE Referral to zone: rootcanary.net. in 0.063 s]
+#        [SECURE Referral to zone: rootcanary.net. in 0.037 s]
 ZONE: rootcanary.net.
 NS: ns1.surfnet.nl.
 NS: ns2.surfnet.nl.
 NS: ns3.surfnet.nl.
 NS: ns1.zurich.surf.net. 195.176.255.9 2001:620:0:9::1103
 DS: 64786 8 2 5cd8f125f5487708121a497bd0b1079406add42002b3c195ee0669d2aeb763c9
-DNSKEY: rootcanary.net. 256 25188 8
-DNSKEY: rootcanary.net. 257 64786 8
+DNSKEY: rootcanary.net. 257 64786 RSASHA256 (8) 1024-bits
+DNSKEY: rootcanary.net. 256 25188 RSASHA256 (8) 1024-bits
 
 # QUERY: bogus.d2a15n3.rootcanary.net. A IN at zone rootcanary.net. address 195.176.255.9
-#        [Got answer in 0.106 s]
+#        [Got answer in 0.105 s]
 # FETCH: NS/DS/DNSKEY for d2a15n3.rootcanary.net.
 Traceback (most recent call last):
   File "./resolve.py", line 14, in <module>
     sys.exit(main())
   File "/home/shuque/git/resolve/reslib/main.py", line 47, in main
     resolve_name(query, RootZone, addResults=query)
-  File "/home/shuque/git/resolve/reslib/lookup.py", line 395, in resolve_name
+  File "/home/shuque/git/resolve/reslib/lookup.py", line 411, in resolve_name
     rc, referral = process_response(response, query, addResults=addResults)
-  File "/home/shuque/git/resolve/reslib/lookup.py", line 302, in process_response
+  File "/home/shuque/git/resolve/reslib/lookup.py", line 318, in process_response
     process_answer(response, query, addResults=addResults)     # Answer
-  File "/home/shuque/git/resolve/reslib/lookup.py", line 236, in process_answer
+  File "/home/shuque/git/resolve/reslib/lookup.py", line 249, in process_answer
     validate_rrset(srrset, query)
-  File "/home/shuque/git/resolve/reslib/lookup.py", line 213, in validate_rrset
-    raise ResError("Validation fail: {}".format(failed))
-reslib.exception.ResError: Validation fail: [(<DNSKEY: d2a15n3.rootcanary.net. 257 50165 15>, BadSignatureError('Signature was forged or corrupt',))]
+  File "/home/shuque/git/resolve/reslib/lookup.py", line 214, in validate_rrset
+    failed))
+reslib.exception.ResError: Validation fail: bogus.d2a15n3.rootcanary.net. 60 IN A 145.97.20.17, keys=[(DNSKEY: d2a15n3.rootcanary.net. 257 50165 ED25519 (15) 256-bits, BadSignatureError('Signature was forged or corrupt',))]
 ```
+
 
 ### Batch mode
 

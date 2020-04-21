@@ -20,7 +20,7 @@ from reslib.rrset import RRset
 from reslib.utils import (vprint_quiet, make_query_message, send_query,
                           is_referral)
 from reslib.dnssec import (key_cache, load_keys, validate_all,
-                           ds_rrset_matches_dnskey, check_dnskey_self_signature)
+                           ds_rrset_matches_dnskey, check_self_signature)
 
 
 def get_ns_addrs(zone, additional):
@@ -212,7 +212,6 @@ def validate_rrset(srrset, query):
     else:
         raise ResError("Validation fail: {}, keys={}".format(srrset.rrset,
                                                              failed))
-
 
 def process_answer(response, query, addResults=None):
     """Process answer section, chasing aliases when needed."""
@@ -502,13 +501,11 @@ def match_ds(zone, referring_query=None):
     if dnskey_rrsigs is None:
         raise ResError("No signatures found for root DNSKEY set!")
 
-    keylist = load_keys(dnskey_rrset)
-    sigkeys = check_dnskey_self_signature(dnskey_rrset, dnskey_rrsigs, keylist)
+    keylist, sigkeys = check_self_signature(dnskey_rrset, dnskey_rrsigs)
 
     if referring_query and Prefs.VERBOSE and not referring_query.quiet:
         for key in keylist:
-            print("DNSKEY: {} {} {} {}".format(
-                key.name, key.flags, key.keytag, key.algorithm))
+            print(key)
 
     for key in sigkeys:
         if not key.sep_flag:
