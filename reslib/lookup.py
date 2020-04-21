@@ -556,4 +556,13 @@ def initialize_dnssec():
 
     key_cache.install(dns.name.root, load_keys(dnskey_rrset))
     key_cache.SecureSoFar = True
+
     return
+
+
+def print_root_zone():
+    """Print root zone details"""
+    RootZone.print_details()
+    if Prefs.DNSSEC:
+        for key in key_cache.get_keys(RootZone.name):
+            print(key)

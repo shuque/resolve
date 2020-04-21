@@ -199,7 +199,6 @@ def keydata_to_rsa(keydata):
         elen, = struct.unpack('B', keydata[0:1])
     exponent = int.from_bytes(keydata[1:1+elen], byteorder='big')
     modulus = keydata[1+elen:]
-    modulus_len = len(modulus) * 8
     modulus_int = int.from_bytes(modulus, byteorder='big')
     return RSA.construct((modulus_int, exponent))
 

@@ -2,9 +2,9 @@
 batch mode operation.
 """
 
-from reslib.common import Prefs
+from reslib.common import Prefs, RootZone
 from reslib.query import Query
-from reslib.lookup import resolve_name
+from reslib.lookup import resolve_name, print_root_zone
 
 
 def batchmode(cache, infile, info):
@@ -31,11 +31,12 @@ def batchmode(cache, infile, info):
             print("\nERROR input line {}: {}".format(linenum, line))
             continue
 
-        print("\n### INPUT: {}, {}, {}".format(qname, qtype, qclass))
+        print("\n###\n### Query: {}, {}, {}".format(qname, qtype, qclass))
         query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
         starting_zone = cache.closest_zone(query.qname)
-        print("### Query: {}".format(query))
-        print("### Starting at zone: {}".format(starting_zone))
+        print("### Starting at zone: {}\n###".format(starting_zone.name))
+        if Prefs.VERBOSE and starting_zone == RootZone:
+            print_root_zone()
         resolve_name(query, starting_zone, addResults=query)
         if Prefs.VERBOSE:
             print('')

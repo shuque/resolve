@@ -12,7 +12,7 @@ from reslib.common import Prefs, stats, cache, RootZone
 from reslib.options import process_args
 from reslib.query import Query
 from reslib.dnssec import key_cache
-from reslib.lookup import resolve_name, initialize_dnssec
+from reslib.lookup import resolve_name, initialize_dnssec, print_root_zone
 from reslib.batch import batchmode
 from reslib.exit import exit_status
 
@@ -44,6 +44,8 @@ def main():
     query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
 
     time_start = time.time()
+    if Prefs.VERBOSE:
+        print_root_zone()
     resolve_name(query, RootZone, addResults=query)
     stats.elapsed = time.time() - time_start
 

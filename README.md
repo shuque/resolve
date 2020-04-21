@@ -9,13 +9,16 @@ DNS name, type, and class. If either type or class or both are omitted,
 then a  default type of 'A' (IPv4 address record), and a default class 
 of 'IN' (Internet class) are used.
 
-I often use this program to debug a variety of DNS configuration problems.
-I prefer it to "dig +trace", because the latter only resolves the exact
-name given to it and does not follow CNAME and DNAME redirections, does
-not support query name minimization, and does not perform DNSSEC validation.
-(The newer "delv" program that ships with ISC BIND, does do DNSSEC
-validation, but requires the help of a DNSSEC aware resolver, and does
-not perform iterative name resolution by itself).
+I originally wrote this program to investigate the behavior of authoritative
+servers in the presence of query name minimization. Since then I've gradually
+developed into a more full fledged iterative resolver. These days, I typically
+use this program to debug a variety of DNS problems. I prefer it over
+"dig +trace", because the latter only resolves the exact name given to it
+and does not follow CNAME and DNAME redirections, does not support query
+name minimization, and does not perform DNSSEC validation. (The newer "delv"
+program that ships with ISC BIND, does do DNSSEC validation, but requires the
+help of a DNSSEC aware resolver, and does not perform iterative name resolution
+by itself).
 
 Pre-requisites:  
 - Python 3
@@ -109,6 +112,21 @@ hierarchy:
 ```
 $ resolve.py -v1 www.seas.upenn.edu AAAA
 
+ZONE: .
+NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
+NS: b.root-servers.net. 199.9.14.201 2001:500:200::b
+NS: c.root-servers.net. 192.33.4.12 2001:500:2::c
+NS: d.root-servers.net. 199.7.91.13 2001:500:2d::d
+NS: e.root-servers.net. 192.203.230.10 2001:500:a8::e
+NS: f.root-servers.net. 192.5.5.241 2001:500:2f::f
+NS: g.root-servers.net. 192.112.36.4 2001:500:12::d0d
+NS: h.root-servers.net. 198.97.190.53 2001:500:1::53
+NS: i.root-servers.net. 192.36.148.17 2001:7fe::53
+NS: j.root-servers.net. 192.58.128.30 2001:503:c27::2:30
+NS: k.root-servers.net. 193.0.14.129 2001:7fd::1
+NS: l.root-servers.net. 199.7.83.42 2001:500:9f::42
+NS: m.root-servers.net. 202.12.27.33 2001:dc3::35
+
 # QUERY: www.seas.upenn.edu. AAAA IN at zone . address 198.41.0.4
 #        [Referral to zone: edu. in 0.012 s]
 ZONE: edu.
@@ -151,6 +169,23 @@ Use -z to turn on DNSSEC validation. Example output:
 
 ```
 $ resolve.py -v1 -z www.upenn.edu. A
+
+ZONE: .
+NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
+NS: b.root-servers.net. 199.9.14.201 2001:500:200::b
+NS: c.root-servers.net. 192.33.4.12 2001:500:2::c
+NS: d.root-servers.net. 199.7.91.13 2001:500:2d::d
+NS: e.root-servers.net. 192.203.230.10 2001:500:a8::e
+NS: f.root-servers.net. 192.5.5.241 2001:500:2f::f
+NS: g.root-servers.net. 192.112.36.4 2001:500:12::d0d
+NS: h.root-servers.net. 198.97.190.53 2001:500:1::53
+NS: i.root-servers.net. 192.36.148.17 2001:7fe::53
+NS: j.root-servers.net. 192.58.128.30 2001:503:c27::2:30
+NS: k.root-servers.net. 193.0.14.129 2001:7fd::1
+NS: l.root-servers.net. 199.7.83.42 2001:500:9f::42
+NS: m.root-servers.net. 202.12.27.33 2001:dc3::35
+DNSKEY: . 256 48903 RSASHA256 (8) 2048-bits
+DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits
 
 # QUERY: www.upenn.edu. A IN at zone . address 198.41.0.4
 #        [SECURE Referral to zone: edu. in 0.013 s]
@@ -230,6 +265,23 @@ from the Root Canary project:
 
 ```
 $ resolve.py -v1 -z bogus.d2a15n3.rootcanary.net. A
+
+ZONE: .
+NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
+NS: b.root-servers.net. 199.9.14.201 2001:500:200::b
+NS: c.root-servers.net. 192.33.4.12 2001:500:2::c
+NS: d.root-servers.net. 199.7.91.13 2001:500:2d::d
+NS: e.root-servers.net. 192.203.230.10 2001:500:a8::e
+NS: f.root-servers.net. 192.5.5.241 2001:500:2f::f
+NS: g.root-servers.net. 192.112.36.4 2001:500:12::d0d
+NS: h.root-servers.net. 198.97.190.53 2001:500:1::53
+NS: i.root-servers.net. 192.36.148.17 2001:7fe::53
+NS: j.root-servers.net. 192.58.128.30 2001:503:c27::2:30
+NS: k.root-servers.net. 193.0.14.129 2001:7fd::1
+NS: l.root-servers.net. 199.7.83.42 2001:500:9f::42
+NS: m.root-servers.net. 202.12.27.33 2001:dc3::35
+DNSKEY: . 256 48903 RSASHA256 (8) 2048-bits
+DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits
 
 # QUERY: bogus.d2a15n3.rootcanary.net. A IN at zone . address 198.41.0.4
 #        [SECURE Referral to zone: net. in 0.014 s]
