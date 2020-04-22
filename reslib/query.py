@@ -32,6 +32,7 @@ class Query:
         self.is_nsquery = is_nsquery
         self.quiet = False                # don't print query being issued
         self.rcode = None
+        self.latest_rcode = None
         self.got_answer = False
         self.elapsed_last = None
         self.cname_chain = []

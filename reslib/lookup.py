@@ -94,7 +94,7 @@ def print_referral_trace(query, zonename, has_ds=False):
             zonename, query.elapsed_last))
 
 
-def process_referral(message, query):
+def process_referral(query):
     """
     Process referral. Returns a zone object for the referred zone.
     The zone object is populated with the nameserver names, addresses,
@@ -103,7 +103,7 @@ def process_referral(message, query):
 
     ns_rrset = ds_rrset = ds_rrsigs = None
 
-    for rrset in message.authority:
+    for rrset in query.response.authority:
         if rrset.rdtype == dns.rdatatype.NS:
             if ns_rrset is None:
                 ns_rrset = rrset
@@ -140,7 +140,7 @@ def process_referral(message, query):
     print_referral_trace(query, zonename, ds_rrset)
 
     zone = install_zone_in_cache(zonename, ns_rrset, ds_rrset,
-                                 message.additional)
+                                 query.response.additional)
     if vprint_quiet(query):
         zone.print_details()
 
@@ -168,6 +168,36 @@ def synthesize_cname(dname_rrset, query):
     rdataset.add(cname_rdata)
     cname_rrset.update(rdataset)
     return cname_rrset
+
+
+def process_cname(query, rrset_dict, cname_dict, synthetic_cname,
+                  addResults=None):
+    """
+    Process CNAMEs in the response.
+    """
+
+    seen = []
+    final_alias = query.response.question[0].name
+    while True:
+        if final_alias in seen:
+            raise ResError("CNAME loop detected: {}".format(final_alias))
+        seen.append(final_alias)
+        if final_alias in cname_dict:
+            if synthetic_cname and final_alias == synthetic_cname.name:
+                if Prefs.DNSSEC:
+                    if cname_dict[final_alias] == synthetic_cname[0].target:
+                        srrset = rrset_dict[(final_alias, dns.rdatatype.CNAME)]
+                        srrset.set_validated()
+            final_alias = cname_dict[final_alias]
+        else:
+            break
+    cname_query = Query(final_alias, query.qtype, query.qclass)
+    resolve_name(cname_query, cache.closest_zone(cname_query.qname),
+                 addResults=addResults)
+    if addResults:
+        addResults.latest_rcode = cname_query.rcode
+
+    return
 
 
 def get_rrset_dict(section):
@@ -235,7 +265,8 @@ def validate_rrset(srrset, query):
         raise ResError("Validation fail: {}, keys={}".format(srrset.rrset,
                                                              failed))
 
-def process_answer(response, query, addResults=None):
+
+def process_answer(query, addResults=None):
     """
     Process answer section, chasing aliases when needed.
     """
@@ -251,7 +282,7 @@ def process_answer(response, query, addResults=None):
     if vprint_quiet(query):
         print("#        [Got answer in {:.3f} s]".format(query.elapsed_last))
 
-    rrset_dict = get_rrset_dict(response.answer)
+    rrset_dict = get_rrset_dict(query.response.answer)
 
     for (rrname, rrtype) in rrset_dict:
         srrset = rrset_dict[(rrname, rrtype)]
@@ -284,43 +315,23 @@ def process_answer(response, query, addResults=None):
                     Prefs.MAX_CNAME))
 
     if cname_dict:
-        seen = []
-        final_alias = response.question[0].name
-        while True:
-            if final_alias in seen:
-                raise ResError("CNAME loop detected: {}".format(final_alias))
-            seen.append(final_alias)
-            if final_alias in cname_dict:
-                if synthetic_cname and final_alias == synthetic_cname.name:
-                    if cname_dict[final_alias] == synthetic_cname[0].target:
-                        srrset = rrset_dict[(final_alias, dns.rdatatype.CNAME)]
-                        srrset.set_validated()
-                final_alias = cname_dict[final_alias]
-            else:
-                break
-        cname_query = Query(final_alias, query.qtype, query.qclass)
-        if addResults:
-            addResults.cname_chain.append(cname_query)
-        resolve_name(cname_query, cache.closest_zone(cname_query.qname),
-                     addResults=addResults)
-
+        process_cname(query, rrset_dict, cname_dict, synthetic_cname,
+                      addResults=addResults)
     return
 
 
-def process_response(response, query, addResults=None):
+def process_response(query, addResults=None):
     """
     Process a DNS response. Returns rcode & zone referral.
     """
 
-    query.rcode = response.rcode()
-
     if query.rcode == dns.rcode.NOERROR:
 
-        if is_referral(response):                                  # Referral
-            referral = process_referral(response, query)
+        if is_referral(query.response):                            # Referral
+            referral = process_referral(query)
             return query.rcode, referral
 
-        if not response.answer:                                    # NODATA
+        if not query.response.answer:                              # NODATA
             if vprint_quiet(query):
                 print("#        [Got answer in {:.3f} s]".format(
                     query.elapsed_last))
@@ -330,7 +341,7 @@ def process_response(response, query, addResults=None):
                     dns.rdatatype.to_text(query.qtype)))
             return query.rcode, None
 
-        process_answer(response, query, addResults=addResults)     # Answer
+        process_answer(query, addResults=addResults)               # Answer
         return query.rcode, None
 
     if query.rcode == dns.rcode.NXDOMAIN:                          # NXDOMAIN
@@ -422,8 +433,9 @@ def resolve_name(query, zone, addResults=None):
 
         response = send_query_zone(query, curr_zone)
         query.response = response
+        query.rcode = response.rcode()
 
-        rc, referral = process_response(response, query, addResults=addResults)
+        rc, referral = process_response(query, addResults=addResults)
 
         if rc == dns.rcode.NXDOMAIN:
             if Prefs.VIOLATE and (query.minimize) and (query.qname != query.orig_qname):
@@ -443,8 +455,12 @@ def resolve_name(query, zone, addResults=None):
                     referral.name, curr_zone.name))
                 break
             curr_zone = referral
-            if curr_zone.dslist:
-                match_ds(curr_zone, referring_query=query)
+            if Prefs.DNSSEC:
+                if curr_zone.dslist:
+                    match_ds(curr_zone, referring_query=query)
+                else:
+                    if Prefs.VERBOSE and not query.quiet:
+                        check_isolated_dnskey(curr_zone)
 
     if stats.cnt_deleg >= Prefs.MAX_DELEG:
         print("ERROR: Max number of delegation ({}) reached.".format(
@@ -515,6 +531,27 @@ def fetch_ds(zonename):
         raise ResError("No signatures found for {} DS set!".format(
             zonename))
     return ds_rrset, ds_rrsigs
+
+
+def check_isolated_dnskey(zone):
+    """
+    With verbose mode, for an insecure delegation, this routine attempts
+    to obtain the DNSKEY RRset anyway, and it if exists, verify its self
+    signature, and print information about the keys.
+    """
+
+    try:
+        dnskey_rrset, dnskey_rrsigs = fetch_dnskey(zone)
+    except ResError:
+        return
+
+    try:
+        keylist, _ = check_self_signature(dnskey_rrset, dnskey_rrsigs)
+    except ResError:
+        print("WARNING: {} DNSKEY self signature did not validate".format(zone))
+
+    for key in keylist:
+        print(key)
 
 
 def match_ds(zone, referring_query=None):

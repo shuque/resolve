@@ -27,7 +27,7 @@ Pre-requisites:
   - [pycryptodome](https://www.pycryptodome.org/en/latest/)
   - [pynacl](https://pypi.org/project/PyNaCl/)
 
-DNSSEC validation is still under development. Full chain authentication of
+DNSSEC validation is not fully completed yet. Full chain authentication of
 positive answers is implemented. The most popular signing algorithms are
 supported (RSASHA1, RSASHA1-NSEC3-SHA1, RSASHA256, RSASHA512, ECDSAP256SHA256,
 ECDSAP384SHA384, and ED25519). The main todo items are: Authenticated Denial
