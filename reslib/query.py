@@ -38,7 +38,7 @@ class Query:
         self.answer_rrset = []
         self.full_answer_rrset = []
         self.dnssec_status = False
-        self.responses = []               # list of full response messages
+        self.response = []                # full response message
 
     def set_quiet(self, action=True):
         """
@@ -60,19 +60,23 @@ class Query:
         Print full set of answer records including aliases. Report
         security status if DNSSEC is being used.
         """
-        if Prefs.VERBOSE:
-            print("# ANSWER:")
         count = 0
         secure_count = 0
         if self.full_answer_rrset:
+            print("# ANSWER:")
             for x in self.full_answer_rrset:
                 count += 1
                 if x.validated:
                     secure_count += 1
                 print(x.rrset.to_text())
-            if Prefs.VERBOSE and Prefs.DNSSEC:
+            if Prefs.DNSSEC:
                 print("# DNSSEC status: {}".format(
                     "SECURE" if (secure_count == count) else "INSECURE"))
+        else:
+            if self.rcode == 0:
+                print("# ANSWER: NODATA")
+            elif self.rcode == 3:
+                print("# ANSWER: NXDOMAIN")
 
     def get_answer_ip_list(self):
         """get list of answer IP addresses if any"""

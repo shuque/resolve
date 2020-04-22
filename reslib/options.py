@@ -13,7 +13,7 @@ def process_args(arguments):
     """Process all command line arguments"""
 
     try:
-        (options, args) = getopt.getopt(arguments, 'mtv:snxe:zcb:')
+        (options, args) = getopt.getopt(arguments, 'mtvsnxe:zcb:')
     except getopt.GetoptError:
         usage()
 
@@ -23,7 +23,7 @@ def process_args(arguments):
         elif opt == "-t":
             Prefs.TCPONLY = True
         elif opt == "-v":
-            Prefs.VERBOSE = int(optval)
+            Prefs.VERBOSE += 1
         elif opt == "-s":
             Prefs.STATS = True
         elif opt == "-n":

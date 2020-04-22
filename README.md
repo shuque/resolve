@@ -11,10 +11,10 @@ of 'IN' (Internet class) are used.
 
 I originally wrote this program to investigate the behavior of authoritative
 servers in the presence of query name minimization. Since then I've gradually
-developed into a more full fledged iterative resolver. These days, I typically
-use this program to debug a variety of DNS problems. I prefer it over
-"dig +trace", because the latter only resolves the exact name given to it
-and does not follow CNAME and DNAME redirections, does not support query
+developed it into a more full fledged iterative resolver. These days, I
+typically use this program to debug a variety of DNS problems. I prefer it
+over "dig +trace", because the latter only resolves the exact name given to
+it and does not follow CNAME and DNAME redirections, does not support query
 name minimization, and does not perform DNSSEC validation. (The newer "delv"
 program that ships with ISC BIND, does do DNSSEC validation, but requires the
 help of a DNSSEC aware resolver, and does not perform iterative name resolution
@@ -30,8 +30,8 @@ Pre-requisites:
 DNSSEC validation is still under development. Full chain authentication of
 positive answers is implemented. The most popular signing algorithms are
 supported (RSASHA1, RSASHA1-NSEC3-SHA1, RSASHA256, RSASHA512, ECDSAP256SHA256,
-ECDSAP384SHA384, and ED25519). The main todo items are: DNAME processing,
-Authenticated Denial of Existence, and support for algorithm 16 (ED448).
+ECDSAP384SHA384, and ED25519). The main todo items are: Authenticated Denial
+of Existence, and support for algorithm 16 (ED448).
 
 If you need to use a version without DNSSEC, because you haven't or don't
 want to install the pycryptodome and pynacl crypto libraries, you can
@@ -45,22 +45,22 @@ earlier versions:
 ### Usage
 
 ```
-resolve.py version 0.22
+resolve.py version 0.23
 Perform iterative resolution of a DNS name, type, and class.
 
     Usage: resolve.py [Options] <qname> [<qtype>] [<qclass>]
            resolve.py [Options] -b <batchfile>
 
      Options:
-     -v N: verbosity level: 0,1,2 (0 default)
+     -v: increase verbosity level by 1 (default 0)
      -m: do qname minimization
      -t: use TCP only
      -s: print summary statistics
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
-     -e N: use EDNS0 buffer size N (default: 1460; 0=disable EDNS)
+     -eN: use EDNS0 buffer size N (default: 1460; 0=disable EDNS)
      -z: use DNSSEC (default is no; work in progress)
-     -c: dump zone/ns/key caches at end
+     -c: dump zone/ns/key caches at end of program execution
      -b <batchfile>: batch file mode
 
 When using -b, <batchfile> contains one (space separated) query name, type,
@@ -105,12 +105,12 @@ na21-chx.my.salesforce.com. 120 IN A 96.43.152.168
 na21-chx.my.salesforce.com. 120 IN A 96.43.152.40
 ```
 
-Here's the first lookup with the -v1 switch (increase verbosity level
-to 1) to show the iterative resolution path taken through the DNS
+Here's the first lookup with the -v switch added (increase verbosity
+level), to show the iterative resolution path taken through the DNS
 hierarchy:
 
 ```
-$ resolve.py -v1 www.seas.upenn.edu AAAA
+$ resolve.py -v www.seas.upenn.edu AAAA
 
 ZONE: .
 NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
@@ -165,10 +165,13 @@ www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
 
 ### DNSSEC validation mode
 
-Use -z to turn on DNSSEC validation. Example output:
+Use -z to turn on DNSSEC validation. In this mode, wih the -vN switch,
+the program additionally shows DS and DNSKEY record information, whether
+the referrals encountered were secure or not, and whether the final
+answer is end-to-end DNSSEC validated. Example output:
 
 ```
-$ resolve.py -v1 -z www.upenn.edu. A
+$ resolve.py -vz www.upenn.edu. A
 
 ZONE: .
 NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
@@ -264,7 +267,7 @@ signature validation error. Here's output from such a bogus record
 from the Root Canary project:
 
 ```
-$ resolve.py -v1 -z bogus.d2a15n3.rootcanary.net. A
+$ resolve.py -vz bogus.d2a15n3.rootcanary.net. A
 
 ZONE: .
 NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
@@ -364,7 +367,7 @@ Here's an example run with qname minimization (-m) and the verbose (-v)
 option:
 
 ```
-$ resolve.py -v1 -m www.seas.upenn.edu AAAA
+$ resolve.py -vm www.seas.upenn.edu AAAA
 
 # QUERY: edu. AAAA IN at zone . address 198.41.0.4
 #        [Referral to zone: edu. in 0.011 s]

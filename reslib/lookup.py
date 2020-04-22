@@ -134,7 +134,6 @@ def process_referral(message, query):
         if not ds_verified:
             raise ResError("DS RRset failed to authenticate")
     else:
-        # TODO: authenticate lack of DS, if possible
         if not query.is_nsquery:
             key_cache.SecureSoFar = False
 
@@ -146,6 +145,29 @@ def process_referral(message, query):
         zone.print_details()
 
     return zone
+
+
+def synthesize_cname(dname_rrset, query):
+    """
+    Synthesize CNAME for queryname from DNAME RR.
+    """
+    dname_owner = dname_rrset.name
+    dname_rr = dname_rrset[0]
+    dname_target = dname_rr.target
+    qname = query.qname
+    if not qname.is_subdomain(dname_owner):
+        raise ResError("DNAME not ancestor of qname: {} {}".format(
+            dname_owner, qnqme))
+    cname_target = qname.relativize(dname_owner).concatenate(dname_target)
+    cname_rrset = dns.rrset.RRset(qname, query.qclass, dns.rdatatype.CNAME)
+    rdataset = dns.rdataset.Rdataset(query.qclass, dns.rdatatype.CNAME)
+    rdataset.update_ttl(dname_rrset.ttl)
+    cname_rdata = dns.rdtypes.ANY.CNAME.CNAME(query.qclass,
+                                              dns.rdatatype.CNAME,
+                                              cname_target)
+    rdataset.add(cname_rdata)
+    cname_rrset.update(rdataset)
+    return cname_rrset
 
 
 def get_rrset_dict(section):
@@ -214,11 +236,13 @@ def validate_rrset(srrset, query):
                                                              failed))
 
 def process_answer(response, query, addResults=None):
-    """Process answer section, chasing aliases when needed."""
+    """
+    Process answer section, chasing aliases when needed.
+    """
 
-    cname_dict = {}              # dict of alias -> target
+    cname_dict = {}              # dict of CNAME owner: target
+    synthetic_cname = None       # only set if DNAME encountered
 
-    # qname minimization (ignore); TODO: validate also?
     if query.qname != query.orig_qname:
         if vprint_quiet(query):
             print("#        [Ignoring AA=1 answer for intermediate name]")
@@ -229,9 +253,8 @@ def process_answer(response, query, addResults=None):
 
     rrset_dict = get_rrset_dict(response.answer)
 
-    for key in rrset_dict:
-        rrname, rrtype = key
-        srrset = rrset_dict[key]
+    for (rrname, rrtype) in rrset_dict:
+        srrset = rrset_dict[(rrname, rrtype)]
         if key_cache.SecureSoFar and srrset.rrsig and not query.is_nsquery:
             validate_rrset(srrset, query)
 
@@ -246,34 +269,39 @@ def process_answer(response, query, addResults=None):
                 addResults.add_to_full_answer(srrset)
             if Prefs.VERBOSE:
                 print(srrset.rrset.to_text())
+            synthetic_cname = synthesize_cname(srrset.rrset, query)
         elif rrtype == dns.rdatatype.CNAME:
             query.answer_rrset.append(srrset)
             if addResults:
                 addResults.add_to_full_answer(srrset)
             if Prefs.VERBOSE:
                 print(srrset.rrset.to_text())
-            cname = srrset.rrset[0].target
-            cname_dict[srrset.rrset.name] = srrset.rrset[0].target
+            cname_target = srrset.rrset[0].target
+            cname_dict[srrset.rrset.name] = cname_target
             stats.cnt_cname += 1
             if stats.cnt_cname >= Prefs.MAX_CNAME:
                 raise ResError("Too many ({}) CNAME indirections.".format(
                     Prefs.MAX_CNAME))
 
-    seen = []
     if cname_dict:
+        seen = []
         final_alias = response.question[0].name
         while True:
             if final_alias in seen:
                 raise ResError("CNAME loop detected: {}".format(final_alias))
             seen.append(final_alias)
             if final_alias in cname_dict:
+                if synthetic_cname and final_alias == synthetic_cname.name:
+                    if cname_dict[final_alias] == synthetic_cname[0].target:
+                        srrset = rrset_dict[(final_alias, dns.rdatatype.CNAME)]
+                        srrset.set_validated()
                 final_alias = cname_dict[final_alias]
             else:
                 break
         cname_query = Query(final_alias, query.qtype, query.qclass)
         if addResults:
             addResults.cname_chain.append(cname_query)
-        resolve_name(cname_query, cache.closest_zone(cname),
+        resolve_name(cname_query, cache.closest_zone(cname_query.qname),
                      addResults=addResults)
 
     return
@@ -393,7 +421,7 @@ def resolve_name(query, zone, addResults=None):
                 query.set_minimized(curr_zone)
 
         response = send_query_zone(query, curr_zone)
-        query.responses.append(response)
+        query.response = response
 
         rc, referral = process_response(response, query, addResults=addResults)
 

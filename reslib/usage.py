@@ -21,13 +21,13 @@ Perform iterative resolution of a DNS name, type, and class.
            {0} [Options] -b <batchfile>
 
      Options:
-     -v N: verbosity level: 0,1,2 (0 default)
+     -v: increase verbosity level by 1 (default 0)
      -m: do qname minimization
      -t: use TCP only
      -s: print summary statistics
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
-     -e N: use EDNS0 buffer size N (default: {2}; 0=disable EDNS)
+     -eN: use EDNS0 buffer size N (default: {2}; 0=disable EDNS)
      -z: use DNSSEC (default is no; work in progress)
      -c: dump zone/ns/key caches at end
      -b <batchfile>: batch file mode
