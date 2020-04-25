@@ -3,6 +3,7 @@ Main suite of functions to perform iterative DNS resolution.
 
 """
 
+import sys
 import time
 
 import dns.message
@@ -157,7 +158,7 @@ def synthesize_cname(dname_rrset, query):
     qname = query.qname
     if not qname.is_subdomain(dname_owner):
         raise ResError("DNAME not ancestor of qname: {} {}".format(
-            dname_owner, qnqme))
+            dname_owner, qname))
     cname_target = qname.relativize(dname_owner).concatenate(dname_target)
     cname_rrset = dns.rrset.RRset(qname, query.qclass, dns.rdatatype.CNAME)
     rdataset = dns.rdataset.Rdataset(query.qclass, dns.rdatatype.CNAME)
@@ -182,20 +183,20 @@ def process_cname(query, rrset_dict, cname_dict, synthetic_cname,
         if final_alias in seen:
             raise ResError("CNAME loop detected: {}".format(final_alias))
         seen.append(final_alias)
-        if final_alias in cname_dict:
-            if synthetic_cname and final_alias == synthetic_cname.name:
-                if Prefs.DNSSEC:
-                    if cname_dict[final_alias] == synthetic_cname[0].target:
-                        srrset = rrset_dict[(final_alias, dns.rdatatype.CNAME)]
-                        srrset.set_validated()
-            final_alias = cname_dict[final_alias]
-        else:
+        if final_alias not in cname_dict:
             break
+        if Prefs.DNSSEC and synthetic_cname  and \
+           (final_alias == synthetic_cname.name)  and \
+           (cname_dict[final_alias] == synthetic_cname[0].target):
+            srrset = rrset_dict[(final_alias, dns.rdatatype.CNAME)]
+            srrset.set_validated()
+        final_alias = cname_dict[final_alias]
+
     cname_query = Query(final_alias, query.qtype, query.qclass)
     resolve_name(cname_query, cache.closest_zone(cname_query.qname),
                  addResults=addResults)
     if addResults:
-        addResults.latest_rcode = cname_query.rcode
+        addResults.latest_rcode = cname_query.response.rcode()
 
     return
 
@@ -227,6 +228,8 @@ def get_rrset_dict(section):
 def get_ns_ds_dnskey(zonename):
     """Get NS/DS/DNSKEY for zone"""
 
+    if Prefs.VERBOSE:
+        print("# FETCH: NS/DS/DNSKEY for {}".format(zonename))
     zone = get_zone(zonename)
     ds_rrset, ds_rrsigs = fetch_ds(zonename)
     ds_verified, _ = validate_all(ds_rrset, ds_rrsigs)
@@ -251,8 +254,6 @@ def validate_rrset(srrset, query):
 
     signer = srrset.rrsig[0].signer
     if not key_cache.has_key(signer):
-        if Prefs.VERBOSE:
-            print("# FETCH: NS/DS/DNSKEY for {}".format(signer))
         get_ns_ds_dnskey(signer)
 
     verified, failed = validate_all(srrset.rrset, srrset.rrsig)
@@ -287,7 +288,8 @@ def process_answer(query, addResults=None):
     for (rrname, rrtype) in rrset_dict:
         srrset = rrset_dict[(rrname, rrtype)]
         if key_cache.SecureSoFar and srrset.rrsig and not query.is_nsquery:
-            validate_rrset(srrset, query)
+            if not query.dnskey_novalidate:
+                validate_rrset(srrset, query)
 
         if rrtype == query.qtype and rrname == query.qname:
             query.got_answer = True
@@ -325,11 +327,11 @@ def process_response(query, addResults=None):
     Process a DNS response. Returns rcode & zone referral.
     """
 
-    if query.rcode == dns.rcode.NOERROR:
+    if query.response.rcode() == dns.rcode.NOERROR:
 
         if is_referral(query.response):                            # Referral
             referral = process_referral(query)
-            return query.rcode, referral
+            return query.response.rcode(), referral
 
         if not query.response.answer:                              # NODATA
             if vprint_quiet(query):
@@ -339,19 +341,19 @@ def process_response(query, addResults=None):
                 print("ERROR: NODATA: {} of type {} not found".format(
                     query.qname,
                     dns.rdatatype.to_text(query.qtype)))
-            return query.rcode, None
+            return query.response.rcode(), None
 
         process_answer(query, addResults=addResults)               # Answer
-        return query.rcode, None
+        return query.response.rcode(), None
 
-    if query.rcode == dns.rcode.NXDOMAIN:                          # NXDOMAIN
+    if query.response.rcode() == dns.rcode.NXDOMAIN:               # NXDOMAIN
         if vprint_quiet(query):
             print("#        [Got answer in {:.3f} s]".format(
                 query.elapsed_last))
         if not query.quiet:
             print("ERROR: NXDOMAIN: {} not found".format(query.qname))
 
-    return query.rcode, None
+    return query.response.rcode(), None
 
 
 def print_query_trace(query, zone, address):
@@ -382,7 +384,7 @@ def get_zone_addresses(zone):
     return result
 
 
-def send_query_zone(query, zone):
+def send_query_zone(query, zone, addResults=None):
     """Send DNS query to nameservers of given zone"""
 
     msg = make_query_message(query)
@@ -398,19 +400,26 @@ def send_query_zone(query, zone):
         except OSError as e:
             print("OSError {}: {}: {}".format(e.errno, e.strerror, nsaddr.addr))
             continue
-        if response:
-            if response.rcode() not in [dns.rcode.NOERROR, dns.rcode.NXDOMAIN]:
-                stats.cnt_fail += 1
-                print("WARNING: response {} from {}".format(
-                    dns.rcode.to_text(response.rcode()), nsaddr.addr))
-                continue
-            break
-    else:
-        raise ResError("Queries to all servers for zone {} failed.".format(
-            zone.name))
+        if not response:
+            print("WARNING: no response from {}".format(nsaddr))
+            continue
+        if response.rcode() not in [dns.rcode.NOERROR, dns.rcode.NXDOMAIN]:
+            stats.cnt_fail += 1
+            print("WARNING: response {} from {}".format(
+                dns.rcode.to_text(response.rcode()), nsaddr.addr))
+            continue
+        # process and return response; but goto next server on error
+        query.elapsed_last = time.time() - time_start
+        query.response = response
+        try:
+            return process_response(query, addResults=addResults)
+        except ResError as e:
+            print("WARNING: {} error {}".format(nsaddr.addr, e))
+            continue
 
-    query.elapsed_last = time.time() - time_start
-    return response
+    print("\nERROR: Queries to all servers for zone {} failed.".format(
+        zone.name))
+    sys.exit(-1)
 
 
 def resolve_name(query, zone, addResults=None):
@@ -431,11 +440,10 @@ def resolve_name(query, zone, addResults=None):
             else:
                 query.set_minimized(curr_zone)
 
-        response = send_query_zone(query, curr_zone)
-        query.response = response
-        query.rcode = response.rcode()
+        rc, referral = send_query_zone(query, curr_zone, addResults=addResults)
 
-        rc, referral = process_response(query, addResults=addResults)
+        if rc == -1:
+            return
 
         if rc == dns.rcode.NXDOMAIN:
             if Prefs.VIOLATE and (query.minimize) and (query.qname != query.orig_qname):
@@ -482,9 +490,10 @@ def get_zone(zonename):
 
     qtype = dns.rdatatype.from_text('NS')
     qclass = dns.rdataclass.from_text('IN')
-    query = Query(zonename, qtype, qclass)
+    query = Query(zonename, qtype, qclass, is_nsquery=True)
     query.set_quiet(True)
-    msg = send_query_zone(query, cache.closest_zone(query.qname))
+    _ = send_query_zone(query, cache.closest_zone(query.qname))
+    msg = query.response
 
     zone = Zone(zonename, cache)
     ns_rrset = msg.get_rrset(msg.answer, zonename, qclass, qtype)
@@ -519,7 +528,8 @@ def fetch_ds(zonename):
 
     startZone = cache.closest_zone(zonename.parent())
 
-    msg = send_query_zone(query, startZone)
+    _ = send_query_zone(query, startZone)
+    msg = query.response
     ds_rrset = msg.get_rrset(msg.answer, qname, qclass, qtype)
     ds_rrsigs = msg.get_rrset(msg.answer, qname, qclass,
                               dns.rdatatype.RRSIG, covers=qtype)
@@ -580,7 +590,8 @@ def match_ds(zone, referring_query=None):
             key_cache.install(zone.name, keylist)
             return True
 
-    raise ResError("DS did not match DNSKEY for {}".format(zone.name))
+    print("\nERROR: DS did not match DNSKEY for {}".format(zone.name))
+    sys.exit(-1)
 
 
 def fetch_dnskey(zone):
@@ -593,8 +604,10 @@ def fetch_dnskey(zone):
     qclass = dns.rdataclass.from_text('IN')
     query = Query(qname, qtype, qclass)
     query.set_quiet(True)
+    query.dnskey_novalidate = True
 
-    msg = send_query_zone(query, zone)
+    _ = send_query_zone(query, zone)
+    msg = query.response
     dnskey_rrset = msg.get_rrset(msg.answer, qname, qclass, qtype)
     dnskey_rrsigs = msg.get_rrset(msg.answer, qname, qclass,
                                   dns.rdatatype.RRSIG, covers=qtype)

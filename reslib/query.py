@@ -31,15 +31,15 @@ class Query:
         self.minimize = minimize
         self.is_nsquery = is_nsquery
         self.quiet = False                # don't print query being issued
-        self.rcode = None
-        self.latest_rcode = None
+        self.dnskey_novalidate = False    # for pre-DS matching queries
         self.got_answer = False
         self.elapsed_last = None
         self.cname_chain = []
         self.answer_rrset = []
         self.full_answer_rrset = []
         self.dnssec_status = False
-        self.response = []                # full response message
+        self.response = None                # full response message
+        self.latest_rcode = None
 
     def set_quiet(self, action=True):
         """
@@ -74,9 +74,9 @@ class Query:
                 print("# DNSSEC status: {}".format(
                     "SECURE" if (secure_count == count) else "INSECURE"))
         else:
-            if self.rcode == 0:
+            if self.response.rcode() == 0:
                 print("# ANSWER: NODATA")
-            elif self.rcode == 3:
+            elif self.response.rcode() == 3:
                 print("# ANSWER: NXDOMAIN")
 
     def get_answer_ip_list(self):

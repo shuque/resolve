@@ -20,9 +20,9 @@ class Prefs:
     TIMEOUT = 3                      # Query timeout in seconds
     RETRIES = 2                      # Number of retries per server
     RETRY = 1                        # of full list (not implemented yet)
-    MAX_CNAME = 10                   # Max #CNAME indirections
-    MAX_QUERY = 300                  # Max number of queries
-    MAX_DELEG = 75                   # Max number of delegations
+    MAX_CNAME = 15                   # Max #CNAME indirections
+    MAX_QUERY = 400                  # Max number of queries
+    MAX_DELEG = 100                  # Max number of delegations
 
 
 class Stats:
