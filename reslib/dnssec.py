@@ -388,7 +388,7 @@ def nsec3_hashalg(algnum):
     if algnum == 1:
         return SHA1
     else:
-        raise ValueError("unsupported NSEC3 hash algorithm {}".format(algnum))
+        raise ResError("unsupported NSEC3 hash algorithm {}".format(algnum))
 
 
 def nsec3hash(name, algnum, salt, iterations, binary_out=False):

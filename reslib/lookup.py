@@ -277,6 +277,7 @@ def process_nodata(query):
     and at least one NSEC or NSEC3 record should deny the existence
     of the rrtype at the query name.
     """
+
     rrset_dict = get_rrset_dict(query.response.authority)
 
     authenticated = False
@@ -379,7 +380,7 @@ def process_response(query, addResults=None):
                 print("ERROR: NODATA: {} of type {} not found".format(
                     query.qname,
                     dns.rdatatype.to_text(query.qtype)))
-            if Prefs.DNSSEC and key_cache.SecureSoFar:
+            if Prefs.DNSSEC and not query.is_nsquery and key_cache.SecureSoFar:
                 process_nodata(query)
             return query.response.rcode(), None
 

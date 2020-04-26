@@ -27,11 +27,13 @@ Pre-requisites:
   - [pycryptodome](https://www.pycryptodome.org/en/latest/)
   - [pynacl](https://pypi.org/project/PyNaCl/)
 
-DNSSEC validation is not fully completed yet. Full chain authentication of
-positive answers is implemented. The most popular signing algorithms are
-supported (RSASHA1, RSASHA1-NSEC3-SHA1, RSASHA256, RSASHA512, ECDSAP256SHA256,
-ECDSAP384SHA384, and ED25519). The main todo items are: Authenticated Denial
-of Existence, and support for algorithm 16 (ED448).
+DNSSEC validation is not fully complete yet. Full chain authentication of
+positive answers is implemented, as is authentication of NODATA responses.
+The most popular signing algorithms are supported (RSASHA1, RSASHA1-NSEC3-SHA1,
+RSASHA256, RSASHA512, ECDSAP256SHA256, ECDSAP384SHA384, and ED25519). The main
+todo items are: complete Authenticated Denial of Existence support (i.e.
+NXDOMAIN, Wildcard no-closer-match proof, and proof of insecure referral),
+and support for algorithm 16 (ED448).
 
 If you need to use a version without DNSSEC, because you haven't or don't
 want to install the pycryptodome and pynacl crypto libraries, you can
@@ -41,6 +43,7 @@ grab the release tarballs for those versions. Direct links to these
 earlier versions:
 - https://github.com/shuque/resolve/tree/v0.15
 - https://github.com/shuque/resolve/tree/v0.20
+
 
 ### Usage
 
@@ -240,129 +243,10 @@ www.upenn.edu. 300 IN A 151.101.2.217
 # DNSSEC status: SECURE
 ```
 
-A response that resolves fine, but is insecure, reports "# DNSSEC status:
-INSECURE" at the end. A response that results in a validation failure, like
-the example below, will print an appropriate error message. In this case,
-the failure is due to an incorrect DS record in the parent zone, that does
-not match the DNSKEY RRset in the zone containing the answer.
-
-```
-$ resolve.py -vz dnssec-failed.org. A
-
-ZONE: .
-NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
-NS: b.root-servers.net. 199.9.14.201 2001:500:200::b
-NS: c.root-servers.net. 192.33.4.12 2001:500:2::c
-NS: d.root-servers.net. 199.7.91.13 2001:500:2d::d
-NS: e.root-servers.net. 192.203.230.10 2001:500:a8::e
-NS: f.root-servers.net. 192.5.5.241 2001:500:2f::f
-NS: g.root-servers.net. 192.112.36.4 2001:500:12::d0d
-NS: h.root-servers.net. 198.97.190.53 2001:500:1::53
-NS: i.root-servers.net. 192.36.148.17 2001:7fe::53
-NS: j.root-servers.net. 192.58.128.30 2001:503:c27::2:30
-NS: k.root-servers.net. 193.0.14.129 2001:7fd::1
-NS: l.root-servers.net. 199.7.83.42 2001:500:9f::42
-NS: m.root-servers.net. 202.12.27.33 2001:dc3::35
-DNSKEY: . 256 48903 RSASHA256 (8) 2048-bits
-DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits
-
-# QUERY: dnssec-failed.org. A IN at zone . address 198.41.0.4
-#        [SECURE Referral to zone: org. in 0.011 s]
-ZONE: org.
-NS: a0.org.afilias-nst.info. 199.19.56.1 2001:500:e::1
-NS: a2.org.afilias-nst.info. 199.249.112.1 2001:500:40::1
-NS: b0.org.afilias-nst.org. 199.19.54.1 2001:500:c::1
-NS: b2.org.afilias-nst.org. 199.249.120.1 2001:500:48::1
-NS: c0.org.afilias-nst.info. 199.19.53.1 2001:500:b::1
-NS: d0.org.afilias-nst.org. 199.19.57.1 2001:500:f::1
-DS: 9795 7 1 364dfab3daf254cab477b5675b10766ddaa24982
-DS: 9795 7 2 3922b31b6f3a4ea92b19eb7b52120f031fd8e05ff0b03bafcf9f891bfe7ff8e5
-DS: 17883 7 1 38c5cf93b369c7557e0515faaa57060f1bfb12c1
-DS: 17883 7 2 d889cad790f01979e860d6627b58f85ab554e0e491fe06515f35548d1eb4e6ee
-DNSKEY: org. 256 37022 NSEC3-RSASHA1 (7) 1024-bits
-DNSKEY: org. 256 27074 NSEC3-RSASHA1 (7) 1024-bits
-DNSKEY: org. 257 17883 NSEC3-RSASHA1 (7) 2048-bits
-
-# QUERY: dnssec-failed.org. A IN at zone org. address 199.19.56.1
-#        [SECURE Referral to zone: dnssec-failed.org. in 0.003 s]
-ZONE: dnssec-failed.org.
-NS: dns105.comcast.net. 2001:558:100e:5:68:87:72:244 68.87.72.244
-NS: dns102.comcast.net. 2001:558:1004:7:68:87:85:132 68.87.85.132
-NS: dns103.comcast.net. 2001:558:1014:c:68:87:76:228 68.87.76.228
-NS: dns104.comcast.net. 2001:558:100a:5:68:87:68:244 68.87.68.244
-NS: dns101.comcast.net. 2001:558:fe23:8:69:252:250:103 69.252.250.103
-DS: 106 5 2 ae3424c9b171af3b202203767e5703426130d76ef6847175f2eed355f86ef1ce
-DS: 106 5 1 4f219dce274f820ea81ea1150638dabe21eb27fc
-DNSKEY: dnssec-failed.org. 256 44973 RSASHA1 (5) 1024-bits
-DNSKEY: dnssec-failed.org. 257 29521 RSASHA1 (5) 2048-bits
-
-ERROR: DS did not match DNSKEY for dnssec-failed.org.
-```
-
-Querying a record with a invalid signature:
-
-```
-$ resolve.py -vz bogus.d2a15n3.rootcanary.net. A
-
-ZONE: .
-NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
-NS: b.root-servers.net. 199.9.14.201 2001:500:200::b
-NS: c.root-servers.net. 192.33.4.12 2001:500:2::c
-NS: d.root-servers.net. 199.7.91.13 2001:500:2d::d
-NS: e.root-servers.net. 192.203.230.10 2001:500:a8::e
-NS: f.root-servers.net. 192.5.5.241 2001:500:2f::f
-NS: g.root-servers.net. 192.112.36.4 2001:500:12::d0d
-NS: h.root-servers.net. 198.97.190.53 2001:500:1::53
-NS: i.root-servers.net. 192.36.148.17 2001:7fe::53
-NS: j.root-servers.net. 192.58.128.30 2001:503:c27::2:30
-NS: k.root-servers.net. 193.0.14.129 2001:7fd::1
-NS: l.root-servers.net. 199.7.83.42 2001:500:9f::42
-NS: m.root-servers.net. 202.12.27.33 2001:dc3::35
-DNSKEY: . 256 48903 RSASHA256 (8) 2048-bits
-DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits
-
-# QUERY: bogus.d2a15n3.rootcanary.net. A IN at zone . address 198.41.0.4
-#        [SECURE Referral to zone: net. in 0.013 s]
-ZONE: net.
-NS: a.gtld-servers.net. 192.5.6.30 2001:503:a83e::2:30
-NS: b.gtld-servers.net. 192.33.14.30 2001:503:231d::2:30
-NS: c.gtld-servers.net. 192.26.92.30 2001:503:83eb::30
-NS: d.gtld-servers.net. 192.31.80.30 2001:500:856e::30
-NS: e.gtld-servers.net. 192.12.94.30 2001:502:1ca1::30
-NS: f.gtld-servers.net. 192.35.51.30 2001:503:d414::30
-NS: g.gtld-servers.net. 192.42.93.30 2001:503:eea3::30
-NS: h.gtld-servers.net. 192.54.112.30 2001:502:8cc::30
-NS: i.gtld-servers.net. 192.43.172.30 2001:503:39c1::30
-NS: j.gtld-servers.net. 192.48.79.30 2001:502:7094::30
-NS: k.gtld-servers.net. 192.52.178.30 2001:503:d2d::30
-NS: l.gtld-servers.net. 192.41.162.30 2001:500:d937::30
-NS: m.gtld-servers.net. 192.55.83.30 2001:501:b1f9::30
-DS: 35886 8 2 7862b27f5f516ebe19680444d4ce5e762981931842c465f00236401d8bd973ee
-DNSKEY: net. 257 35886 RSASHA256 (8) 2048-bits
-DNSKEY: net. 256 36059 RSASHA256 (8) 1280-bits
-
-# QUERY: bogus.d2a15n3.rootcanary.net. A IN at zone net. address 192.5.6.30
-#        [SECURE Referral to zone: rootcanary.net. in 0.078 s]
-ZONE: rootcanary.net.
-NS: ns1.surfnet.nl.
-NS: ns2.surfnet.nl.
-NS: ns3.surfnet.nl.
-NS: ns1.zurich.surf.net. 195.176.255.9 2001:620:0:9::1103
-DS: 64786 8 2 5cd8f125f5487708121a497bd0b1079406add42002b3c195ee0669d2aeb763c9
-DNSKEY: rootcanary.net. 256 25188 RSASHA256 (8) 1024-bits
-DNSKEY: rootcanary.net. 257 64786 RSASHA256 (8) 1024-bits
-
-# QUERY: bogus.d2a15n3.rootcanary.net. A IN at zone rootcanary.net. address 195.176.255.9
-#        [Got answer in 0.102 s]
-# FETCH: NS/DS/DNSKEY for d2a15n3.rootcanary.net.
-WARNING: 195.176.255.9 error Validation fail: bogus.d2a15n3.rootcanary.net. 60 IN A 145.97.20.17, keys=[(DNSKEY: d2a15n3.rootcanary.net. 257 50165 ED25519 (15) 256-bits, BadSignatureError('Signature was forged or corrupt',))]
-
-# QUERY: bogus.d2a15n3.rootcanary.net. A IN at zone rootcanary.net. address 2001:620:0:9::1103
-#        [Got answer in 0.510 s]
-WARNING: 2001:620:0:9::1103 error Validation fail: bogus.d2a15n3.rootcanary.net. 60 IN A 145.97.20.17, keys=[(DNSKEY: d2a15n3.rootcanary.net. 257 50165 ED25519 (15) 256-bits, BadSignatureError('Signature was forged or corrupt',))]
-
-ERROR: Queries to all servers for zone rootcanary.net. failed.
-```
+Many more examples of DNSSEC, including both successful and failed responses
+of various kinds (DS mismatch, signature verification failures, signature
+expirations, and more) are included in the accompanying document
+[DNSSEC.md](DNSSEC.md).
 
 
 ### Batch mode
