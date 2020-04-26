@@ -278,9 +278,4 @@ SECURE: 33Q996NVAUKA6LERAAPRR2TTBPO5G2MG.huque.com. 3600 IN NSEC3 1 0 5 9eba4228
 # ANSWER:
 www.huque.com. 300 IN CNAME cheetara.huque.com.
 # DNSSEC status: SECURE
-(py) shuque@cheetara:~/git/resolve/reslib>$ ../resolve.py -z www.huque.com. TLSA
-ERROR: NODATA: cheetara.huque.com. of type TLSA not found
-# ANSWER:
-www.huque.com. 300 IN CNAME cheetara.huque.com.
-# DNSSEC status: SECURE
 ```
