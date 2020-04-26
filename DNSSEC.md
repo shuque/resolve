@@ -279,3 +279,24 @@ SECURE: 33Q996NVAUKA6LERAAPRR2TTBPO5G2MG.huque.com. 3600 IN NSEC3 1 0 5 9eba4228
 www.huque.com. 300 IN CNAME cheetara.huque.com.
 # DNSSEC status: SECURE
 ```
+
+The following example queries a record with an (intentionally) expired
+DNSSEC signature. The program retried the query against all authoritative
+servers and then gave up with an error:
+
+```
+$ resolve.py -z _443._tcp.expiredsig.busted.huque.com. TLSA
+
+WARNING: 162.159.27.72 error Validation fail: _443._tcp.expiredsig.busted.huque.com./TLSA, keys=[(DNSKEY: busted.huque.com. 256 7101 RSASHA256 (8) 1024-bits, ResError('Signature has expired',))]
+WARNING: 162.159.25.129 error Validation fail: _443._tcp.expiredsig.busted.huque.com./TLSA, keys=[(DNSKEY: busted.huque.com. 256 7101 RSASHA256 (8) 1024-bits, ResError('Signature has expired',))]
+WARNING: 2400:cb00:2049:1::a29f:1981 error Validation fail: _443._tcp.expiredsig.busted.huque.com./TLSA, keys=[(DNSKEY: busted.huque.com. 256 7101 RSASHA256 (8) 1024-bits, ResError('Signature has expired',))]
+WARNING: 162.159.24.25 error Validation fail: _443._tcp.expiredsig.busted.huque.com./TLSA, keys=[(DNSKEY: busted.huque.com. 256 7101 RSASHA256 (8) 1024-bits, ResError('Signature has expired',))]
+WARNING: 2400:cb00:2049:1::a29f:1819 error Validation fail: _443._tcp.expiredsig.busted.huque.com./TLSA, keys=[(DNSKEY: busted.huque.com. 256 7101 RSASHA256 (8) 1024-bits, ResError('Signature has expired',))]
+WARNING: 162.159.26.99 error Validation fail: _443._tcp.expiredsig.busted.huque.com./TLSA, keys=[(DNSKEY: busted.huque.com. 256 7101 RSASHA256 (8) 1024-bits, ResError('Signature has expired',))]
+WARNING: 2400:cb00:2049:1::a29f:1b48 error Validation fail: _443._tcp.expiredsig.busted.huque.com./TLSA, keys=[(DNSKEY: busted.huque.com. 256 7101 RSASHA256 (8) 1024-bits, ResError('Signature has expired',))]
+WARNING: 162.159.24.39 error Validation fail: _443._tcp.expiredsig.busted.huque.com./TLSA, keys=[(DNSKEY: busted.huque.com. 256 7101 RSASHA256 (8) 1024-bits, ResError('Signature has expired',))]
+WARNING: 2400:cb00:2049:1::a29f:1827 error Validation fail: _443._tcp.expiredsig.busted.huque.com./TLSA, keys=[(DNSKEY: busted.huque.com. 256 7101 RSASHA256 (8) 1024-bits, ResError('Signature has expired',))]
+WARNING: 2400:cb00:2049:1::a29f:1a63 error Validation fail: _443._tcp.expiredsig.busted.huque.com./TLSA, keys=[(DNSKEY: busted.huque.com. 256 7101 RSASHA256 (8) 1024-bits, ResError('Signature has expired',))]
+
+ERROR: Queries to all servers for zone busted.huque.com. failed.
+```
