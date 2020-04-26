@@ -441,5 +441,79 @@ def get_hashed_owner(qname, signer, nsec3_rdata):
     return dns.name.Name((hash_output,) + signer.labels)
 
 
+def nsec_covers_name(nsec_rrset, qname):
+    """
+    Does NSEC RR cover the given qname?
+    """
+    n1 = nsec_rrset.name.canonicalize()
+    n2 = nsec_rrset[0].next.canonicalize()
+    if (qname.fullcompare(n1)[1] > 0) and (qname.fullcompare(n2)[1] < 0):
+        return True
+    return False
+
+
+def closest_encloser_and_next(qname, ancestor, nsec_list):
+    """
+    Given qname and an ancestor name (usually the zone name),
+    and the set of related NSEC records, return the closest
+    encloser and the next closer name.
+    """
+
+    if not qname.is_subdomain(ancestor):
+        raise ResError("qname is not subdomain of ancestor")
+    resultlist = []
+    q = qname
+    while q != ancestor:
+        q = q.parent()
+        resultlist.append(q)
+    resultlist.reverse()
+
+    for candidate in resultlist:
+        for nsec in nsec_list:
+            if nsec_covers_name(nsec, candidate):
+                return candidate.parent(), candidate
+    return None, None
+
+
+def wildcard_at_closest_encloser(qname, ancestor, nsec_list):
+    """
+    Return wildcard name at closest encloser.
+    """
+    closest_encloser, _ = closest_encloser_and_next(qname,
+                                                    ancestor,
+                                                    nsec_list)
+    return dns.name.Name(('*',) + closest_encloser.labels)
+
+
+def nxdomain_proof_nsec(qname, signer, nsec_list):
+    """
+    Check NSEC NXDOMAIN proof for given qname, zone, and NSEC list.
+    Raise exception if not proved.
+    """
+
+    qname_cover = False
+    wildcard_cover = False
+
+    for rrset in nsec_list:
+        owner = rrset.name
+        rdata = rrset[0]
+        print(owner, rdata)
+        if nsec_covers_name(rrset, qname):
+            qname_cover = True
+
+    if not qname_cover:
+        raise ResError("No NSEC covering qname {} found.".format(qname))
+
+    wildcard = wildcard_at_closest_encloser(qname, signer, nsec_list)
+
+    for rrset in nsec_list:
+        if nsec_covers_name(rrset, wildcard):
+            wildcard_cover = True
+            break
+
+    if not wildcard_cover:
+        raise ResError("No NSEC covering wildcard {} found.".format(wildcard))
+
+
 # Instantiate key cache at module level
 key_cache = KeyCache()

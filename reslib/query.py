@@ -75,7 +75,10 @@ class Query:
                     "SECURE" if (secure_count == count) else "INSECURE"))
         else:
             if self.response.rcode() == 0:
-                print("# ANSWER: NODATA")
+                print("# ANSWER: NODATA: {}".format(self))
+            elif self.response.rcode() == 3:
+                print("# ANSWER: NXDOMAIN: {}".format(self))
+
             if Prefs.DNSSEC:
                 print("# DNSSEC status: {}".format(
                     "SECURE" if self.dnssec_secure else "INSECURE"))

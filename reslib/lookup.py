@@ -22,7 +22,7 @@ from reslib.utils import (vprint_quiet, make_query_message, send_query,
                           is_referral)
 from reslib.dnssec import (key_cache, load_keys, validate_all,
                            ds_rrset_matches_dnskey, check_self_signature,
-                           nsec3hash, type_in_bitmap, get_hashed_owner)
+                           type_in_bitmap, get_hashed_owner, nxdomain_proof_nsec)
 
 
 def get_ns_addrs(zone, additional):
@@ -270,10 +270,58 @@ def validate_rrset(srrset, query):
                                                              failed))
 
 
-def process_nodata(query):
+def authenticate_nxdomain(query):
+    """
+    Attempt to authenticate NXDOMAIN response. All RRsets in authority
+    section should be signed and validated, an SOA should be present,
+    and NSEC or NSEC3 records that prove the non-existence of the name
+    and the non-existence of a wildcard that could have synthesized the
+    name must be present.
+    """
+
+    rrset_dict = get_rrset_dict(query.response.authority)
+    nsec_set = []
+    nsec3_set = []
+    seen_soa = False
+    signers = []
+
+    for (rrname, rrtype) in rrset_dict:
+        srrset = rrset_dict[(rrname, rrtype)]
+        validate_rrset(srrset, query)
+        if rrtype == dns.rdatatype.SOA:
+            seen_soa = True
+        elif rrtype == dns.rdatatype.NSEC:
+            signer = srrset.rrsig[0].signer
+            if signer not in signers:
+                signers.append(signer)
+            nsec_set.append(srrset.rrset)
+        elif rrtype == dns.rdatatype.NSEC3:
+            signer = srrset.rrsig[0].signer
+            if signer not in signers:
+                signers.append(signer)
+            nsec3_set.append(srrset.rrset)
+
+    if len(signers) > 1:
+        raise ResError("Response with multiple NSEC/3 signers.")
+    if not seen_soa:
+        raise ResError("No signed SOA found in NXDOMAIN response.")
+    if not (nsec_set or nsec3_set):
+        raise ResError("No NSEC/3 records found in NXDOMAIN response")
+
+    if nsec3_set:
+        # TODO: call relevant routine when written.
+        pass
+    elif nsec_set:
+        nxdomain_proof_nsec(query.qname, signer, nsec_set)
+        # Move this down and unindent, once NSEC3 proof is done.
+        if query.qname == query.orig_qname:
+            query.dnssec_secure = True
+
+
+def authenticate_nodata(query):
     """
     Attempt to authenticate NODATA response. All RRsets in authority
-    section should be signed and validated, a SOA should be present,
+    section should be signed and validated, an SOA should be present,
     and at least one NSEC or NSEC3 record should deny the existence
     of the rrtype at the query name.
     """
@@ -303,7 +351,8 @@ def process_nodata(query):
     if not (seen_soa and authenticated):
         raise ResError("Failed to authenticate NODATA response")
     else:
-        query.dnssec_secure = True
+        if query.qname == query.orig_qname:
+            query.dnssec_secure = True
 
 
 def process_answer(query, addResults=None):
@@ -381,7 +430,7 @@ def process_response(query, addResults=None):
                     query.qname,
                     dns.rdatatype.to_text(query.qtype)))
             if Prefs.DNSSEC and not query.is_nsquery and key_cache.SecureSoFar:
-                process_nodata(query)
+                authenticate_nodata(query)
             return query.response.rcode(), None
 
         process_answer(query, addResults=addResults)               # Answer
@@ -393,6 +442,8 @@ def process_response(query, addResults=None):
                 query.elapsed_last))
         if not query.quiet:
             print("ERROR: NXDOMAIN: {} not found".format(query.qname))
+        if Prefs.DNSSEC and not query.is_nsquery and key_cache.SecureSoFar:
+            authenticate_nxdomain(query)
 
     return query.response.rcode(), None
 

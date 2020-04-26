@@ -27,12 +27,13 @@ Pre-requisites:
   - [pycryptodome](https://www.pycryptodome.org/en/latest/)
   - [pynacl](https://pypi.org/project/PyNaCl/)
 
-DNSSEC validation is not fully complete yet. Full chain authentication of
-positive answers is implemented, as is authentication of NODATA responses.
-The most popular signing algorithms are supported (RSASHA1, RSASHA1-NSEC3-SHA1,
-RSASHA256, RSASHA512, ECDSAP256SHA256, ECDSAP384SHA384, and ED25519). The main
-todo items are: complete Authenticated Denial of Existence support (i.e.
-NXDOMAIN, Wildcard no-closer-match proof, and proof of insecure referral),
+DNSSEC validation is substantially implemented, but not complete yet. Full
+chain authentication of positive answers is implemented, as is authentication
+of NODATA responses, and NXDOMAIN responses for NSEC zones. The most popular
+signing algorithms are supported (RSASHA1, RSASHA1-NSEC3-SHA1, RSASHA256,
+RSASHA512, ECDSAP256SHA256, ECDSAP384SHA384, and ED25519). The remaining
+work is to complete Authenticated Denial of Existence support (i.e. NXDOMAIN
+for NSEC3, Wildcard no-closer-match proof, and proof of insecure referral),
 and support for algorithm 16 (ED448).
 
 If you need to use a version without DNSSEC, because you haven't or don't

@@ -300,3 +300,74 @@ WARNING: 2400:cb00:2049:1::a29f:1a63 error Validation fail: _443._tcp.expiredsig
 
 ERROR: Queries to all servers for zone busted.huque.com. failed.
 ```
+
+Example of an NSEC Authenticated NXDOMAIN response:
+
+```
+$ resolve.py -vz www7.blah.ietf.org. A
+#####################################################################
+ZONE: .
+NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
+NS: b.root-servers.net. 199.9.14.201 2001:500:200::b
+NS: c.root-servers.net. 192.33.4.12 2001:500:2::c
+NS: d.root-servers.net. 199.7.91.13 2001:500:2d::d
+NS: e.root-servers.net. 192.203.230.10 2001:500:a8::e
+NS: f.root-servers.net. 192.5.5.241 2001:500:2f::f
+NS: g.root-servers.net. 192.112.36.4 2001:500:12::d0d
+NS: h.root-servers.net. 198.97.190.53 2001:500:1::53
+NS: i.root-servers.net. 192.36.148.17 2001:7fe::53
+NS: j.root-servers.net. 192.58.128.30 2001:503:c27::2:30
+NS: k.root-servers.net. 193.0.14.129 2001:7fd::1
+NS: l.root-servers.net. 199.7.83.42 2001:500:9f::42
+NS: m.root-servers.net. 202.12.27.33 2001:dc3::35
+DNSKEY: . 256 48903 RSASHA256 (8) 2048-bits
+DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits
+
+# QUERY: www7.blah.ietf.org. A IN at zone . address 198.41.0.4
+#        [SECURE Referral to zone: org. in 0.014 s]
+ZONE: org.
+NS: a0.org.afilias-nst.info. 199.19.56.1 2001:500:e::1
+NS: a2.org.afilias-nst.info. 199.249.112.1 2001:500:40::1
+NS: b0.org.afilias-nst.org. 199.19.54.1 2001:500:c::1
+NS: b2.org.afilias-nst.org. 199.249.120.1 2001:500:48::1
+NS: c0.org.afilias-nst.info. 199.19.53.1 2001:500:b::1
+NS: d0.org.afilias-nst.org. 199.19.57.1 2001:500:f::1
+DS: 9795 7 1 364dfab3daf254cab477b5675b10766ddaa24982
+DS: 9795 7 2 3922b31b6f3a4ea92b19eb7b52120f031fd8e05ff0b03bafcf9f891bfe7ff8e5
+DS: 17883 7 1 38c5cf93b369c7557e0515faaa57060f1bfb12c1
+DS: 17883 7 2 d889cad790f01979e860d6627b58f85ab554e0e491fe06515f35548d1eb4e6ee
+DNSKEY: org. 257 17883 NSEC3-RSASHA1 (7) 2048-bits
+DNSKEY: org. 256 27074 NSEC3-RSASHA1 (7) 1024-bits
+DNSKEY: org. 256 37022 NSEC3-RSASHA1 (7) 1024-bits
+
+# QUERY: www7.blah.ietf.org. A IN at zone org. address 199.19.56.1
+#        [SECURE Referral to zone: ietf.org. in 0.003 s]
+WARN: response was truncated; retrying with TCP ..
+WARN: UDP query timeout for 2001:1900:3001:11::28
+ZONE: ietf.org.
+NS: ns1.hkg1.afilias-nst.info. 65.22.6.1 2a01:8840:6::1
+NS: ns1.yyz1.afilias-nst.info. 65.22.9.1 2a01:8840:9::1
+NS: ns1.ams1.afilias-nst.info. 65.22.6.79
+NS: ns1.mia1.afilias-nst.info. 65.22.7.1 2a01:8840:7::1
+NS: ns1.sea1.afilias-nst.info. 65.22.8.1 2a01:8840:8::1
+NS: ns0.amsl.com. 2001:1900:3001:11::28 4.31.198.40
+DS: 45586 5 1 d0fdf996d1af2ccdbdc942b02cb02d379629e20b
+DS: 45586 5 2 67fcd7e0b9e0366309f3b6f7476dff931d5226edc5348cd80fd82a081dfcf6ee
+WARN: UDP query timeout for 2001:1900:3001:11::28
+DNSKEY: ietf.org. 257 45586 RSASHA1 (5) 2048-bits
+DNSKEY: ietf.org. 256 40452 RSASHA1 (5) 2048-bits
+
+# QUERY: www7.blah.ietf.org. A IN at zone ietf.org. address 2001:1900:3001:11::28
+WARN: UDP query timeout for 2001:1900:3001:11::28
+#        [Got answer in 3.075 s]
+ERROR: NXDOMAIN: www7.blah.ietf.org. not found
+SECURE: ietf.org. 1800 IN SOA ns0.amsl.com. glen.amsl.com. 1200000459 1800 1800 604800 1800
+SECURE: ietf.org. 1800 IN NSEC _dmarc.ietf.org. A NS SOA MX TXT AAAA RRSIG NSEC DNSKEY SPF
+SECURE: beta.ietf.org. 1800 IN NSEC codimd.ietf.org. CNAME RRSIG NSEC
+ietf.org. _dmarc.ietf.org. A NS SOA MX TXT AAAA RRSIG NSEC DNSKEY SPF
+beta.ietf.org. codimd.ietf.org. CNAME RRSIG NSEC
+DEBUG: Successfully authenticated NXDOMAIN.
+
+# ANSWER: NXDOMAIN: <Query: www7.blah.ietf.org.,A,IN>
+# DNSSEC status: SECURE
+```
