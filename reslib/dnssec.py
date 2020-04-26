@@ -472,7 +472,7 @@ def closest_encloser_and_next(qname, ancestor, nsec_list):
         for nsec in nsec_list:
             if nsec_covers_name(nsec, candidate):
                 return candidate.parent(), candidate
-    return None, None
+    return candidate, qname
 
 
 def wildcard_at_closest_encloser(qname, ancestor, nsec_list):
@@ -495,9 +495,6 @@ def nxdomain_proof_nsec(qname, signer, nsec_list):
     wildcard_cover = False
 
     for rrset in nsec_list:
-        owner = rrset.name
-        rdata = rrset[0]
-        print(owner, rdata)
         if nsec_covers_name(rrset, qname):
             qname_cover = True
 
