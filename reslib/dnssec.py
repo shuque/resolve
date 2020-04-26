@@ -6,6 +6,7 @@ import time
 import base64
 import struct
 from io import BytesIO
+import dns.name
 import dns.rcode
 import dns.rdata
 import dns.rdatatype
@@ -128,8 +129,7 @@ class DNSKEY:
         """Return key size in bits"""
         if isinstance(self.key, RSA.RsaKey):
             return self.key.n.bit_length()
-        else:
-            return len(self.rawkey) * 8
+        return len(self.rawkey) * 8
 
     def __repr__(self):
         return "DNSKEY: {} {} {} {} ({}) {}-bits".format(
@@ -399,18 +399,46 @@ def nsec3hash(name, algnum, salt, iterations, binary_out=False):
     """
 
     if iterations < 0:
-        raise(ValueError, "iterations must be >= 0")
+        raise ResError("NSEC3 hash iterations must be >= 0")
     hashfunc = nsec3_hashalg(algnum)
     digest = name.to_digestable()
-    while (iterations >= 0):
+    while iterations >= 0:
         digest = hashfunc.new(data=digest+salt).digest()
         iterations -= 1
     if binary_out:
         return digest
-    else:
-        output = base64.b32encode(digest)
-        output = output.translate(b32_to_ext_hex).decode()
-        return output
+
+    output = base64.b32encode(digest)
+    output = output.translate(b32_to_ext_hex).decode()
+    return output
+
+
+def type_in_bitmap(rrtype, nsec_rr):
+    """Is RR type present in NSEC/NSEC3 RR type bitmap?"""
+
+    window_needed, bitmap_offset = divmod(rrtype, 256)
+    for window, bitmap in nsec_rr.windows:
+        if window == window_needed:
+            bitmap_octet, bitpos = divmod(bitmap_offset, 8)
+            if bitmap_octet >= len(bitmap):
+                return False
+            isset = (bitmap[bitmap_octet] >> (7-bitpos)) & 0x1
+            if isset:
+                return True
+    return False
+
+
+def get_hashed_owner(qname, signer, nsec3_rdata):
+    """
+    Obtain NSEC3 hashed owner name for given qname, signer, and
+    NSEC3 rdata.
+    """
+
+    hash_output = nsec3hash(qname,
+                            nsec3_rdata.algorithm,
+                            nsec3_rdata.salt,
+                            nsec3_rdata.iterations)
+    return dns.name.Name((hash_output,) + signer.labels)
 
 
 # Instantiate key cache at module level

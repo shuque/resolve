@@ -22,7 +22,7 @@ from reslib.utils import (vprint_quiet, make_query_message, send_query,
                           is_referral)
 from reslib.dnssec import (key_cache, load_keys, validate_all,
                            ds_rrset_matches_dnskey, check_self_signature,
-                           nsec3hash)
+                           nsec3hash, type_in_bitmap, get_hashed_owner)
 
 
 def get_ns_addrs(zone, additional):
@@ -270,19 +270,6 @@ def validate_rrset(srrset, query):
                                                              failed))
 
 
-def type_in_bitmap(rrtype, nsec_rr):
-    """Is RR type present in NSEC/NSEC3 RR type bitmap?"""
-
-    window_needed, bitmap_offset = divmod(rrtype, 256)
-    for window, bitmap in nsec_rr.windows:
-        if window == window_needed:
-            bitmap_octet, bitpos = divmod(bitmap_offset, 8)
-            isset = (bitmap[bitmap_octet] >> (7-bitpos)) & 0x1
-            if isset:
-                return True
-    return False
-
-
 def process_nodata(query):
     """
     Attempt to authenticate NODATA response. All RRsets in authority
@@ -305,15 +292,12 @@ def process_nodata(query):
             if not type_in_bitmap(query.qtype, srrset.rrset[0]):
                 authenticated = True
         elif rrtype == dns.rdatatype.NSEC3:
-            nsec3_owner = rrname
             nsec3_rdata = srrset.rrset[0]
-            hash = nsec3hash(query.qname, nsec3_rdata.algorithm,
-                                     nsec3_rdata.salt, nsec3_rdata.iterations)
-            hashed_labels = (hash,) + query.qname.labels
-            hashed_owner = dns.name.Name(hashed_labels)
+            signer = srrset.rrsig[0].signer
+            hashed_owner = get_hashed_owner(query.qname, signer, nsec3_rdata)
             if hashed_owner != rrname:
                 continue
-            if not type_in_bitmap(query.qtype, srrset.rrset[0]):
+            if not type_in_bitmap(query.qtype, nsec3_rdata):
                 authenticated = True
     if not (seen_soa and authenticated):
         raise ResError("Failed to authenticate NODATA response")
