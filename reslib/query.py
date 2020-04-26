@@ -37,7 +37,7 @@ class Query:
         self.cname_chain = []
         self.answer_rrset = []
         self.full_answer_rrset = []
-        self.dnssec_status = False
+        self.dnssec_secure = False
         self.response = None                # full response message
         self.latest_rcode = None
 
@@ -76,6 +76,9 @@ class Query:
         else:
             if self.response.rcode() == 0:
                 print("# ANSWER: NODATA")
+            if Prefs.DNSSEC:
+                print("# DNSSEC status: {}".format(
+                    "SECURE" if self.dnssec_secure else "INSECURE"))
             elif self.response.rcode() == 3:
                 print("# ANSWER: NXDOMAIN")
 

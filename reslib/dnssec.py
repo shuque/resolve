@@ -3,6 +3,7 @@ DNSSEC functions.
 """
 
 import time
+import base64
 import struct
 from io import BytesIO
 import dns.rcode
@@ -373,6 +374,43 @@ def ds_rrset_matches_dnskey(ds_list, dnskey):
         if hashout.digest() == ds.digest:
             return True
     return False
+
+
+b32_to_ext_hex = bytes.maketrans(b'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567',
+                                 b'0123456789ABCDEFGHIJKLMNOPQRSTUV')
+
+
+def nsec3_hashalg(algnum):
+    """
+    Return NSEC3 hash function; only SHA1 supported at this time in
+    the DNSSEC specifications.
+    """
+    if algnum == 1:
+        return SHA1
+    else:
+        raise ValueError("unsupported NSEC3 hash algorithm {}".format(algnum))
+
+
+def nsec3hash(name, algnum, salt, iterations, binary_out=False):
+    """
+    Compute NSEC3 hash for given domain name and parameters. name is
+    of type dns.name.Name, salt is a binary bytestring, algnum and
+    iterations are integers.
+    """
+
+    if iterations < 0:
+        raise(ValueError, "iterations must be >= 0")
+    hashfunc = nsec3_hashalg(algnum)
+    digest = name.to_digestable()
+    while (iterations >= 0):
+        digest = hashfunc.new(data=digest+salt).digest()
+        iterations -= 1
+    if binary_out:
+        return digest
+    else:
+        output = base64.b32encode(digest)
+        output = output.translate(b32_to_ext_hex).decode()
+        return output
 
 
 # Instantiate key cache at module level

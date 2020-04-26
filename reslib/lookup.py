@@ -21,7 +21,8 @@ from reslib.rrset import RRset
 from reslib.utils import (vprint_quiet, make_query_message, send_query,
                           is_referral)
 from reslib.dnssec import (key_cache, load_keys, validate_all,
-                           ds_rrset_matches_dnskey, check_self_signature)
+                           ds_rrset_matches_dnskey, check_self_signature,
+                           nsec3hash)
 
 
 def get_ns_addrs(zone, additional):
@@ -263,8 +264,61 @@ def validate_rrset(srrset, query):
             for line in srrset.rrset.to_text().split('\n'):
                 print("SECURE: {}".format(line))
     else:
-        raise ResError("Validation fail: {}, keys={}".format(srrset.rrset,
+        rrstring = "{}/{}".format(srrset.rrname,
+                                  dns.rdatatype.to_text(srrset.rrtype))
+        raise ResError("Validation fail: {}, keys={}".format(rrstring,
                                                              failed))
+
+
+def type_in_bitmap(rrtype, nsec_rr):
+    """Is RR type present in NSEC/NSEC3 RR type bitmap?"""
+
+    window_needed, bitmap_offset = divmod(rrtype, 256)
+    for window, bitmap in nsec_rr.windows:
+        if window == window_needed:
+            bitmap_octet, bitpos = divmod(bitmap_offset, 8)
+            isset = (bitmap[bitmap_octet] >> (7-bitpos)) & 0x1
+            if isset:
+                return True
+    return False
+
+
+def process_nodata(query):
+    """
+    Attempt to authenticate NODATA response. All RRsets in authority
+    section should be signed and validated, a SOA should be present,
+    and at least one NSEC or NSEC3 record should deny the existence
+    of the rrtype at the query name.
+    """
+    rrset_dict = get_rrset_dict(query.response.authority)
+
+    authenticated = False
+    seen_soa = False
+    for (rrname, rrtype) in rrset_dict:
+        srrset = rrset_dict[(rrname, rrtype)]
+        validate_rrset(srrset, query)
+        if rrtype == dns.rdatatype.SOA:
+            seen_soa = True
+        elif rrtype == dns.rdatatype.NSEC:
+            if query.qname != rrname:
+                continue
+            if not type_in_bitmap(query.qtype, srrset.rrset[0]):
+                authenticated = True
+        elif rrtype == dns.rdatatype.NSEC3:
+            nsec3_owner = rrname
+            nsec3_rdata = srrset.rrset[0]
+            hash = nsec3hash(query.qname, nsec3_rdata.algorithm,
+                                     nsec3_rdata.salt, nsec3_rdata.iterations)
+            hashed_labels = (hash,) + query.qname.labels
+            hashed_owner = dns.name.Name(hashed_labels)
+            if hashed_owner != rrname:
+                continue
+            if not type_in_bitmap(query.qtype, srrset.rrset[0]):
+                authenticated = True
+    if not (seen_soa and authenticated):
+        raise ResError("Failed to authenticate NODATA response")
+    else:
+        query.dnssec_secure = True
 
 
 def process_answer(query, addResults=None):
@@ -341,6 +395,8 @@ def process_response(query, addResults=None):
                 print("ERROR: NODATA: {} of type {} not found".format(
                     query.qname,
                     dns.rdatatype.to_text(query.qtype)))
+            if Prefs.DNSSEC and key_cache.SecureSoFar:
+                process_nodata(query)
             return query.response.rcode(), None
 
         process_answer(query, addResults=addResults)               # Answer
@@ -441,9 +497,6 @@ def resolve_name(query, zone, addResults=None):
                 query.set_minimized(curr_zone)
 
         rc, referral = send_query_zone(query, curr_zone, addResults=addResults)
-
-        if rc == -1:
-            return
 
         if rc == dns.rcode.NXDOMAIN:
             if Prefs.VIOLATE and (query.minimize) and (query.qname != query.orig_qname):
