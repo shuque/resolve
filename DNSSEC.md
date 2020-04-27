@@ -371,3 +371,73 @@ DEBUG: Successfully authenticated NXDOMAIN.
 # ANSWER: NXDOMAIN: <Query: www7.blah.ietf.org.,A,IN>
 # DNSSEC status: SECURE
 ```
+
+An NXDOMAIN response from an NSEC3 signed zone follows. With -v, the program
+additionally prints the NSEC3 records and the computed hash values for the
+closest encloser, next closer name, and wildcard at closest encloser names.
+This makes it easier to visually inspect the proof against the NSEC3 records,
+if desired.
+
+```
+$ resolve.py -vz foo.bar.www.huque.com
+ZONE: .
+NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
+NS: b.root-servers.net. 199.9.14.201 2001:500:200::b
+NS: c.root-servers.net. 192.33.4.12 2001:500:2::c
+NS: d.root-servers.net. 199.7.91.13 2001:500:2d::d
+NS: e.root-servers.net. 192.203.230.10 2001:500:a8::e
+NS: f.root-servers.net. 192.5.5.241 2001:500:2f::f
+NS: g.root-servers.net. 192.112.36.4 2001:500:12::d0d
+NS: h.root-servers.net. 198.97.190.53 2001:500:1::53
+NS: i.root-servers.net. 192.36.148.17 2001:7fe::53
+NS: j.root-servers.net. 192.58.128.30 2001:503:c27::2:30
+NS: k.root-servers.net. 193.0.14.129 2001:7fd::1
+NS: l.root-servers.net. 199.7.83.42 2001:500:9f::42
+NS: m.root-servers.net. 202.12.27.33 2001:dc3::35
+DNSKEY: . 256 48903 RSASHA256 (8) 2048-bits
+DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits
+
+# QUERY: foo.bar.www.huque.com. A IN at zone . address 198.41.0.4
+#        [SECURE Referral to zone: com. in 0.013 s]
+ZONE: com.
+NS: e.gtld-servers.net. 192.12.94.30 2001:502:1ca1::30
+NS: b.gtld-servers.net. 192.33.14.30 2001:503:231d::2:30
+NS: j.gtld-servers.net. 192.48.79.30 2001:502:7094::30
+NS: m.gtld-servers.net. 192.55.83.30 2001:501:b1f9::30
+NS: i.gtld-servers.net. 192.43.172.30 2001:503:39c1::30
+NS: f.gtld-servers.net. 192.35.51.30 2001:503:d414::30
+NS: a.gtld-servers.net. 192.5.6.30 2001:503:a83e::2:30
+NS: g.gtld-servers.net. 192.42.93.30 2001:503:eea3::30
+NS: h.gtld-servers.net. 192.54.112.30 2001:502:8cc::30
+NS: l.gtld-servers.net. 192.41.162.30 2001:500:d937::30
+NS: k.gtld-servers.net. 192.52.178.30 2001:503:d2d::30
+NS: c.gtld-servers.net. 192.26.92.30 2001:503:83eb::30
+NS: d.gtld-servers.net. 192.31.80.30 2001:500:856e::30
+DS: 30909 8 2 e2d3c916f6deeac73294e8268fb5885044a833fc5459588f4a9184cfc41a5766
+DNSKEY: com. 256 39844 RSASHA256 (8) 1280-bits
+DNSKEY: com. 257 30909 RSASHA256 (8) 2048-bits
+
+# QUERY: foo.bar.www.huque.com. A IN at zone com. address 192.12.94.30
+#        [SECURE Referral to zone: huque.com. in 0.063 s]
+ZONE: huque.com.
+NS: adns2.upenn.edu. 128.91.254.22 2607:f470:1002::2:3
+NS: adns1.upenn.edu. 128.91.3.128 2607:f470:1001::1:a
+NS: adns3.upenn.edu. 128.91.251.33 2607:f470:1003::3:c
+DS: 40924 8 2 816524eb1c3b7d1315ae8330652dd17909c95de0533c1f2dc023bffedb1f5e9b
+DNSKEY: huque.com. 257 40924 RSASHA256 (8) 2048-bits
+DNSKEY: huque.com. 256 14703 RSASHA256 (8) 1024-bits
+
+# QUERY: foo.bar.www.huque.com. A IN at zone huque.com. address 128.91.254.22
+#        [Got answer in 0.017 s]
+ERROR: NXDOMAIN: foo.bar.www.huque.com. not found
+SECURE: huque.com. 3600 IN SOA mname.huque.com. hostmaster.huque.com. 1000013153 43200 3600 3628800 3600
+SECURE: BHC26OBVA5IVSSUNCIM9IBSKP9LDHTF3.huque.com. 3600 IN NSEC3 1 0 5 9eba4228 bliqgpljj9u1ls10e24o7admh19jt83d CNAME RRSIG
+SECURE: I6F6LIVI2B99V5KSG7JEE4UNIGAHFQDE.huque.com. 3600 IN NSEC3 1 0 5 9eba4228 ib131cn8g5grn6h660pcldgvqg64peud
+SECURE: 8A4IH6GUN04T65I6UNBN3CJ43VNONT2P.huque.com. 3600 IN NSEC3 1 0 5 9eba4228 8soph4cq7137p93bnsuna23rmqn3e8ec
+INFO: closest encloser: www.huque.com. BHC26OBVA5IVSSUNCIM9IBSKP9LDHTF3
+INFO: next closer: bar.www.huque.com. IAPTN5EOPL2CA48BOVVPQQV7RDVHGEQB
+INFO: wildcard: *.www.huque.com. 8D3IP64KO9RESL73HP4DMUPS7SNORBT1
+
+# ANSWER: NXDOMAIN: <Query: foo.bar.www.huque.com.,A,IN>
+# DNSSEC status: SECURE
+```

@@ -18,6 +18,7 @@ from Crypto.Hash import SHA1, SHA256, SHA384, SHA512
 import nacl.encoding
 import nacl.signing
 
+from reslib.common import Prefs
 from reslib.rootkey import RootKeyData
 from reslib.exception import ResError
 
@@ -413,6 +414,19 @@ def nsec3hash(name, algnum, salt, iterations, binary_out=False):
     return output
 
 
+def nsec3hash_from_record(name, nsec3, zonename, binary_out=False):
+    """
+    Compute NSEC3 hash for name from given NSEC3 record parameters.
+    """
+    algnum = nsec3[0].algorithm
+    iterations = nsec3[0].iterations
+    salt = nsec3[0].salt
+    hashed_label = nsec3hash(name, algnum, salt, iterations,
+                             binary_out=binary_out)
+    hashed_name = dns.name.Name((hashed_label,) + zonename.labels)
+    return hashed_name
+
+
 def type_in_bitmap(rrtype, nsec_rr):
     """Is RR type present in NSEC/NSEC3 RR type bitmap?"""
 
@@ -441,55 +455,59 @@ def get_hashed_owner(qname, signer, nsec3_rdata):
     return dns.name.Name((hash_output,) + signer.labels)
 
 
-def nsec_covers_name(nsec_rrset, qname):
+def nsec_covers_name(nsec_rrset, name):
     """
-    Does NSEC RR cover the given qname?
+    Does NSEC RR cover the given name?
     """
     n1 = nsec_rrset.name.canonicalize()
     n2 = nsec_rrset[0].next.canonicalize()
-    if (qname.fullcompare(n1)[1] > 0) and (qname.fullcompare(n2)[1] < 0):
+    if (name.fullcompare(n1)[1] > 0) and (name.fullcompare(n2)[1] < 0):
         return True
     return False
 
 
-def closest_encloser_and_next(qname, ancestor, nsec_list):
+def nsec_closest_encloser(qname, zonename, nsec_list):
     """
-    Given qname and an ancestor name (usually the zone name),
-    and the set of related NSEC records, return the closest
-    encloser and the next closer name.
+    Given qname, zone name, and the set of related NSEC records, return
+    the closest encloser name.
     """
 
-    if not qname.is_subdomain(ancestor):
+    if not qname.is_subdomain(zonename):
         raise ResError("qname is not subdomain of ancestor")
     resultlist = []
     q = qname
-    while q != ancestor:
+    while q != zonename:
         q = q.parent()
         resultlist.append(q)
     resultlist.reverse()
 
+    candidate = None
     for candidate in resultlist:
         for nsec in nsec_list:
             if nsec_covers_name(nsec, candidate):
-                return candidate.parent(), candidate
-    return candidate, qname
+                return candidate.parent()
+    return candidate
 
 
-def wildcard_at_closest_encloser(qname, ancestor, nsec_list):
+def nsec_wildcard_at_closest_encloser(qname, zonename, nsec_list):
     """
     Return wildcard name at closest encloser.
     """
-    closest_encloser, _ = closest_encloser_and_next(qname,
-                                                    ancestor,
-                                                    nsec_list)
+    closest_encloser = nsec_closest_encloser(qname,
+                                             zonename,
+                                             nsec_list)
     return dns.name.Name(('*',) + closest_encloser.labels)
 
 
-def nxdomain_proof_nsec(qname, signer, nsec_list):
+def nsec_nxdomain_proof(query, signer, nsec_list):
     """
     Check NSEC NXDOMAIN proof for given qname, zone, and NSEC list.
     Raise exception if not proved.
     """
+
+    qname = query.qname
+    # TODO: look through answer to see if there is a terminal CNAME,
+    # and if so, we need to use that as the qname.
 
     qname_cover = False
     wildcard_cover = False
@@ -501,7 +519,7 @@ def nxdomain_proof_nsec(qname, signer, nsec_list):
     if not qname_cover:
         raise ResError("No NSEC covering qname {} found.".format(qname))
 
-    wildcard = wildcard_at_closest_encloser(qname, signer, nsec_list)
+    wildcard = nsec_wildcard_at_closest_encloser(qname, signer, nsec_list)
 
     for rrset in nsec_list:
         if nsec_covers_name(rrset, wildcard):
@@ -510,6 +528,86 @@ def nxdomain_proof_nsec(qname, signer, nsec_list):
 
     if not wildcard_cover:
         raise ResError("No NSEC covering wildcard {} found.".format(wildcard))
+
+
+def nsec3_covers_name(nsec_rrset, name, zonename):
+    """
+    Does NSEC3 RR cover the given name?
+    """
+    name = name.canonicalize()
+    n1 = nsec_rrset.name.canonicalize()
+    n2_hash = base64.b32encode(nsec_rrset[0].next)
+    n2_hash = n2_hash.translate(b32_to_ext_hex).decode()
+    n2 = dns.name.Name((n2_hash,) + zonename.labels)
+    n2 = n2.canonicalize()
+    if (name.fullcompare(n1)[1] > 0) and (name.fullcompare(n2)[1] < 0):
+        return True
+    return False
+
+
+def nsec3_closest_encloser_and_next(qname, zonename, nsec3_list):
+    """
+    Given qname and an zone name and the set of relavent NSEC3 records,
+    return the closest encloser name and the next closer name.
+    """
+
+    if not qname.is_subdomain(zonename):
+        raise ResError("qname is not subdomain of zone")
+    resultlist = []
+    q = qname
+    while q != zonename:
+        q = q.parent()
+        resultlist.append(q)
+    resultlist.reverse()
+
+    candidate = None
+    for candidate in resultlist:
+        for nsec3 in nsec3_list:
+            hashed_name = nsec3hash_from_record(candidate, nsec3, zonename)
+            if nsec3_covers_name(nsec3, hashed_name, zonename):
+                return candidate.parent(), candidate
+    return candidate, qname
+
+
+def nsec3_nxdomain_proof(query, signer, nsec3_list):
+    """
+    Check NSEC3 NXDOMAIN proof for given qname, zone, and NSEC list.
+    Raise exception if not proved.
+    """
+
+    qname = query.qname
+    # TODO: look through answer to see if there is a terminal CNAME,
+    # and if so, we need to use that as the qname.
+
+    closest_encloser_match = False
+    next_closer_cover = False
+    wildcard_cover = False
+
+    closest_encloser, next_closer = nsec3_closest_encloser_and_next(
+        qname, signer, nsec3_list)
+    wildcard = dns.name.Name(('*',) + closest_encloser.labels)
+    for nsec3 in nsec3_list:
+        hashed_ce = nsec3hash_from_record(closest_encloser, nsec3, signer)
+        hashed_nc = nsec3hash_from_record(next_closer, nsec3, signer)
+        hashed_wild = nsec3hash_from_record(wildcard, nsec3, signer)
+        if nsec3.name == hashed_ce:
+            closest_encloser_match = True
+            if Prefs.VERBOSE and not query.quiet:
+                print("INFO: closest encloser: {} {}".format(
+                    closest_encloser, hashed_ce.labels[0].decode()))
+        if nsec3_covers_name(nsec3, hashed_nc, signer):
+            next_closer_cover = True
+            if Prefs.VERBOSE and not query.quiet:
+                print("INFO: next closer: {} {}".format(
+                    next_closer, hashed_nc.labels[0].decode()))
+        if nsec3_covers_name(nsec3, hashed_wild, signer):
+            wildcard_cover = True
+            if Prefs.VERBOSE and not query.quiet:
+                print("INFO: wildcard: {} {}".format(
+                    wildcard, hashed_wild.labels[0].decode()))
+
+    if not (closest_encloser_match and next_closer_cover and wildcard_cover):
+        raise ResError("NSEC3 NXDOMAIN proof did not succeed.")
 
 
 # Instantiate key cache at module level

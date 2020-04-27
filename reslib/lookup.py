@@ -22,7 +22,8 @@ from reslib.utils import (vprint_quiet, make_query_message, send_query,
                           is_referral)
 from reslib.dnssec import (key_cache, load_keys, validate_all,
                            ds_rrset_matches_dnskey, check_self_signature,
-                           type_in_bitmap, get_hashed_owner, nxdomain_proof_nsec)
+                           type_in_bitmap, get_hashed_owner,
+                           nsec_nxdomain_proof, nsec3_nxdomain_proof)
 
 
 def get_ns_addrs(zone, additional):
@@ -198,6 +199,7 @@ def process_cname(query, rrset_dict, cname_dict, synthetic_cname,
                  addResults=addResults)
     if addResults:
         addResults.latest_rcode = cname_query.response.rcode()
+        addResults.cname_chain.append(cname_query)
 
     return
 
@@ -309,13 +311,12 @@ def authenticate_nxdomain(query):
         raise ResError("No NSEC/3 records found in NXDOMAIN response")
 
     if nsec3_set:
-        # TODO: call relevant routine when written.
-        pass
+        nsec3_nxdomain_proof(query, signer, nsec3_set)
     elif nsec_set:
-        nxdomain_proof_nsec(query.qname, signer, nsec_set)
-        # Move this down and unindent, once NSEC3 proof is done.
-        if query.qname == query.orig_qname:
-            query.dnssec_secure = True
+        nsec_nxdomain_proof(query, signer, nsec_set)
+
+    if query.qname == query.orig_qname:
+        query.dnssec_secure = True
 
 
 def authenticate_nodata(query):
