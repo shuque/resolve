@@ -83,6 +83,48 @@ def install_zone_in_cache(zonename, ns_rrset, ds_rrset, additional):
     return zone
 
 
+def authenticate_insecure_referral(query, zonename):
+    """
+    Attempt insecure referral. AUTHORITY section should have a signed
+    NSEC/NSEC3 record that demonstrates that no DS record exists.
+    However, the opt-out flag on the NSEC/NSEC3 records, if present may
+    omit this requirement.
+    """
+
+    rrset_dict = get_rrset_dict(query.response.authority)
+    authenticated = False
+    optout = False
+
+    for (rrname, rrtype) in rrset_dict:
+        if rrtype not in (dns.rdatatype.NSEC, dns.rdatatype.NSEC3):
+            continue
+        srrset = rrset_dict[(rrname, rrtype)]
+        validate_rrset(srrset, query, silent=True)
+        if rrtype == dns.rdatatype.NSEC:
+            if zonename != rrname:
+                continue
+            if not type_in_bitmap(dns.rdatatype.DS, srrset.rrset[0]):
+                authenticated = True
+        elif rrtype == dns.rdatatype.NSEC3:
+            # TODO: properly process opt out RRs here
+            nsec3_rdata = srrset.rrset[0]
+            optout = nsec3_rdata.flags & 0x1
+            signer = srrset.rrsig[0].signer
+            hashed_owner = get_hashed_owner(zonename, signer, nsec3_rdata)
+            if hashed_owner != rrname:
+                continue
+            if not type_in_bitmap(dns.rdatatype.DS, nsec3_rdata):
+                authenticated = True
+
+    if Prefs.VERBOSE and not query.quiet:
+        if optout:
+            print("# INFO: NSEC3 opt-out insecure referral")
+
+    if not optout and not authenticated:
+        raise ResError("Failed authenticating insecure referral: {}".format(
+            zonename))
+
+
 def print_referral_trace(query, zonename, has_ds=False):
     """
     Print Referral trace: {secure/insecure, zone, response time}
@@ -99,9 +141,11 @@ def print_referral_trace(query, zonename, has_ds=False):
 
 def process_referral(query):
     """
-    Process referral. Returns a zone object for the referred zone.
-    The zone object is populated with the nameserver names, addresses,
-    and if present, authenticated DS RRset data.
+    Process referral. Returns a zone object for the referred zone. If
+    referring zone is signed, then if DS records are present, they are
+    authenticated, otherwise the lack of secure referral is authenticated.
+    The returned zone object is populated with the nameserver names,
+    addresses, and if present, DS RRset data.
     """
 
     ns_rrset = ds_rrset = ds_rrsigs = None
@@ -128,14 +172,19 @@ def process_referral(query):
         raise ResError("Unable to find NS RRset in referral response")
 
     zonename = ns_rrset.name
-    if key_cache.SecureSoFar and ds_rrset:
-        if zonename != ds_rrset.name:
-            raise ResError("DS didn't match NS in referral message")
-        if ds_rrsigs is None:
-            raise ResError("DS RRset has no signatures")
-        ds_verified, _ = validate_all(ds_rrset, ds_rrsigs)
-        if not ds_verified:
-            raise ResError("DS RRset failed to authenticate")
+    if key_cache.SecureSoFar:
+        if ds_rrset:
+            if zonename != ds_rrset.name:
+                raise ResError("DS didn't match NS in referral message")
+            if ds_rrsigs is None:
+                raise ResError("DS RRset has no signatures")
+            ds_verified, _ = validate_all(ds_rrset, ds_rrsigs)
+            if not ds_verified:
+                raise ResError("DS RRset failed to authenticate")
+        else:
+            authenticate_insecure_referral(query, zonename)
+            if not query.is_nsquery:
+                key_cache.SecureSoFar = False
     else:
         if not query.is_nsquery:
             key_cache.SecureSoFar = False
@@ -243,7 +292,7 @@ def get_ns_ds_dnskey(zonename):
     return
 
 
-def validate_rrset(srrset, query):
+def validate_rrset(srrset, query, silent=False):
     """
     Validate signed RRset object
 
@@ -262,7 +311,7 @@ def validate_rrset(srrset, query):
     verified, failed = validate_all(srrset.rrset, srrset.rrsig)
     if verified:
         srrset.set_validated()
-        if vprint_quiet(query):
+        if not silent and vprint_quiet(query):
             for line in srrset.rrset.to_text().split('\n'):
                 print("SECURE: {}".format(line))
     else:
@@ -443,6 +492,8 @@ def process_response(query, addResults=None):
                 query.elapsed_last))
         if not query.quiet:
             print("ERROR: NXDOMAIN: {} not found".format(query.qname))
+        if query.response.answer:
+            process_answer(query, addResults=addResults)
         if Prefs.DNSSEC and not query.is_nsquery and key_cache.SecureSoFar:
             authenticate_nxdomain(query)
 

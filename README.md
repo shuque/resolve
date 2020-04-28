@@ -30,11 +30,13 @@ Pre-requisites:
 DNSSEC validation is substantially implemented, but not complete yet. Full
 chain authentication of positive answers and also negative answers (NODATA
 and NXDOMAIN) is largely implemented. The main remaining work is to
-implement wildcard no-closer-match proofs and proof of insecure referrals).
+implement wildcard no-closer-match proofs.
 The most popular signing algorithms are supported (RSASHA1, RSASHA1-NSEC3-SHA1,
 RSASHA256, RSASHA512, ECDSAP256SHA256, ECDSAP384SHA384, and ED25519). I
 haven't implemented ED448 (algorithm 16) yet, because the crypto libraries
 I'm using don't support it. But I plan to address that in the near future.
+The included document, [DNSSEC.md](DNSSEC.md) has many examples of the
+use of DNSSEC with this program.
 
 If you need to use a version without DNSSEC, because you haven't or don't
 want to install the pycryptodome and pynacl crypto libraries, you can

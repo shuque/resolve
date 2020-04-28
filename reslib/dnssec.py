@@ -414,9 +414,10 @@ def nsec3hash(name, algnum, salt, iterations, binary_out=False):
     return output
 
 
-def nsec3hash_from_record(name, nsec3, zonename, binary_out=False):
+def nsec3hashname_from_record(name, nsec3, zonename, binary_out=False):
     """
-    Compute NSEC3 hash for name from given NSEC3 record parameters.
+    Compute NSEC3 hashed name for name and zone, from given NSEC3 record
+    parameters.
     """
     algnum = nsec3[0].algorithm
     iterations = nsec3[0].iterations
@@ -563,7 +564,7 @@ def nsec3_closest_encloser_and_next(qname, zonename, nsec3_list):
     candidate = None
     for candidate in resultlist:
         for nsec3 in nsec3_list:
-            hashed_name = nsec3hash_from_record(candidate, nsec3, zonename)
+            hashed_name = nsec3hashname_from_record(candidate, nsec3, zonename)
             if nsec3_covers_name(nsec3, hashed_name, zonename):
                 return candidate.parent(), candidate
     return candidate, qname
@@ -578,6 +579,8 @@ def nsec3_nxdomain_proof(query, signer, nsec3_list):
     qname = query.qname
     # TODO: look through answer to see if there is a terminal CNAME,
     # and if so, we need to use that as the qname.
+    if query.full_answer_rrset:
+        print("DEBUG:", query.full_answer_rrset.pop())
 
     closest_encloser_match = False
     next_closer_cover = False
@@ -587,23 +590,23 @@ def nsec3_nxdomain_proof(query, signer, nsec3_list):
         qname, signer, nsec3_list)
     wildcard = dns.name.Name(('*',) + closest_encloser.labels)
     for nsec3 in nsec3_list:
-        hashed_ce = nsec3hash_from_record(closest_encloser, nsec3, signer)
-        hashed_nc = nsec3hash_from_record(next_closer, nsec3, signer)
-        hashed_wild = nsec3hash_from_record(wildcard, nsec3, signer)
+        hashed_ce = nsec3hashname_from_record(closest_encloser, nsec3, signer)
+        hashed_nc = nsec3hashname_from_record(next_closer, nsec3, signer)
+        hashed_wild = nsec3hashname_from_record(wildcard, nsec3, signer)
         if nsec3.name == hashed_ce:
             closest_encloser_match = True
             if Prefs.VERBOSE and not query.quiet:
-                print("INFO: closest encloser: {} {}".format(
+                print("# INFO: closest encloser: {} {}".format(
                     closest_encloser, hashed_ce.labels[0].decode()))
         if nsec3_covers_name(nsec3, hashed_nc, signer):
             next_closer_cover = True
             if Prefs.VERBOSE and not query.quiet:
-                print("INFO: next closer: {} {}".format(
+                print("# INFO: next closer: {} {}".format(
                     next_closer, hashed_nc.labels[0].decode()))
         if nsec3_covers_name(nsec3, hashed_wild, signer):
             wildcard_cover = True
             if Prefs.VERBOSE and not query.quiet:
-                print("INFO: wildcard: {} {}".format(
+                print("# INFO: wildcard: {} {}".format(
                     wildcard, hashed_wild.labels[0].decode()))
 
     if not (closest_encloser_match and next_closer_cover and wildcard_cover):

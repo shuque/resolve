@@ -82,8 +82,6 @@ class Query:
             if Prefs.DNSSEC:
                 print("# DNSSEC status: {}".format(
                     "SECURE" if self.dnssec_secure else "INSECURE"))
-            elif self.response.rcode() == 3:
-                print("# ANSWER: NXDOMAIN")
 
     def get_answer_ip_list(self):
         """get list of answer IP addresses if any"""
