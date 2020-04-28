@@ -1,11 +1,42 @@
 # resolve.py DNSSEC examples
 
-### DNSSEC Usage Examples
+Invoking the prorgram with -z turns on DNSSEC validation. In this mode,
+it shows the DNSSEC status of the response (SECURE or INSECURE). Additionally,
+with the -v switch, the program shows the full iterative trace annotated
+with DNSSEC validation related information, such as DS and DNSKEY RRset
+information, and whether the referrals encountered were secure or not. For
+negative answers, the NSEC/NSEC3 set is shown, and for NSEC3 the computed
+closest encloser, next closer, and wildcard at closest encloser and their
+hashes are shown, to make it easy to visually inspect the proof of non
+existence. The program intentionally doesn't show the actual RRSIG records
+or the DNSKEY key material, as that is mostly unintelligible to (normal)
+human beings, although I might in a future version, optionally show this
+information at a greater verbosity level.
 
-Use -z to turn on DNSSEC validation. In this mode, with the -v switch,
-the program additionally shows DS and DNSKEY record information, whether
-the referrals encountered were secure or not, and whether the final
-answer is end-to-end DNSSEC validated. Example output:
+With just -z:
+
+```
+$ resolve.py -z www.upenn.edu. A
+# ANSWER:
+www.upenn.edu. 300 IN A 151.101.66.217
+www.upenn.edu. 300 IN A 151.101.130.217
+www.upenn.edu. 300 IN A 151.101.194.217
+www.upenn.edu. 300 IN A 151.101.2.217
+# DNSSEC status: SECURE
+```
+
+
+An insecure name:
+
+```
+$ resolve.py -z google.com. A
+# ANSWER:
+google.com. 300 IN A 172.217.7.14
+# DNSSEC status: INSECURE
+```
+
+
+Adding -v, shows the full iterative trace:
 
 ```
 $ resolve.py -vz www.upenn.edu. A
@@ -77,6 +108,7 @@ www.upenn.edu. 300 IN A 151.101.2.217
 # DNSSEC status: SECURE
 ```
 
+
 A response that resolves fine, but is insecure, reports "# DNSSEC status:
 INSECURE" at the end. A response that results in a validation failure, like
 the example below, will print an appropriate error message. In this case,
@@ -136,7 +168,9 @@ DNSKEY: dnssec-failed.org. 257 29521 RSASHA1 (5) 2048-bits
 ERROR: DS did not match DNSKEY for dnssec-failed.org.
 ```
 
-Querying a record with a invalid signature:
+Querying a record with an invalid signature. Here we retry other
+available authoritative servers looking for a valid signature, and
+give up in the end with an error.
 
 ```
 $ resolve.py -vz bogus.d2a15n3.rootcanary.net. A
@@ -366,7 +400,6 @@ SECURE: ietf.org. 1800 IN NSEC _dmarc.ietf.org. A NS SOA MX TXT AAAA RRSIG NSEC 
 SECURE: beta.ietf.org. 1800 IN NSEC codimd.ietf.org. CNAME RRSIG NSEC
 ietf.org. _dmarc.ietf.org. A NS SOA MX TXT AAAA RRSIG NSEC DNSKEY SPF
 beta.ietf.org. codimd.ietf.org. CNAME RRSIG NSEC
-DEBUG: Successfully authenticated NXDOMAIN.
 
 # ANSWER: NXDOMAIN: <Query: www7.blah.ietf.org.,A,IN>
 # DNSSEC status: SECURE
