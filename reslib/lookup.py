@@ -23,6 +23,7 @@ from reslib.utils import (vprint_quiet, make_query_message, send_query,
 from reslib.dnssec import (key_cache, load_keys, validate_all,
                            ds_rrset_matches_dnskey, check_self_signature,
                            type_in_bitmap, get_hashed_owner,
+                           nsec_covers_name, nsec3_covers_name,
                            nsec_nxdomain_proof, nsec3_nxdomain_proof)
 
 
@@ -85,8 +86,8 @@ def install_zone_in_cache(zonename, ns_rrset, ds_rrset, additional):
 
 def authenticate_insecure_referral(query, zonename):
     """
-    Attempt insecure referral. AUTHORITY section should have a signed
-    NSEC/NSEC3 record that demonstrates that no DS record exists.
+    Authenticate insecure referral. AUTHORITY section should have a
+    signed NSEC/NSEC3 record that demonstrates that no DS record exists.
     However, the opt-out flag on the NSEC/NSEC3 records, if present may
     omit this requirement.
     """
@@ -292,6 +293,45 @@ def get_ns_ds_dnskey(zonename):
     return
 
 
+def validate_wildcard(srrset, query):
+    """
+    If RRset was synthesized from a wildcard, authenticate that no
+    closer match exists (except if the query is for the wildcard itself).
+    """
+
+    wildcard = srrset.wildcard()
+    if wildcard is None or wildcard == srrset.rrname:
+        return
+
+    wildcard_base = dns.name.Name(wildcard.labels[1:])
+    next_label = srrset.rrname.relativize(wildcard_base).labels[-1]
+    next_closer = dns.name.Name((next_label,) + wildcard_base.labels)
+    print("# INFO: Wildcard match: {}".format(wildcard))
+
+    rrset_dict = get_rrset_dict(query.response.authority)
+    authenticated = False
+
+    for (rrname, rrtype) in rrset_dict:
+        if rrtype not in (dns.rdatatype.NSEC, dns.rdatatype.NSEC3):
+            continue
+        srrset = rrset_dict[(rrname, rrtype)]
+        validate_rrset(srrset, query, silent=True)
+        if rrtype == dns.rdatatype.NSEC:
+            nsec = srrset.rrset
+            if nsec_covers_name(nsec, next_closer):
+                authenticated = True
+        elif rrtype == dns.rdatatype.NSEC3:
+            nsec3 = srrset.rrset
+            signer = srrset.rrsig[0].signer
+            hashed_next = get_hashed_owner(next_closer, signer, nsec3[0])
+            if nsec3_covers_name(nsec3, hashed_next, signer):
+                authenticated = True
+
+    if not authenticated:
+        raise ResError("Failed wildcard no closer match proof: {}".format(
+            wildcard))
+
+
 def validate_rrset(srrset, query, silent=False):
     """
     Validate signed RRset object
@@ -309,16 +349,17 @@ def validate_rrset(srrset, query, silent=False):
         get_ns_ds_dnskey(signer)
 
     verified, failed = validate_all(srrset.rrset, srrset.rrsig)
-    if verified:
-        srrset.set_validated()
-        if not silent and vprint_quiet(query):
-            for line in srrset.rrset.to_text().split('\n'):
-                print("SECURE: {}".format(line))
-    else:
+    if not verified:
         rrstring = "{}/{}".format(srrset.rrname,
                                   dns.rdatatype.to_text(srrset.rrtype))
         raise ResError("Validation fail: {}, keys={}".format(rrstring,
                                                              failed))
+    validate_wildcard(srrset, query)
+
+    srrset.set_validated()
+    if not silent and vprint_quiet(query):
+        for line in srrset.rrset.to_text().split('\n'):
+            print("SECURE: {}".format(line))
 
 
 def authenticate_nxdomain(query):
