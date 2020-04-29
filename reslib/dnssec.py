@@ -134,9 +134,13 @@ class DNSKEY:
         return len(self.rawkey) * 8
 
     def __repr__(self):
-        return "DNSKEY: {} {} {} {} ({}) {}-bits".format(
+        flags_text = ''
+        if self.sep_flag: flags_text += " SEP"
+        if self.revoke_flag: flags_text += " REV"
+        return "DNSKEY: {} {} {} {} ({}) {}-bits{}".format(
             self.name, self.flags, self.keytag,
-            ALG.get(self.algorithm, "Unknown"), self.algorithm, self.size())
+            ALG.get(self.algorithm, "Unknown"), self.algorithm,
+            self.size(), flags_text)
 
 
 class Signature:
