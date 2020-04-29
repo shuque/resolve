@@ -77,7 +77,7 @@ class KeyCache:
 
     def install(self, zone, keylist):
         """install (zone -> keylist) into dictionary"""
-        self.data[zone] = keylist
+        self.data[zone] = [k for k in keylist if not k.revoke_flag]
 
     def has_key(self, zone):
         """do we have keys for given zone"""
@@ -116,6 +116,7 @@ class DNSKEY:
         self.rawkey = rr.key
         self.keytag = dns.dnssec.key_id(rr)
         self.sep_flag = (self.flags & 0x01) == 0x01
+        self.revoke_flag = (self.flags >> 7 & 0x01) == 0x01
         if self.algorithm in [5, 7, 8, 10]:
             self.key = keydata_to_rsa(rr.key)
         elif self.algorithm in [13, 14]:
