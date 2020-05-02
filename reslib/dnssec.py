@@ -174,9 +174,11 @@ class Signature:
         """
         current_time = int(time.time() + 0.5)
         if current_time < (self.rdata.inception - skew):
-            raise ResError("Signature inception too far in the future")
+            raise ResError("Signature inception in future: {}".format(
+                time.asctime(time.gmtime(self.rdata.inception))))
         if current_time > (self.rdata.expiration + skew):
-            raise ResError("Signature has expired")
+            raise ResError("Signature has expired: {}".format(
+                time.asctime(time.gmtime(self.rdata.expiration))))
 
     def __repr__(self):
         return "<Signature: {}/{}/{} {} {}>".format(
