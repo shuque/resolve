@@ -439,6 +439,10 @@ def authenticate_nodata(query):
                 continue
             if not type_in_bitmap(query.qtype, nsec3_rdata):
                 authenticated = True
+                if Prefs.VERBOSE and not query.quiet:
+                    print("# INFO H({}) = {}".format(
+                        query.qname, hashed_owner))
+
     if not (seen_soa and authenticated):
         raise ResError("Failed to authenticate NODATA response")
     else:
@@ -517,6 +521,9 @@ def process_response(query, addResults=None):
                 print("#        [Got answer in {:.3f} s]".format(
                     query.elapsed_last))
             if not query.quiet and query.qname == query.orig_qname:
+                query.nodata = True
+                if addResults:
+                    addResults.nodata = True
                 print("ERROR: NODATA: {} of type {} not found".format(
                     query.qname,
                     dns.rdatatype.to_text(query.qtype)))

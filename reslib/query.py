@@ -8,6 +8,7 @@ import dns.rdataclass
 
 from reslib.common import Prefs
 from reslib.exception import ResError
+from reslib.dnssec import key_cache
 
 
 class Query:
@@ -30,14 +31,15 @@ class Query:
             self.qclass = dns.rdataclass.from_text(qclass)
         self.minimize = minimize
         self.is_nsquery = is_nsquery
-        self.quiet = False                # don't print query being issued
-        self.dnskey_novalidate = False    # for pre-DS matching queries
+        self.quiet = False                  # don't print query being issued
+        self.dnskey_novalidate = False      # for pre-DS matching queries
+        self.nodata = False
         self.got_answer = False
         self.elapsed_last = None
         self.cname_chain = []
         self.answer_rrset = []
         self.full_answer_rrset = []
-        self.dnssec_secure = False
+        self.dnssec_secure = False          # only set for negative responses?
         self.response = None                # full response message
         self.latest_rcode = None
 
@@ -56,32 +58,41 @@ class Query:
             raise ResError("RRset answer loop detected: {}".format(srrset.rrset))
         self.full_answer_rrset.append(srrset)
 
+    def is_secure(self):
+        """Is full assembled answer secure?"""
+        count = 0
+        secure_count = 0
+        if self.full_answer_rrset:
+            for x in self.full_answer_rrset:
+                count += 1
+                if x.validated:
+                    secure_count += 1
+            # TODO: return self.dnssec_secure and (secure_count == count)
+            return key_cache.SecureSoFar and (secure_count == count)
+        else:
+            return  self.dnssec_secure
+
     def print_full_answer(self):
         """
         Print full set of answer records including aliases. Report
         security status if DNSSEC is being used.
         """
-        count = 0
-        secure_count = 0
-        if self.full_answer_rrset:
-            print("# ANSWER:")
-            for x in self.full_answer_rrset:
-                count += 1
-                if x.validated:
-                    secure_count += 1
-                print(x.rrset.to_text())
-            if Prefs.DNSSEC:
-                print("# DNSSEC status: {}".format(
-                    "SECURE" if (secure_count == count) else "INSECURE"))
-        else:
-            if self.response.rcode() == 0:
-                print("# ANSWER: NODATA: {}".format(self))
-            elif self.response.rcode() == 3:
-                print("# ANSWER: NXDOMAIN: {}".format(self))
+        secure = self.is_secure()
 
-            if Prefs.DNSSEC:
-                print("# DNSSEC status: {}".format(
-                    "SECURE" if self.dnssec_secure else "INSECURE"))
+        print("# ANSWER to {}".format(self))
+        if self.full_answer_rrset:
+            for x in self.full_answer_rrset:
+                print(x.rrset.to_text())
+
+        if self.response.rcode() == 0 and self.nodata:
+            print("# NODATA: {} of type {} not found".format(
+                self.qname, dns.rdatatype.to_text(self.qtype)))
+        elif self.response.rcode() == 3:
+            print("# NXDOMAIN")
+
+        if Prefs.DNSSEC:
+            print("# DNSSEC status: {}".format(
+                "SECURE" if secure else "INSECURE"))
 
     def get_answer_ip_list(self):
         """get list of answer IP addresses if any"""
@@ -106,6 +117,6 @@ class Query:
         self.qname = dns.name.Name(self.orig_qname[-numLabels:])
 
     def __repr__(self):
-        return "<Query: {},{},{}>".format(self.qname,
+        return "QUERY: {} {} {}".format(self.qname,
                                           dns.rdatatype.to_text(self.qtype),
                                           dns.rdataclass.to_text(self.qclass))
