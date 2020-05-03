@@ -37,6 +37,6 @@ class RRset:
         return dns.name.Name(label_tuple)
 
     def __repr__(self):
-        return "<RRset: {}/{}{}>".format(self.rrset.name,
-                                         dns.rdatatype.to_text(self.rrtype),
-                                         " (signed)" if self.rrsig else "")
+        return "RRset: {}/{}{}".format(self.rrset.name,
+                                       dns.rdatatype.to_text(self.rrtype),
+                                       " (signed)" if self.rrsig else "")

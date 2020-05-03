@@ -95,6 +95,7 @@ Here's a basic lookup of the IPv6 address of www.seas.upenn.edu:
 
 ```
 $ resolve.py www.seas.upenn.edu. AAAA
+# ANSWER to QUERY: www.seas.upenn.edu. AAAA IN
 www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
 ```
 
@@ -102,6 +103,7 @@ A more complicated answer involving a chain of aliases:
 
 ```
 $ resolve.py fda.my.salesforce.com
+# ANSWER to QUERY: fda.my.salesforce.com. A IN
 fda.my.salesforce.com. 300 IN CNAME na21.my.salesforce.com.
 na21.my.salesforce.com. 30 IN CNAME na21-chx.gia1.my.salesforce.com.
 na21-chx.gia1.my.salesforce.com. 30 IN CNAME na21-chx.my.salesforce.com.
@@ -115,7 +117,6 @@ hierarchy:
 
 ```
 $ resolve.py -v www.seas.upenn.edu AAAA
-
 ZONE: .
 NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
 NS: b.root-servers.net. 199.9.14.201 2001:500:200::b
@@ -132,7 +133,7 @@ NS: l.root-servers.net. 199.7.83.42 2001:500:9f::42
 NS: m.root-servers.net. 202.12.27.33 2001:dc3::35
 
 # QUERY: www.seas.upenn.edu. AAAA IN at zone . address 198.41.0.4
-#        [Referral to zone: edu. in 0.012 s]
+#        [Referral to zone: edu. in 0.097 s]
 ZONE: edu.
 NS: a.edu-servers.net. 192.5.6.30 2001:503:a83e::2:30
 NS: b.edu-servers.net. 192.33.14.30 2001:503:231d::2:30
@@ -149,7 +150,7 @@ NS: l.edu-servers.net. 192.41.162.30 2001:500:d937::30
 NS: m.edu-servers.net. 192.55.83.30 2001:501:b1f9::30
 
 # QUERY: www.seas.upenn.edu. AAAA IN at zone edu. address 192.5.6.30
-#        [Referral to zone: upenn.edu. in 0.012 s]
+#        [Referral to zone: upenn.edu. in 0.077 s]
 ZONE: upenn.edu.
 NS: dns1.udel.edu. 128.175.13.16
 NS: dns2.udel.edu. 128.175.13.17
@@ -161,9 +162,9 @@ NS: adns5.upenn.edu. 208.80.124.32 2600:1801:6::1:0
 NS: adns6.upenn.edu. 208.80.126.32 2600:1802:7::1:0
 
 # QUERY: www.seas.upenn.edu. AAAA IN at zone upenn.edu. address 128.175.13.16
-#        [Got answer in 0.018 s]
+#        [Got answer in 0.015 s]
 
-# ANSWER:
+# ANSWER to QUERY: www.seas.upenn.edu. AAAA IN
 www.seas.upenn.edu. 120 IN AAAA 2607:f470:8:64:5ea5::9
 ```
 
@@ -176,7 +177,6 @@ answer is end-to-end DNSSEC validated. Example output:
 
 ```
 $ resolve.py -vz www.upenn.edu. A
-
 ZONE: .
 NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
 NS: b.root-servers.net. 199.9.14.201 2001:500:200::b
@@ -192,30 +192,30 @@ NS: k.root-servers.net. 193.0.14.129 2001:7fd::1
 NS: l.root-servers.net. 199.7.83.42 2001:500:9f::42
 NS: m.root-servers.net. 202.12.27.33 2001:dc3::35
 DNSKEY: . 256 48903 RSASHA256 (8) 2048-bits
-DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits
+DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits SEP
 
 # QUERY: www.upenn.edu. A IN at zone . address 198.41.0.4
-#        [SECURE Referral to zone: edu. in 0.013 s]
+#        [SECURE Referral to zone: edu. in 0.021 s]
 ZONE: edu.
-NS: a.edu-servers.net. 192.5.6.30 2001:503:a83e::2:30
 NS: b.edu-servers.net. 192.33.14.30 2001:503:231d::2:30
-NS: c.edu-servers.net. 192.26.92.30 2001:503:83eb::30
-NS: d.edu-servers.net. 192.31.80.30 2001:500:856e::30
-NS: e.edu-servers.net. 192.12.94.30 2001:502:1ca1::30
 NS: f.edu-servers.net. 192.35.51.30 2001:503:d414::30
-NS: g.edu-servers.net. 192.42.93.30 2001:503:eea3::30
-NS: h.edu-servers.net. 192.54.112.30 2001:502:8cc::30
 NS: i.edu-servers.net. 192.43.172.30 2001:503:39c1::30
+NS: a.edu-servers.net. 192.5.6.30 2001:503:a83e::2:30
+NS: g.edu-servers.net. 192.42.93.30 2001:503:eea3::30
 NS: j.edu-servers.net. 192.48.79.30 2001:502:7094::30
 NS: k.edu-servers.net. 192.52.178.30 2001:503:d2d::30
-NS: l.edu-servers.net. 192.41.162.30 2001:500:d937::30
 NS: m.edu-servers.net. 192.55.83.30 2001:501:b1f9::30
+NS: l.edu-servers.net. 192.41.162.30 2001:500:d937::30
+NS: h.edu-servers.net. 192.54.112.30 2001:502:8cc::30
+NS: c.edu-servers.net. 192.26.92.30 2001:503:83eb::30
+NS: e.edu-servers.net. 192.12.94.30 2001:502:1ca1::30
+NS: d.edu-servers.net. 192.31.80.30 2001:500:856e::30
 DS: 28065 8 2 4172496cde85534e51129040355bd04b1fcfebae996dfdde652006f6f8b2ce76
-DNSKEY: edu. 257 28065 RSASHA256 (8) 2048-bits
+DNSKEY: edu. 257 28065 RSASHA256 (8) 2048-bits SEP
 DNSKEY: edu. 256 8663 RSASHA256 (8) 1280-bits
 
-# QUERY: www.upenn.edu. A IN at zone edu. address 192.5.6.30
-#        [SECURE Referral to zone: upenn.edu. in 0.080 s]
+# QUERY: www.upenn.edu. A IN at zone edu. address 192.33.14.30
+#        [SECURE Referral to zone: upenn.edu. in 0.033 s]
 ZONE: upenn.edu.
 NS: dns1.udel.edu. 128.175.13.16
 NS: dns2.udel.edu. 128.175.13.17
@@ -226,21 +226,21 @@ NS: adns4.upenn.edu. 208.94.148.32 2600:1800:5::1:0
 NS: adns5.upenn.edu. 208.80.124.32 2600:1801:6::1:0
 NS: adns6.upenn.edu. 208.80.126.32 2600:1802:7::1:0
 DS: 10500 13 2 4629d71f8f9dd9ceac6a047041b161c9a7812406e449a80c0b319c3925b48c52
+DNSKEY: upenn.edu. 257 10500 ECDSA-P256 (13) 512-bits SEP
 DNSKEY: upenn.edu. 256 54481 ECDSA-P256 (13) 512-bits
-DNSKEY: upenn.edu. 257 10500 ECDSA-P256 (13) 512-bits
 
 # QUERY: www.upenn.edu. A IN at zone upenn.edu. address 128.175.13.16
-#        [Got answer in 0.016 s]
+#        [Got answer in 0.017 s]
+SECURE: www.upenn.edu. 300 IN A 151.101.2.217
 SECURE: www.upenn.edu. 300 IN A 151.101.66.217
 SECURE: www.upenn.edu. 300 IN A 151.101.130.217
 SECURE: www.upenn.edu. 300 IN A 151.101.194.217
-SECURE: www.upenn.edu. 300 IN A 151.101.2.217
 
-# ANSWER:
+# ANSWER to QUERY: www.upenn.edu. A IN
+www.upenn.edu. 300 IN A 151.101.2.217
 www.upenn.edu. 300 IN A 151.101.66.217
 www.upenn.edu. 300 IN A 151.101.130.217
 www.upenn.edu. 300 IN A 151.101.194.217
-www.upenn.edu. 300 IN A 151.101.2.217
 # DNSSEC status: SECURE
 ```
 

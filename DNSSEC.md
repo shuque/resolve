@@ -17,7 +17,7 @@ With just -z:
 
 ```
 $ resolve.py -z www.upenn.edu. A
-# ANSWER:
+# ANSWER to QUERY: www.upenn.edu. A IN
 www.upenn.edu. 300 IN A 151.101.66.217
 www.upenn.edu. 300 IN A 151.101.130.217
 www.upenn.edu. 300 IN A 151.101.194.217
@@ -30,8 +30,8 @@ An insecure name:
 
 ```
 $ resolve.py -z google.com. A
-# ANSWER:
-google.com. 300 IN A 172.217.7.14
+# ANSWER to QUERY: google.com. A IN
+google.com. 300 IN A 172.217.6.238
 # DNSSEC status: INSECURE
 ```
 
@@ -40,7 +40,6 @@ Adding -v, shows the full iterative trace:
 
 ```
 $ resolve.py -vz www.upenn.edu. A
-
 ZONE: .
 NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
 NS: b.root-servers.net. 199.9.14.201 2001:500:200::b
@@ -56,10 +55,10 @@ NS: k.root-servers.net. 193.0.14.129 2001:7fd::1
 NS: l.root-servers.net. 199.7.83.42 2001:500:9f::42
 NS: m.root-servers.net. 202.12.27.33 2001:dc3::35
 DNSKEY: . 256 48903 RSASHA256 (8) 2048-bits
-DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits
+DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits SEP
 
 # QUERY: www.upenn.edu. A IN at zone . address 198.41.0.4
-#        [SECURE Referral to zone: edu. in 0.013 s]
+#        [SECURE Referral to zone: edu. in 0.023 s]
 ZONE: edu.
 NS: a.edu-servers.net. 192.5.6.30 2001:503:a83e::2:30
 NS: b.edu-servers.net. 192.33.14.30 2001:503:231d::2:30
@@ -75,11 +74,11 @@ NS: k.edu-servers.net. 192.52.178.30 2001:503:d2d::30
 NS: l.edu-servers.net. 192.41.162.30 2001:500:d937::30
 NS: m.edu-servers.net. 192.55.83.30 2001:501:b1f9::30
 DS: 28065 8 2 4172496cde85534e51129040355bd04b1fcfebae996dfdde652006f6f8b2ce76
-DNSKEY: edu. 257 28065 RSASHA256 (8) 2048-bits
+DNSKEY: edu. 257 28065 RSASHA256 (8) 2048-bits SEP
 DNSKEY: edu. 256 8663 RSASHA256 (8) 1280-bits
 
 # QUERY: www.upenn.edu. A IN at zone edu. address 192.5.6.30
-#        [SECURE Referral to zone: upenn.edu. in 0.080 s]
+#        [SECURE Referral to zone: upenn.edu. in 0.013 s]
 ZONE: upenn.edu.
 NS: dns1.udel.edu. 128.175.13.16
 NS: dns2.udel.edu. 128.175.13.17
@@ -90,34 +89,32 @@ NS: adns4.upenn.edu. 208.94.148.32 2600:1800:5::1:0
 NS: adns5.upenn.edu. 208.80.124.32 2600:1801:6::1:0
 NS: adns6.upenn.edu. 208.80.126.32 2600:1802:7::1:0
 DS: 10500 13 2 4629d71f8f9dd9ceac6a047041b161c9a7812406e449a80c0b319c3925b48c52
+DNSKEY: upenn.edu. 257 10500 ECDSA-P256 (13) 512-bits SEP
 DNSKEY: upenn.edu. 256 54481 ECDSA-P256 (13) 512-bits
-DNSKEY: upenn.edu. 257 10500 ECDSA-P256 (13) 512-bits
 
 # QUERY: www.upenn.edu. A IN at zone upenn.edu. address 128.175.13.16
-#        [Got answer in 0.016 s]
+#        [Got answer in 0.018 s]
+SECURE: www.upenn.edu. 300 IN A 151.101.2.217
 SECURE: www.upenn.edu. 300 IN A 151.101.66.217
 SECURE: www.upenn.edu. 300 IN A 151.101.130.217
 SECURE: www.upenn.edu. 300 IN A 151.101.194.217
-SECURE: www.upenn.edu. 300 IN A 151.101.2.217
 
-# ANSWER:
+# ANSWER to QUERY: www.upenn.edu. A IN
+www.upenn.edu. 300 IN A 151.101.2.217
 www.upenn.edu. 300 IN A 151.101.66.217
 www.upenn.edu. 300 IN A 151.101.130.217
 www.upenn.edu. 300 IN A 151.101.194.217
-www.upenn.edu. 300 IN A 151.101.2.217
 # DNSSEC status: SECURE
 ```
 
 
-A response that resolves fine, but is insecure, reports "# DNSSEC status:
-INSECURE" at the end. A response that results in a validation failure, like
-the example below, will print an appropriate error message. In this case,
-the failure is due to an incorrect DS record in the parent zone, that does
-not match the DNSKEY RRset in the zone containing the answer.
+A response that results in a validation failure, like the example below,
+will print an appropriate error message. In this case, the failure is due
+to an incorrect DS record in the parent zone, that does not match the DNSKEY
+RRset in the zone containing the answer.
 
 ```
 $ resolve.py -vz dnssec-failed.org. A
-
 ZONE: .
 NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
 NS: b.root-servers.net. 199.9.14.201 2001:500:200::b
@@ -133,37 +130,35 @@ NS: k.root-servers.net. 193.0.14.129 2001:7fd::1
 NS: l.root-servers.net. 199.7.83.42 2001:500:9f::42
 NS: m.root-servers.net. 202.12.27.33 2001:dc3::35
 DNSKEY: . 256 48903 RSASHA256 (8) 2048-bits
-DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits
+DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits SEP
 
 # QUERY: dnssec-failed.org. A IN at zone . address 198.41.0.4
-#        [SECURE Referral to zone: org. in 0.011 s]
+#        [SECURE Referral to zone: org. in 0.089 s]
 ZONE: org.
+NS: d0.org.afilias-nst.org. 199.19.57.1 2001:500:f::1
 NS: a0.org.afilias-nst.info. 199.19.56.1 2001:500:e::1
+NS: c0.org.afilias-nst.info. 199.19.53.1 2001:500:b::1
 NS: a2.org.afilias-nst.info. 199.249.112.1 2001:500:40::1
 NS: b0.org.afilias-nst.org. 199.19.54.1 2001:500:c::1
 NS: b2.org.afilias-nst.org. 199.249.120.1 2001:500:48::1
-NS: c0.org.afilias-nst.info. 199.19.53.1 2001:500:b::1
-NS: d0.org.afilias-nst.org. 199.19.57.1 2001:500:f::1
-DS: 9795 7 1 364dfab3daf254cab477b5675b10766ddaa24982
-DS: 9795 7 2 3922b31b6f3a4ea92b19eb7b52120f031fd8e05ff0b03bafcf9f891bfe7ff8e5
 DS: 17883 7 1 38c5cf93b369c7557e0515faaa57060f1bfb12c1
 DS: 17883 7 2 d889cad790f01979e860d6627b58f85ab554e0e491fe06515f35548d1eb4e6ee
-DNSKEY: org. 256 37022 NSEC3-RSASHA1 (7) 1024-bits
 DNSKEY: org. 256 27074 NSEC3-RSASHA1 (7) 1024-bits
-DNSKEY: org. 257 17883 NSEC3-RSASHA1 (7) 2048-bits
+DNSKEY: org. 257 17883 NSEC3-RSASHA1 (7) 2048-bits SEP
+DNSKEY: org. 256 37022 NSEC3-RSASHA1 (7) 1024-bits
 
-# QUERY: dnssec-failed.org. A IN at zone org. address 199.19.56.1
-#        [SECURE Referral to zone: dnssec-failed.org. in 0.003 s]
+# QUERY: dnssec-failed.org. A IN at zone org. address 199.19.57.1
+#        [SECURE Referral to zone: dnssec-failed.org. in 0.004 s]
 ZONE: dnssec-failed.org.
 NS: dns105.comcast.net. 2001:558:100e:5:68:87:72:244 68.87.72.244
 NS: dns102.comcast.net. 2001:558:1004:7:68:87:85:132 68.87.85.132
-NS: dns103.comcast.net. 2001:558:1014:c:68:87:76:228 68.87.76.228
 NS: dns104.comcast.net. 2001:558:100a:5:68:87:68:244 68.87.68.244
 NS: dns101.comcast.net. 2001:558:fe23:8:69:252:250:103 69.252.250.103
+NS: dns103.comcast.net. 2001:558:1014:c:68:87:76:228 68.87.76.228
 DS: 106 5 2 ae3424c9b171af3b202203767e5703426130d76ef6847175f2eed355f86ef1ce
 DS: 106 5 1 4f219dce274f820ea81ea1150638dabe21eb27fc
 DNSKEY: dnssec-failed.org. 256 44973 RSASHA1 (5) 1024-bits
-DNSKEY: dnssec-failed.org. 257 29521 RSASHA1 (5) 2048-bits
+DNSKEY: dnssec-failed.org. 257 29521 RSASHA1 (5) 2048-bits SEP
 
 ERROR: DS did not match DNSKEY for dnssec-failed.org.
 ```
@@ -240,8 +235,9 @@ The following example shows a NODATA response that has been authenticated:
 ```
 $ resolve.py -z www.huque.com. TLSA
 ERROR: NODATA: cheetara.huque.com. of type TLSA not found
-# ANSWER:
+# ANSWER to QUERY: www.huque.com. TLSA IN
 www.huque.com. 300 IN CNAME cheetara.huque.com.
+# NODATA: www.huque.com. of type TLSA not found
 # DNSSEC status: SECURE
 ```
 
@@ -266,10 +262,10 @@ NS: k.root-servers.net. 193.0.14.129 2001:7fd::1
 NS: l.root-servers.net. 199.7.83.42 2001:500:9f::42
 NS: m.root-servers.net. 202.12.27.33 2001:dc3::35
 DNSKEY: . 256 48903 RSASHA256 (8) 2048-bits
-DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits
+DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits SEP
 
 # QUERY: www.huque.com. TLSA IN at zone . address 198.41.0.4
-#        [SECURE Referral to zone: com. in 0.013 s]
+#        [SECURE Referral to zone: com. in 0.091 s]
 ZONE: com.
 NS: a.gtld-servers.net. 192.5.6.30 2001:503:a83e::2:30
 NS: b.gtld-servers.net. 192.33.14.30 2001:503:231d::2:30
@@ -286,31 +282,33 @@ NS: l.gtld-servers.net. 192.41.162.30 2001:500:d937::30
 NS: m.gtld-servers.net. 192.55.83.30 2001:501:b1f9::30
 DS: 30909 8 2 e2d3c916f6deeac73294e8268fb5885044a833fc5459588f4a9184cfc41a5766
 DNSKEY: com. 256 39844 RSASHA256 (8) 1280-bits
-DNSKEY: com. 257 30909 RSASHA256 (8) 2048-bits
+DNSKEY: com. 257 30909 RSASHA256 (8) 2048-bits SEP
 
 # QUERY: www.huque.com. TLSA IN at zone com. address 192.5.6.30
-#        [SECURE Referral to zone: huque.com. in 0.008 s]
+#        [SECURE Referral to zone: huque.com. in 0.079 s]
 ZONE: huque.com.
 NS: adns2.upenn.edu. 128.91.254.22 2607:f470:1002::2:3
 NS: adns1.upenn.edu. 128.91.3.128 2607:f470:1001::1:a
 NS: adns3.upenn.edu. 128.91.251.33 2607:f470:1003::3:c
 DS: 40924 8 2 816524eb1c3b7d1315ae8330652dd17909c95de0533c1f2dc023bffedb1f5e9b
 DNSKEY: huque.com. 256 14703 RSASHA256 (8) 1024-bits
-DNSKEY: huque.com. 257 40924 RSASHA256 (8) 2048-bits
+DNSKEY: huque.com. 257 40924 RSASHA256 (8) 2048-bits SEP
 
 # QUERY: www.huque.com. TLSA IN at zone huque.com. address 128.91.254.22
-#        [Got answer in 0.017 s]
+#        [Got answer in 0.013 s]
 SECURE: www.huque.com. 300 IN CNAME cheetara.huque.com.
 www.huque.com. 300 IN CNAME cheetara.huque.com.
 
 # QUERY: cheetara.huque.com. TLSA IN at zone huque.com. address 128.91.254.22
-#        [Got answer in 0.007 s]
+#        [Got answer in 0.008 s]
 ERROR: NODATA: cheetara.huque.com. of type TLSA not found
-SECURE: huque.com. 3600 IN SOA mname.huque.com. hostmaster.huque.com. 1000013138 43200 3600 3628800 3600
+SECURE: huque.com. 3600 IN SOA mname.huque.com. hostmaster.huque.com. 1000013289 43200 3600 3628800 3600
 SECURE: 33Q996NVAUKA6LERAAPRR2TTBPO5G2MG.huque.com. 3600 IN NSEC3 1 0 5 9eba4228 37nvtrv4kghasplvv0039bt7ep026aag A AAAA SSHFP RRSIG
+# INFO H(cheetara.huque.com.) = 33Q996NVAUKA6LERAAPRR2TTBPO5G2MG.huque.com.
 
-# ANSWER:
+# ANSWER to QUERY: www.huque.com. TLSA IN
 www.huque.com. 300 IN CNAME cheetara.huque.com.
+# NODATA: www.huque.com. of type TLSA not found
 # DNSSEC status: SECURE
 ```
 
@@ -401,7 +399,8 @@ SECURE: beta.ietf.org. 1800 IN NSEC codimd.ietf.org. CNAME RRSIG NSEC
 ietf.org. _dmarc.ietf.org. A NS SOA MX TXT AAAA RRSIG NSEC DNSKEY SPF
 beta.ietf.org. codimd.ietf.org. CNAME RRSIG NSEC
 
-# ANSWER: NXDOMAIN: <Query: www7.blah.ietf.org.,A,IN>
+# ANSWER to QUERY: www7.blah.ietf.org. A IN
+# NXDOMAIN
 # DNSSEC status: SECURE
 ```
 
@@ -428,59 +427,59 @@ NS: k.root-servers.net. 193.0.14.129 2001:7fd::1
 NS: l.root-servers.net. 199.7.83.42 2001:500:9f::42
 NS: m.root-servers.net. 202.12.27.33 2001:dc3::35
 DNSKEY: . 256 48903 RSASHA256 (8) 2048-bits
-DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits
+DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits SEP
 
 # QUERY: foo.bar.www.huque.com. A IN at zone . address 198.41.0.4
-#        [SECURE Referral to zone: com. in 0.013 s]
+#        [SECURE Referral to zone: com. in 0.087 s]
 ZONE: com.
-NS: e.gtld-servers.net. 192.12.94.30 2001:502:1ca1::30
-NS: b.gtld-servers.net. 192.33.14.30 2001:503:231d::2:30
-NS: j.gtld-servers.net. 192.48.79.30 2001:502:7094::30
-NS: m.gtld-servers.net. 192.55.83.30 2001:501:b1f9::30
-NS: i.gtld-servers.net. 192.43.172.30 2001:503:39c1::30
-NS: f.gtld-servers.net. 192.35.51.30 2001:503:d414::30
 NS: a.gtld-servers.net. 192.5.6.30 2001:503:a83e::2:30
-NS: g.gtld-servers.net. 192.42.93.30 2001:503:eea3::30
-NS: h.gtld-servers.net. 192.54.112.30 2001:502:8cc::30
-NS: l.gtld-servers.net. 192.41.162.30 2001:500:d937::30
-NS: k.gtld-servers.net. 192.52.178.30 2001:503:d2d::30
+NS: b.gtld-servers.net. 192.33.14.30 2001:503:231d::2:30
 NS: c.gtld-servers.net. 192.26.92.30 2001:503:83eb::30
 NS: d.gtld-servers.net. 192.31.80.30 2001:500:856e::30
+NS: e.gtld-servers.net. 192.12.94.30 2001:502:1ca1::30
+NS: f.gtld-servers.net. 192.35.51.30 2001:503:d414::30
+NS: g.gtld-servers.net. 192.42.93.30 2001:503:eea3::30
+NS: h.gtld-servers.net. 192.54.112.30 2001:502:8cc::30
+NS: i.gtld-servers.net. 192.43.172.30 2001:503:39c1::30
+NS: j.gtld-servers.net. 192.48.79.30 2001:502:7094::30
+NS: k.gtld-servers.net. 192.52.178.30 2001:503:d2d::30
+NS: l.gtld-servers.net. 192.41.162.30 2001:500:d937::30
+NS: m.gtld-servers.net. 192.55.83.30 2001:501:b1f9::30
 DS: 30909 8 2 e2d3c916f6deeac73294e8268fb5885044a833fc5459588f4a9184cfc41a5766
 DNSKEY: com. 256 39844 RSASHA256 (8) 1280-bits
-DNSKEY: com. 257 30909 RSASHA256 (8) 2048-bits
+DNSKEY: com. 257 30909 RSASHA256 (8) 2048-bits SEP
 
-# QUERY: foo.bar.www.huque.com. A IN at zone com. address 192.12.94.30
-#        [SECURE Referral to zone: huque.com. in 0.063 s]
+# QUERY: foo.bar.www.huque.com. A IN at zone com. address 192.5.6.30
+#        [SECURE Referral to zone: huque.com. in 0.009 s]
 ZONE: huque.com.
 NS: adns2.upenn.edu. 128.91.254.22 2607:f470:1002::2:3
 NS: adns1.upenn.edu. 128.91.3.128 2607:f470:1001::1:a
 NS: adns3.upenn.edu. 128.91.251.33 2607:f470:1003::3:c
 DS: 40924 8 2 816524eb1c3b7d1315ae8330652dd17909c95de0533c1f2dc023bffedb1f5e9b
-DNSKEY: huque.com. 257 40924 RSASHA256 (8) 2048-bits
+DNSKEY: huque.com. 257 40924 RSASHA256 (8) 2048-bits SEP
 DNSKEY: huque.com. 256 14703 RSASHA256 (8) 1024-bits
 
 # QUERY: foo.bar.www.huque.com. A IN at zone huque.com. address 128.91.254.22
-#        [Got answer in 0.017 s]
+#        [Got answer in 0.016 s]
 ERROR: NXDOMAIN: foo.bar.www.huque.com. not found
-SECURE: huque.com. 3600 IN SOA mname.huque.com. hostmaster.huque.com. 1000013153 43200 3600 3628800 3600
+SECURE: huque.com. 3600 IN SOA mname.huque.com. hostmaster.huque.com. 1000013289 43200 3600 3628800 3600
 SECURE: BHC26OBVA5IVSSUNCIM9IBSKP9LDHTF3.huque.com. 3600 IN NSEC3 1 0 5 9eba4228 bliqgpljj9u1ls10e24o7admh19jt83d CNAME RRSIG
 SECURE: I6F6LIVI2B99V5KSG7JEE4UNIGAHFQDE.huque.com. 3600 IN NSEC3 1 0 5 9eba4228 ib131cn8g5grn6h660pcldgvqg64peud
 SECURE: 8A4IH6GUN04T65I6UNBN3CJ43VNONT2P.huque.com. 3600 IN NSEC3 1 0 5 9eba4228 8soph4cq7137p93bnsuna23rmqn3e8ec
-INFO: closest encloser: www.huque.com. BHC26OBVA5IVSSUNCIM9IBSKP9LDHTF3
-INFO: next closer: bar.www.huque.com. IAPTN5EOPL2CA48BOVVPQQV7RDVHGEQB
-INFO: wildcard: *.www.huque.com. 8D3IP64KO9RESL73HP4DMUPS7SNORBT1
+# INFO: closest encloser: www.huque.com. BHC26OBVA5IVSSUNCIM9IBSKP9LDHTF3
+# INFO: next closer: bar.www.huque.com. IAPTN5EOPL2CA48BOVVPQQV7RDVHGEQB
+# INFO: wildcard: *.www.huque.com. 8D3IP64KO9RESL73HP4DMUPS7SNORBT1
 
-# ANSWER: NXDOMAIN: <Query: foo.bar.www.huque.com.,A,IN>
+# ANSWER to QUERY: foo.bar.www.huque.com. A IN
+# NXDOMAIN
 # DNSSEC status: SECURE
 ```
 
-Wild card synthesized responses are also correctly validated, and the
-program reports the fact that wildcard syntheis was encountered, with
-the name of the wildcard.
+Wildcard synthesized responses are correctly validated (including proof of
+no closer match), and the program reports the wildcard name that matched.
 
 ```
-$ resolve.py -vz foo.bar.wild.huque.com
+$ resolve.py -vz foo.bar.wild.huque.com.
 ZONE: .
 NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
 NS: b.root-servers.net. 199.9.14.201 2001:500:200::b
@@ -496,10 +495,10 @@ NS: k.root-servers.net. 193.0.14.129 2001:7fd::1
 NS: l.root-servers.net. 199.7.83.42 2001:500:9f::42
 NS: m.root-servers.net. 202.12.27.33 2001:dc3::35
 DNSKEY: . 256 48903 RSASHA256 (8) 2048-bits
-DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits
+DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits SEP
 
 # QUERY: foo.bar.wild.huque.com. A IN at zone . address 198.41.0.4
-#        [SECURE Referral to zone: com. in 0.093 s]
+#        [SECURE Referral to zone: com. in 0.024 s]
 ZONE: com.
 NS: e.gtld-servers.net. 192.12.94.30 2001:502:1ca1::30
 NS: b.gtld-servers.net. 192.33.14.30 2001:503:231d::2:30
@@ -516,16 +515,16 @@ NS: c.gtld-servers.net. 192.26.92.30 2001:503:83eb::30
 NS: d.gtld-servers.net. 192.31.80.30 2001:500:856e::30
 DS: 30909 8 2 e2d3c916f6deeac73294e8268fb5885044a833fc5459588f4a9184cfc41a5766
 DNSKEY: com. 256 39844 RSASHA256 (8) 1280-bits
-DNSKEY: com. 257 30909 RSASHA256 (8) 2048-bits
+DNSKEY: com. 257 30909 RSASHA256 (8) 2048-bits SEP
 
 # QUERY: foo.bar.wild.huque.com. A IN at zone com. address 192.12.94.30
-#        [SECURE Referral to zone: huque.com. in 0.037 s]
+#        [SECURE Referral to zone: huque.com. in 0.064 s]
 ZONE: huque.com.
 NS: adns2.upenn.edu. 128.91.254.22 2607:f470:1002::2:3
 NS: adns1.upenn.edu. 128.91.3.128 2607:f470:1001::1:a
 NS: adns3.upenn.edu. 128.91.251.33 2607:f470:1003::3:c
 DS: 40924 8 2 816524eb1c3b7d1315ae8330652dd17909c95de0533c1f2dc023bffedb1f5e9b
-DNSKEY: huque.com. 257 40924 RSASHA256 (8) 2048-bits
+DNSKEY: huque.com. 257 40924 RSASHA256 (8) 2048-bits SEP
 DNSKEY: huque.com. 256 14703 RSASHA256 (8) 1024-bits
 
 # QUERY: foo.bar.wild.huque.com. A IN at zone huque.com. address 128.91.254.22
@@ -533,7 +532,7 @@ DNSKEY: huque.com. 256 14703 RSASHA256 (8) 1024-bits
 # INFO: Wildcard match: *.wild.huque.com.
 SECURE: foo.bar.wild.huque.com. 600 IN A 127.0.99.1
 
-# ANSWER:
+# ANSWER to QUERY: foo.bar.wild.huque.com. A IN
 foo.bar.wild.huque.com. 600 IN A 127.0.99.1
 # DNSSEC status: SECURE
 ```
