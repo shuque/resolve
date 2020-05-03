@@ -399,10 +399,12 @@ def authenticate_nxdomain(query):
 
     if len(signers) > 1:
         raise ResError("Response with multiple NSEC/3 signers.")
+
     if not seen_soa:
-        raise ResError("No signed SOA found in NXDOMAIN response.")
+        raise ResError("NXDOMAIN response failed to include SOA RRset.")
+
     if not (nsec_set or nsec3_set):
-        raise ResError("No NSEC/3 records found in NXDOMAIN response")
+        raise ResError("No NSEC/3 records found in NXDOMAIN response.")
 
     if nsec3_set:
         nsec3_nxdomain_proof(query, signer, nsec3_set)
@@ -444,7 +446,7 @@ def authenticate_nodata(query):
             if optout and nsec3_covers_name(nsec3, hashed_owner, signer):
                 authenticated = True
                 if Prefs.VERBOSE and not query.quiet:
-                    print("# INFO OptOut H({}) = {}".format(
+                    print("# INFO: OptOut H({}) = {}".format(
                         query.qname, hashed_owner))
                 continue
             if hashed_owner != rrname:
@@ -452,14 +454,17 @@ def authenticate_nodata(query):
             if not type_in_bitmap(query.qtype, nsec3_rdata):
                 authenticated = True
                 if Prefs.VERBOSE and not query.quiet:
-                    print("# INFO H({}) = {}".format(
+                    print("# INFO: H({}) = {}".format(
                         query.qname, hashed_owner))
 
-    if not (seen_soa and authenticated):
-        raise ResError("Failed to authenticate NODATA response")
-    else:
-        if query.qname == query.orig_qname:
-            query.dnssec_secure = True
+    if not seen_soa:
+        raise ResError("NODATA response failed to include SOA RRset.")
+
+    if not authenticated:
+        raise ResError("Failed to authenticate NODATA response.")
+
+    if query.qname == query.orig_qname:
+        query.dnssec_secure = True
 
 
 def find_insecure_referral(query):
@@ -522,13 +527,13 @@ def process_answer(query, addResults=None):
     cname_dict = {}              # dict of CNAME owner: target
     synthetic_cname = None       # only set if DNAME encountered
 
-    if query.qname != query.orig_qname:
-        if vprint_quiet(query):
-            print("#        [Ignoring AA=1 answer for intermediate name]")
-        return
-
     if vprint_quiet(query):
         print("#        [Got answer in {:.3f} s]".format(query.elapsed_last))
+
+    if query.qname != query.orig_qname:
+        addResults = None
+        if vprint_quiet(query):
+            print("# INFO: Ignoring AA=1 answer for intermediate name")
 
     rrset_dict, found_sigs = get_rrset_dict(query.response.answer)
 

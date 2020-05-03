@@ -67,10 +67,8 @@ class Query:
                 count += 1
                 if x.validated:
                     secure_count += 1
-            # TODO: return self.dnssec_secure and (secure_count == count)
             return key_cache.SecureSoFar and (secure_count == count)
-        else:
-            return  self.dnssec_secure
+        return  self.dnssec_secure
 
     def print_full_answer(self):
         """
@@ -118,5 +116,5 @@ class Query:
 
     def __repr__(self):
         return "QUERY: {} {} {}".format(self.qname,
-                                          dns.rdatatype.to_text(self.qtype),
-                                          dns.rdataclass.to_text(self.qclass))
+                                        dns.rdatatype.to_text(self.qtype),
+                                        dns.rdataclass.to_text(self.qclass))
