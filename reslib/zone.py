@@ -15,7 +15,7 @@ class Zone:
         self.dslist = []                           # list of DS rdata objects
         self.ttl_ns = None
         self.ttl_ds = None
-        self.ds_verified = False
+        self.secure = False
         self.cache.install_zone(zone, self)
 
     def has_ns(self, ns):
@@ -39,9 +39,9 @@ class Zone:
         self.ttl_ds = ds_rrset.ttl
         self.dslist = ds_rrset.to_rdataset()
 
-    def set_ds_verified(self, action):
-        """Set DS verified to True/False - invoked after DS matching"""
-        self.ds_verified = action
+    def set_secure(self, action):
+        """Set zone to secure; when signed DS matches signed DNSKEY below"""
+        self.secure = action
 
     def iplist(self):
         """Return list of nameserver addresses"""

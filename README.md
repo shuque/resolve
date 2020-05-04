@@ -23,7 +23,7 @@ by itself).
 Pre-requisites:  
 - Python 3
 - [dnspython module](http://www.dnspython.org/) (included with most Linux/*BSD distributions)
-- DNSSEC support requires additional modules:
+- for DNSSEC support:
   - [pycryptodome](https://www.pycryptodome.org/en/latest/)
   - [pynacl](https://pypi.org/project/PyNaCl/)
 

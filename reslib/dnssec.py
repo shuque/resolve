@@ -323,15 +323,17 @@ def check_self_signature(rrset, rrsigs):
     """
 
     Verified = []
+    Failed = []
     keys = load_keys(rrset)
 
     for sig in get_sig_info(rrset, rrsigs):
-        v, _ = verify_sig_with_keys(sig, keys)
+        v, f = verify_sig_with_keys(sig, keys)
         Verified += v
+        Failed += f
 
     if not Verified:
-        raise ResError("DNSKEY self signature failed to validate: {}".format(
-            rrset.name))
+        raise ResError("DNSKEY {} self signature failed to validate: {}".format(
+            rrset.name, Failed))
 
     return keys, Verified
 
@@ -514,8 +516,6 @@ def nsec_nxdomain_proof(query, signer, nsec_list):
     """
 
     qname = query.qname
-    # TODO: look through answer to see if there is a terminal CNAME,
-    # and if so, we need to use that as the qname.
 
     qname_cover = False
     wildcard_cover = False

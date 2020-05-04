@@ -179,9 +179,10 @@ def process_referral(query):
                 raise ResError("DS didn't match NS in referral message")
             if ds_rrsigs is None:
                 raise ResError("DS RRset has no signatures")
-            ds_verified, _ = validate_all(ds_rrset, ds_rrsigs)
+            ds_verified, ds_failed = validate_all(ds_rrset, ds_rrsigs)
             if not ds_verified:
-                raise ResError("DS RRset failed to authenticate")
+                raise ResError("DS RRset {} failed to authenticate: {}".format(
+                    zonename, ds_failed))
         else:
             authenticate_insecure_referral(query, zonename)
             if not query.is_nsquery:
@@ -290,9 +291,10 @@ def get_ns_ds_dnskey(zonename):
         print("# FETCH: NS/DS/DNSKEY for {}".format(zonename))
     zone = get_zone(zonename)
     ds_rrset, ds_rrsigs = fetch_ds(zonename)
-    ds_verified, _ = validate_all(ds_rrset, ds_rrsigs)
+    ds_verified, ds_failed = validate_all(ds_rrset, ds_rrsigs)
     if not ds_verified:
-        raise ResError("DS RRset failed to authenticate")
+        raise ResError("DS RRset {} failed to authenticate: {}".format(
+            zonename, ds_failed))
     zone.install_ds_rrset(ds_rrset)
     match_ds(zone)
     return
@@ -493,10 +495,10 @@ def find_insecure_referral(query):
             print("# INFO: found INSECURE Referral to {}".format(zonename))
             key_cache.SecureSoFar = False
             return
-        ds_verified, _ = validate_all(ds_rrset, ds_rrsigs)
+        ds_verified, ds_failed = validate_all(ds_rrset, ds_rrsigs)
         if not ds_verified:
-            raise ResError("DS RRset failed to authenticate: {}".format(
-                zonename))
+            raise ResError("DS RRset {} failed to authenticate: {}".format(
+                zonename, ds_failed))
         zone.install_ds_rrset(ds_rrset)
         match_ds(zone)
     raise ValueError("Can't find insecure referral, yet response is unsigned.")
@@ -837,9 +839,14 @@ def match_ds(zone, referring_query=None):
 
     dnskey_rrset, dnskey_rrsigs = fetch_dnskey(zone)
     if dnskey_rrsigs is None:
-        raise ResError("No signatures found for root DNSKEY set!")
+        raise ResError("No signatures found for {} DNSKEY set.".format(
+            zone))
 
-    keylist, sigkeys = check_self_signature(dnskey_rrset, dnskey_rrsigs)
+    try:
+        keylist, sigkeys = check_self_signature(dnskey_rrset, dnskey_rrsigs)
+    except ResError as e:
+        print("\nERROR: DNSKEY did not validate: {}".format(e))
+        sys.exit(1)
 
     if referring_query and Prefs.VERBOSE and not referring_query.quiet:
         for key in keylist:
@@ -849,7 +856,7 @@ def match_ds(zone, referring_query=None):
         if not key.sep_flag:
             continue
         if ds_rrset_matches_dnskey(zone.dslist, key):
-            zone.set_ds_verified(True)
+            zone.set_secure(True)
             key_cache.install(zone.name, keylist)
             return True
 

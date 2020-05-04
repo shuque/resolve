@@ -16,6 +16,7 @@ def get_root_zone(cache):
         nsobj = zone.install_ns(name, clobber=False)
         nsobj.install_ip(addr)
     zone.install_ns_rrset_ttl(ROOT_NS_TTL)
+    zone.secure = True
     return zone
 
 
@@ -58,7 +59,8 @@ class Cache:
 
         print("#### Zone Cache dump")
         for zname, zobj in self.ZoneDict.items():
-            print("Zone: {}".format(zname))
+            print("Zone: {}{}".format(zname,
+                                      " (Secure)" if zobj.secure else ""))
             for ns in zobj.nslist:
                 print("    NS: {}".format(self.NSDict[ns].name))
             for ds in zobj.dslist:
