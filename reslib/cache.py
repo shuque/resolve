@@ -4,7 +4,7 @@ TODO: convert this to a more efficient tree data structure.
 """
 
 import dns.name
-from reslib.hints import ROOTHINTS
+from reslib.hints import ROOTHINTS, ROOT_NS_TTL
 from reslib.zone import Zone
 
 
@@ -15,6 +15,7 @@ def get_root_zone(cache):
         name = dns.name.from_text(name)
         nsobj = zone.install_ns(name, clobber=False)
         nsobj.install_ip(addr)
+    zone.install_ns_rrset_ttl(ROOT_NS_TTL)
     return zone
 
 

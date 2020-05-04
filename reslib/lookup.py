@@ -75,10 +75,11 @@ def install_zone_in_cache(zonename, ns_rrset, ds_rrset, additional):
     zone = cache.get_zone(zonename)
     if zone is None:
         zone = Zone(zonename, cache)
+        zone.install_ns_rrset_ttl(ns_rrset.ttl)
         for rr in ns_rrset:
             _ = zone.install_ns(rr.target)
         if ds_rrset:
-            zone.install_ds(ds_rrset.to_rdataset())
+            zone.install_ds_rrset(ds_rrset)
     get_ns_addrs(zone, additional)
     return zone
 
@@ -292,7 +293,7 @@ def get_ns_ds_dnskey(zonename):
     ds_verified, _ = validate_all(ds_rrset, ds_rrsigs)
     if not ds_verified:
         raise ResError("DS RRset failed to authenticate")
-    zone.install_ds(ds_rrset.to_rdataset())
+    zone.install_ds_rrset(ds_rrset)
     match_ds(zone)
     return
 
@@ -489,14 +490,14 @@ def find_insecure_referral(query):
             continue
         ds_rrset, ds_rrsigs = fetch_ds(zonename)
         if ds_rrset is None:
-            print("# INFO: found INSECURE Referral at {}".format(zonename))
+            print("# INFO: found INSECURE Referral to {}".format(zonename))
             key_cache.SecureSoFar = False
             return
         ds_verified, _ = validate_all(ds_rrset, ds_rrsigs)
         if not ds_verified:
             raise ResError("DS RRset failed to authenticate: {}".format(
                 zonename))
-        zone.install_ds(ds_rrset.to_rdataset())
+        zone.install_ds_rrset(ds_rrset)
         match_ds(zone)
     raise ValueError("Can't find insecure referral, yet response is unsigned.")
 
@@ -758,7 +759,7 @@ def get_zone(zonename):
         return None
 
     zone = Zone(zonename, cache)
-
+    zone.install_ns_rrset_ttl(ns_rrset.ttl)
     for ns_rr in ns_rrset:
         _ = zone.install_ns(ns_rr.target)
         nsobj = cache.get_ns(ns_rr.target)

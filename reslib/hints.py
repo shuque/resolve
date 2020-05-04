@@ -2,6 +2,8 @@
 Root server names and addresses.
 """
 
+ROOT_NS_TTL = 518400
+
 ROOTHINTS = [
     ("a.root-servers.net.", "198.41.0.4"),
     ("a.root-servers.net.", "2001:503:ba3e::2:30"),

@@ -11,6 +11,8 @@ cat <<EOF
 Root server names and addresses.
 """
 
+ROOT_NS_TTL = 518400
+
 ROOTHINTS = ["
 EOF
 

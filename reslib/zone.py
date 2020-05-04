@@ -5,7 +5,6 @@ Zone class
 from binascii import hexlify
 from reslib.nameserver import NameServer
 
-
 class Zone:
     """Zone class"""
 
@@ -14,12 +13,18 @@ class Zone:
         self.cache = cache                         # Cache class
         self.nslist = []                           # list of dns.name.Name
         self.dslist = []                           # list of DS rdata objects
+        self.ttl_ns = None
+        self.ttl_ds = None
         self.ds_verified = False
         self.cache.install_zone(zone, self)
 
     def has_ns(self, ns):
         """Does zone have specified nameserver?"""
         return ns in self.nslist
+
+    def install_ns_rrset_ttl(self, ttl):
+        """Set NS RRset TTL"""
+        self.ttl_ns = ttl
 
     def install_ns(self, nsname, clobber=False):
         """Install a nameserver record for this zone"""
@@ -29,9 +34,10 @@ class Zone:
             self.cache.install_ns(nsname, NameServer(nsname))
         return self.cache.get_ns(nsname)
 
-    def install_ds(self, dslist):
+    def install_ds_rrset(self, ds_rrset):
         """Install DS rdata list"""
-        self.dslist = dslist
+        self.ttl_ds = ds_rrset.ttl
+        self.dslist = ds_rrset.to_rdataset()
 
     def set_ds_verified(self, action):
         """Set DS verified to True/False - invoked after DS matching"""
@@ -51,6 +57,11 @@ class Zone:
     def print_details(self):
         """Print zone information"""
         print("ZONE: {}".format(self.name))
+        if self.ttl_ds:
+            print("TTL: Delegation: {}, Signer: {}".format(
+                self.ttl_ns, self.ttl_ds))
+        else:
+            print("TTL: Delegation: {}".format(self.ttl_ns))
         for nsname in self.nslist:
             nsobj = self.cache.get_ns(nsname)
             addresses = " ".join([x.addr for x in nsobj.iplist])
