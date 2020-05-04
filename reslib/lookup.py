@@ -610,7 +610,7 @@ def process_response(query, addResults=None):
             print("ERROR: NXDOMAIN: {} not found".format(query.qname))
         if query.response.answer:
             process_answer(query, addResults=addResults)
-        if Prefs.DNSSEC and not query.is_nsquery and key_cache.SecureSoFar:
+        elif Prefs.DNSSEC and not query.is_nsquery and key_cache.SecureSoFar:
             authenticate_nxdomain(query)
 
     return query.response.rcode(), None

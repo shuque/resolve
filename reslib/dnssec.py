@@ -584,8 +584,6 @@ def nsec3_nxdomain_proof(query, signer, nsec3_list):
     """
 
     qname = query.qname
-    # TODO: look through answer to see if there is a terminal CNAME,
-    # and if so, we need to use that as the qname.
 
     closest_encloser_match = False
     next_closer_cover = False
