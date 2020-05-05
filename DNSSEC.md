@@ -536,3 +536,70 @@ SECURE: foo.bar.wild.huque.com. 600 IN A 127.0.99.1
 foo.bar.wild.huque.com. 600 IN A 127.0.99.1
 # DNSSEC status: SECURE
 ```
+
+An opt-out insecure referral to amazon.com from com:
+
+```
+$ resolve.py -vz amazon.com.
+ZONE: .
+TTL: Delegation: 518400
+NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
+NS: b.root-servers.net. 199.9.14.201 2001:500:200::b
+NS: c.root-servers.net. 192.33.4.12 2001:500:2::c
+NS: d.root-servers.net. 199.7.91.13 2001:500:2d::d
+NS: e.root-servers.net. 192.203.230.10 2001:500:a8::e
+NS: f.root-servers.net. 192.5.5.241 2001:500:2f::f
+NS: g.root-servers.net. 192.112.36.4 2001:500:12::d0d
+NS: h.root-servers.net. 198.97.190.53 2001:500:1::53
+NS: i.root-servers.net. 192.36.148.17 2001:7fe::53
+NS: j.root-servers.net. 192.58.128.30 2001:503:c27::2:30
+NS: k.root-servers.net. 193.0.14.129 2001:7fd::1
+NS: l.root-servers.net. 199.7.83.42 2001:500:9f::42
+NS: m.root-servers.net. 202.12.27.33 2001:dc3::35
+DNSKEY: . 256 48903 RSASHA256 (8) 2048-bits
+DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits SEP
+
+# QUERY: amazon.com. A IN at zone . address 198.41.0.4
+#        [SECURE Referral to zone: com. in 0.088 s]
+ZONE: com.
+TTL: Delegation: 172800, Signer: 86400
+NS: a.gtld-servers.net. 192.5.6.30 2001:503:a83e::2:30
+NS: b.gtld-servers.net. 192.33.14.30 2001:503:231d::2:30
+NS: c.gtld-servers.net. 192.26.92.30 2001:503:83eb::30
+NS: d.gtld-servers.net. 192.31.80.30 2001:500:856e::30
+NS: e.gtld-servers.net. 192.12.94.30 2001:502:1ca1::30
+NS: f.gtld-servers.net. 192.35.51.30 2001:503:d414::30
+NS: g.gtld-servers.net. 192.42.93.30 2001:503:eea3::30
+NS: h.gtld-servers.net. 192.54.112.30 2001:502:8cc::30
+NS: i.gtld-servers.net. 192.43.172.30 2001:503:39c1::30
+NS: j.gtld-servers.net. 192.48.79.30 2001:502:7094::30
+NS: k.gtld-servers.net. 192.52.178.30 2001:503:d2d::30
+NS: l.gtld-servers.net. 192.41.162.30 2001:500:d937::30
+NS: m.gtld-servers.net. 192.55.83.30 2001:501:b1f9::30
+DS: 30909 8 2 e2d3c916f6deeac73294e8268fb5885044a833fc5459588f4a9184cfc41a5766
+DNSKEY: com. 256 39844 RSASHA256 (8) 1280-bits
+DNSKEY: com. 257 30909 RSASHA256 (8) 2048-bits SEP
+
+# QUERY: amazon.com. A IN at zone com. address 192.5.6.30
+# INFO: closest provable encloser: com. CK0POJMG874LJREF7EFN8430QVIT8BSM
+# INFO: next closer: amazon.com. K201BQSV52HID9F4GFEU8D70JL1218CH
+# INFO: NSEC3 opt-out insecure referral
+#        [INSECURE Referral to zone: amazon.com. in 0.014 s]
+ZONE: amazon.com.
+TTL: Delegation: 172800
+NS: pdns1.ultradns.net. 204.74.108.1 2001:502:f3ff::1
+NS: pdns6.ultradns.co.uk. 204.74.115.1 2610:a1:1017::1
+NS: ns1.p31.dynect.net. 208.78.70.31 2001:500:90:1::31
+NS: ns3.p31.dynect.net. 208.78.71.31 2001:500:94:1::31
+NS: ns2.p31.dynect.net. 204.13.250.31
+NS: ns4.p31.dynect.net. 204.13.251.31
+
+# QUERY: amazon.com. A IN at zone amazon.com. address 204.74.108.1
+#        [Got answer in 0.003 s]
+
+# ANSWER to QUERY: amazon.com. A IN
+amazon.com. 60 IN A 176.32.98.166
+amazon.com. 60 IN A 205.251.242.103
+amazon.com. 60 IN A 176.32.103.205
+# DNSSEC status: INSECURE
+```

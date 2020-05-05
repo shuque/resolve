@@ -135,8 +135,10 @@ class DNSKEY:
 
     def __repr__(self):
         flags_text = ''
-        if self.sep_flag: flags_text += " SEP"
-        if self.revoke_flag: flags_text += " REV"
+        if self.sep_flag:
+            flags_text += " SEP"
+        if self.revoke_flag:
+            flags_text += " REV"
         return "DNSKEY: {} {} {} {} ({}) {}-bits{}".format(
             self.name, self.flags, self.keytag,
             ALG.get(self.algorithm, "Unknown"), self.algorithm,
@@ -509,13 +511,11 @@ def nsec_wildcard_at_closest_encloser(qname, zonename, nsec_list):
     return dns.name.Name(('*',) + closest_encloser.labels)
 
 
-def nsec_nxdomain_proof(query, signer, nsec_list):
+def nsec_nxdomain_proof(qname, signer, nsec_list):
     """
     Check NSEC NXDOMAIN proof for given qname, zone, and NSEC list.
     Raise exception if not proved.
     """
-
-    qname = query.qname
 
     qname_cover = False
     wildcard_cover = False
@@ -577,17 +577,15 @@ def nsec3_closest_encloser_and_next(qname, zonename, nsec3_list):
     return candidate, qname
 
 
-def nsec3_nxdomain_proof(query, signer, nsec3_list):
+def nsec3_nxdomain_proof(qname, signer, nsec3_list, optout=False, quiet=False):
     """
     Check NSEC3 NXDOMAIN proof for given qname, zone, and NSEC list.
     Raise exception if not proved.
     """
 
-    qname = query.qname
-
     closest_encloser_match = False
     next_closer_cover = False
-    wildcard_cover = False
+    wildcard_cover = optout
 
     closest_encloser, next_closer = nsec3_closest_encloser_and_next(
         qname, signer, nsec3_list)
@@ -598,22 +596,24 @@ def nsec3_nxdomain_proof(query, signer, nsec3_list):
         hashed_wild = nsec3hashname_from_record(wildcard, nsec3, signer)
         if nsec3.name == hashed_ce:
             closest_encloser_match = True
-            if Prefs.VERBOSE and not query.quiet:
-                print("# INFO: closest encloser: {} {}".format(
+            if Prefs.VERBOSE and not quiet:
+                print("# INFO: closest{} encloser: {} {}".format(
+                    " provable" if optout else "",
                     closest_encloser, hashed_ce.labels[0].decode()))
         if nsec3_covers_name(nsec3, hashed_nc, signer):
             next_closer_cover = True
-            if Prefs.VERBOSE and not query.quiet:
+            if Prefs.VERBOSE and not quiet:
                 print("# INFO: next closer: {} {}".format(
                     next_closer, hashed_nc.labels[0].decode()))
-        if nsec3_covers_name(nsec3, hashed_wild, signer):
+        if not optout and nsec3_covers_name(nsec3, hashed_wild, signer):
             wildcard_cover = True
-            if Prefs.VERBOSE and not query.quiet:
+            if Prefs.VERBOSE and not quiet:
                 print("# INFO: wildcard: {} {}".format(
                     wildcard, hashed_wild.labels[0].decode()))
 
     if not (closest_encloser_match and next_closer_cover and wildcard_cover):
-        raise ResError("NSEC3 NXDOMAIN proof did not succeed.")
+        raise ResError("{} NSEC3 NXDOMAIN proof did not succeed.".format(
+            qname))
 
 
 # Instantiate key cache at module level

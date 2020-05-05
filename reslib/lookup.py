@@ -95,6 +95,7 @@ def authenticate_insecure_referral(query, zonename):
     rrset_dict, _ = get_rrset_dict(query.response.authority)
     authenticated = False
     optout = False
+    nsec3_set = []
 
     for (rrname, rrtype) in rrset_dict:
         if rrtype not in (dns.rdatatype.NSEC, dns.rdatatype.NSEC3):
@@ -107,18 +108,20 @@ def authenticate_insecure_referral(query, zonename):
             if not type_in_bitmap(dns.rdatatype.DS, srrset.rrset[0]):
                 authenticated = True
         elif rrtype == dns.rdatatype.NSEC3:
-            # TODO: properly process opt out RRs here
+            nsec3_set.append(srrset.rrset)
             nsec3_rdata = srrset.rrset[0]
-            optout = nsec3_rdata.flags & 0x1
             signer = srrset.rrsig[0].signer
             hashed_owner = get_hashed_owner(zonename, signer, nsec3_rdata)
-            if hashed_owner != rrname:
-                continue
-            if not type_in_bitmap(dns.rdatatype.DS, nsec3_rdata):
+            if (hashed_owner == rrname and
+                not type_in_bitmap(dns.rdatatype.DS, nsec3_rdata) and
+                not type_in_bitmap(dns.rdatatype.CNAME, nsec3_rdata)):
                 authenticated = True
+            optout = nsec3_rdata.flags & 0x1
 
-    if Prefs.VERBOSE and not query.quiet:
-        if optout:
+    if not authenticated and optout:
+        nsec3_nxdomain_proof(zonename, signer, nsec3_set, optout=True,
+                             quiet=query.quiet)
+        if Prefs.VERBOSE and not query.quiet:
             print("# INFO: NSEC3 opt-out insecure referral")
 
     if not optout and not authenticated:
@@ -410,9 +413,9 @@ def authenticate_nxdomain(query):
         raise ResError("No NSEC/3 records found in NXDOMAIN response.")
 
     if nsec3_set:
-        nsec3_nxdomain_proof(query, signer, nsec3_set)
+        nsec3_nxdomain_proof(query.qname, signer, nsec3_set, quiet=query.quiet)
     elif nsec_set:
-        nsec_nxdomain_proof(query, signer, nsec_set)
+        nsec_nxdomain_proof(query.qname, signer, nsec_set)
 
     if query.qname == query.orig_qname:
         query.dnssec_secure = True
