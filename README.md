@@ -49,7 +49,7 @@ earlier versions:
 ### Usage
 
 ```
-resolve.py version 0.23
+resolve.py version 0.30
 Perform iterative resolution of a DNS name, type, and class.
 
     Usage: resolve.py [Options] <qname> [<qtype>] [<qclass>]
