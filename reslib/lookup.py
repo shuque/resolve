@@ -23,7 +23,8 @@ from reslib.dnssec import (key_cache, load_keys, validate_all,
                            ds_rrset_matches_dnskey, check_self_signature,
                            type_in_bitmap, get_hashed_owner,
                            nsec_covers_name, nsec3_covers_name,
-                           nsec_nxdomain_proof, nsec3_nxdomain_proof)
+                           nsec_nxdomain_proof, nsec3_nxdomain_proof,
+                           nsec3_wildcard_nodata_proof)
 
 
 def get_ns_addrs(zone, additional):
@@ -312,10 +313,12 @@ def validate_wildcard(srrset, query):
     wildcard = srrset.wildcard()
     if wildcard is None or wildcard == srrset.rrname:
         return
+    query.wildcard = wildcard
 
     wildcard_base = dns.name.Name(wildcard.labels[1:])
     next_label = srrset.rrname.relativize(wildcard_base).labels[-1]
     next_closer = dns.name.Name((next_label,) + wildcard_base.labels)
+    query.wildcard = wildcard
     print("# INFO: Wildcard match: {}".format(wildcard))
 
     rrset_dict, _ = get_rrset_dict(query.response.authority)
@@ -427,27 +430,37 @@ def authenticate_nodata(query):
     section should be signed and validated, an SOA should be present,
     and at least one NSEC or NSEC3 record should deny the existence
     of the rrtype at the query name.
+    For NSEC3, if routine NODATA proof fails, attempt wildcard NODATA
+    proof.
     """
 
     rrset_dict, _ = get_rrset_dict(query.response.authority)
+    nsec3_set = []
 
     authenticated = False
     seen_soa = False
+
     for (rrname, rrtype) in rrset_dict:
         srrset = rrset_dict[(rrname, rrtype)]
         validate_rrset(srrset, query)
         if rrtype == dns.rdatatype.SOA:
             seen_soa = True
         elif rrtype == dns.rdatatype.NSEC:
-            if query.qname != rrname:
+            wildcard = srrset.wildcard()
+            if wildcard is not None:
+                if wildcard != rrname:
+                    continue
+            elif query.qname != rrname:
                 continue
-            if not type_in_bitmap(query.qtype, srrset.rrset[0]):
+            if (not type_in_bitmap(query.qtype, srrset.rrset[0]) and
+                not type_in_bitmap(dns.rdatatype.CNAME, srrset.rrset[0])):
                 authenticated = True
         elif rrtype == dns.rdatatype.NSEC3:
             nsec3 = srrset.rrset
             nsec3_rdata = srrset.rrset[0]
             signer = srrset.rrsig[0].signer
             optout = nsec3_rdata.flags & 0x1
+            nsec3_set.append(nsec3)
             hashed_owner = get_hashed_owner(query.qname, signer, nsec3[0])
             if optout and nsec3_covers_name(nsec3, hashed_owner, signer):
                 authenticated = True
@@ -457,11 +470,18 @@ def authenticate_nodata(query):
                 continue
             if hashed_owner != rrname:
                 continue
-            if not type_in_bitmap(query.qtype, nsec3_rdata):
+            if (not type_in_bitmap(query.qtype, nsec3_rdata) and
+                not type_in_bitmap(dns.rdatatype.CNAME, nsec3_rdata)):
                 authenticated = True
                 if Prefs.VERBOSE and not query.quiet:
                     print("# INFO: H({}) = {}".format(
                         query.qname, hashed_owner))
+
+    if not authenticated and nsec3_set:
+        wildcard = nsec3_wildcard_nodata_proof(query, signer, nsec3_set)
+        authenticated = True
+        if Prefs.VERBOSE and not query.quiet:
+            print("# INFO: wildcard NODATA for {}".format(wildcard))
 
     if not seen_soa:
         raise ResError("NODATA response failed to include SOA RRset.")
