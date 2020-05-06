@@ -288,7 +288,7 @@ def get_rrset_dict(section):
     return rrset_dict, found_sigs
 
 
-def get_ns_ds_dnskey(zonename):
+def get_ns_ds_dnskey(zonename, referring_query=None):
     """Get NS/DS/DNSKEY for zone"""
 
     if Prefs.VERBOSE:
@@ -300,7 +300,9 @@ def get_ns_ds_dnskey(zonename):
         raise ResError("DS RRset {} failed to authenticate: {}".format(
             zonename, ds_failed))
     zone.install_ds_rrset(ds_rrset)
-    match_ds(zone)
+    if Prefs.VERBOSE:
+        zone.print_details()
+    match_ds(zone, referring_query=referring_query)
     return
 
 
@@ -333,12 +335,18 @@ def validate_wildcard(srrset, query):
             nsec = srrset.rrset
             if nsec_covers_name(nsec, next_closer):
                 authenticated = True
+                if Prefs.VERBOSE and not query.quiet:
+                    print("# INFO: NSEC no closer: {}".format(nsec))
         elif rrtype == dns.rdatatype.NSEC3:
             nsec3 = srrset.rrset
             signer = srrset.rrsig[0].signer
             hashed_next = get_hashed_owner(next_closer, signer, nsec3[0])
             if nsec3_covers_name(nsec3, hashed_next, signer):
                 authenticated = True
+                if Prefs.VERBOSE and not query.quiet:
+                    print("# INFO next closer: {} {}".format(
+                        next_closer, hashed_next.labels[0].decode()))
+                    print("# INFO: NSEC3: {}".format(nsec3))
 
     if not authenticated:
         raise ResError("Failed wildcard no closer match proof: {}".format(
@@ -359,7 +367,7 @@ def validate_rrset(srrset, query, silent=False):
 
     signer = srrset.rrsig[0].signer
     if not key_cache.has_key(signer):
-        get_ns_ds_dnskey(signer)
+        get_ns_ds_dnskey(signer, referring_query=query)
 
     verified, failed = validate_all(srrset.rrset, srrset.rrsig)
     if not verified:
@@ -478,7 +486,11 @@ def authenticate_nodata(query):
                         query.qname, hashed_owner))
 
     if not authenticated and nsec3_set:
-        wildcard = nsec3_wildcard_nodata_proof(query, signer, nsec3_set)
+        wildcard = nsec3_wildcard_nodata_proof(query.qname,
+                                               query.qtype,
+                                               signer,
+                                               nsec3_set,
+                                               quiet=query.quiet)
         authenticated = True
         if Prefs.VERBOSE and not query.quiet:
             print("# INFO: wildcard NODATA for {}".format(wildcard))

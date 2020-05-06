@@ -602,6 +602,9 @@ def nsec3_nxdomain_proof(qname, signer, nsec3_list, optout=False, quiet=False):
                     " provable" if optout else "",
                     closest_encloser, hashed_ce.labels[0].decode()))
         if nsec3_covers_name(nsec3, hashed_nc, signer):
+            if optout:
+                if not (nsec3[0].flags & 0x1):
+                    continue
             next_closer_cover = True
             if Prefs.VERBOSE and not quiet:
                 print("# INFO: next closer: {} {}".format(
@@ -613,11 +616,11 @@ def nsec3_nxdomain_proof(qname, signer, nsec3_list, optout=False, quiet=False):
                     wildcard, hashed_wild.labels[0].decode()))
 
     if not (closest_encloser_match and next_closer_cover and wildcard_cover):
-        raise ResError("{} NSEC3 NXDOMAIN proof did not succeed.".format(
+        raise ResError("{} NSEC3 NXDOMAIN proof failed.".format(
             qname))
 
 
-def nsec3_wildcard_nodata_proof(query, signer, nsec3_list):
+def nsec3_wildcard_nodata_proof(qname, qtype, signer, nsec3_list, quiet=False):
     """
     NSEC3 wildcard NODATA proof for given qname, zone, and NSEC3 list.
 
@@ -635,7 +638,7 @@ def nsec3_wildcard_nodata_proof(query, signer, nsec3_list):
     wildcard_match = False
 
     closest_encloser, _ = nsec3_closest_encloser_and_next(
-        query.qname, signer, nsec3_list)
+        qname, signer, nsec3_list)
     wildcard = dns.name.Name(('*',) + closest_encloser.labels)
 
     for nsec3 in nsec3_list:
@@ -643,20 +646,20 @@ def nsec3_wildcard_nodata_proof(query, signer, nsec3_list):
         hashed_wild = nsec3hashname_from_record(wildcard, nsec3, signer)
         if nsec3.name == hashed_ce:
             closest_encloser_match = True
-            if Prefs.VERBOSE and not query.quiet:
+            if Prefs.VERBOSE and not quiet:
                 print("# INFO: closest encloser: {} {}".format(
                     closest_encloser, hashed_ce.labels[0].decode()))
         if nsec3.name == hashed_wild:
-            if (not type_in_bitmap(query.qtype, nsec3[0]) and
+            if (not type_in_bitmap(qtype, nsec3[0]) and
                 not type_in_bitmap(dns.rdatatype.CNAME, nsec3[0])):
                 wildcard_match = True
-                if Prefs.VERBOSE and not query.quiet:
+                if Prefs.VERBOSE and not quiet:
                     print("# INFO: wildcard: {} {}".format(
                         wildcard, hashed_wild.labels[0].decode()))
 
     if not (closest_encloser_match and wildcard_match):
         raise ResError("{} NSEC3 Wildcard NODATA proof failed.".format(
-            query.qname))
+            qname))
     return wildcard
 
 
