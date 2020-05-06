@@ -68,7 +68,7 @@ def get_ns_addrs(zone, additional):
     return
 
 
-def install_zone_in_cache(zonename, ns_rrset, ds_rrset, additional):
+def install_zone_in_cache(zonename, ns_srrset, ds_srrset, additional):
     """
     Install zone entry and associated info in global cache. Return
     zone object.
@@ -76,11 +76,11 @@ def install_zone_in_cache(zonename, ns_rrset, ds_rrset, additional):
     zone = cache.get_zone(zonename)
     if zone is None:
         zone = Zone(zonename, cache)
-        zone.install_ns_rrset_ttl(ns_rrset.ttl)
-        for rr in ns_rrset:
+        zone.install_ns_rrset_ttl(ns_srrset.rrset.ttl)
+        for rr in ns_srrset.rrset:
             _ = zone.install_ns(rr.target)
-        if ds_rrset:
-            zone.install_ds_rrset(ds_rrset)
+        if ds_srrset:
+            zone.install_ds_rrset(ds_srrset.rrset)
     get_ns_addrs(zone, additional)
     return zone
 
@@ -130,13 +130,13 @@ def authenticate_insecure_referral(query, zonename):
             zonename))
 
 
-def print_referral_trace(query, zonename, has_ds=False):
+def print_referral_trace(query, zonename, ds_srrset):
     """
     Print Referral trace: {secure/insecure, zone, response time}
     """
     if vprint_quiet(query):
         if Prefs.DNSSEC:
-            ref_prefix = "SECURE " if has_ds else "INSECURE "
+            ref_prefix = "SECURE " if ds_srrset else "INSECURE "
         else:
             ref_prefix = None
         print("#        [{}Referral to zone: {} in {:.3f} s]".format(
@@ -153,40 +153,33 @@ def process_referral(query):
     addresses, and if present, DS RRset data.
     """
 
-    ns_rrset = ds_rrset = ds_rrsigs = None
+    ns_srrset = ds_srrset = None
 
-    for rrset in query.response.authority:
-        if rrset.rdtype == dns.rdatatype.NS:
-            if ns_rrset is None:
-                ns_rrset = rrset
+    rrset_dict, _ = get_rrset_dict(query.response.authority)
+
+    for (rrname, rrtype) in rrset_dict:
+        srrset = rrset_dict[(rrname, rrtype)]
+        if rrtype != dns.rdatatype.NS:
+            validate_rrset(srrset, query, silent=True)
+        if rrtype == dns.rdatatype.NS:
+            if ns_srrset is None:
+                ns_srrset = srrset
             else:
                 raise ResError("Multiple NS RRset found in referral")
-        elif rrset.rdtype == dns.rdatatype.DS:
-            if ds_rrset is None:
-                ds_rrset = rrset
+        elif rrtype == dns.rdatatype.DS:
+            if ds_srrset is None:
+                ds_srrset = srrset
             else:
                 raise ResError("Multiple DS RRset found in referral")
-        elif rrset.rdtype == dns.rdatatype.RRSIG:
-            if rrset.covers == dns.rdatatype.DS:
-                if ds_rrsigs is None:
-                    ds_rrsigs = rrset
-                else:
-                    raise ResError("Multiple DS RRSIG sets found in referral")
 
-    if ns_rrset is None:
+    if ns_srrset is None:
         raise ResError("Unable to find NS RRset in referral response")
 
-    zonename = ns_rrset.name
+    zonename = ns_srrset.rrname
     if key_cache.SecureSoFar:
-        if ds_rrset:
-            if zonename != ds_rrset.name:
+        if ds_srrset:
+            if zonename != ds_srrset.rrname:
                 raise ResError("DS didn't match NS in referral message")
-            if ds_rrsigs is None:
-                raise ResError("DS RRset has no signatures")
-            ds_verified, ds_failed = validate_all(ds_rrset, ds_rrsigs)
-            if not ds_verified:
-                raise ResError("DS RRset {} failed to authenticate: {}".format(
-                    zonename, ds_failed))
         else:
             authenticate_insecure_referral(query, zonename)
             if not query.is_nsquery:
@@ -195,9 +188,11 @@ def process_referral(query):
         if not query.is_nsquery:
             key_cache.SecureSoFar = False
 
-    print_referral_trace(query, zonename, ds_rrset)
+    print_referral_trace(query, zonename, ds_srrset)
 
-    zone = install_zone_in_cache(zonename, ns_rrset, ds_rrset,
+    zone = install_zone_in_cache(zonename,
+                                 ns_srrset,
+                                 ds_srrset,
                                  query.response.additional)
     if vprint_quiet(query):
         zone.print_details()
