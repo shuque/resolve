@@ -285,7 +285,11 @@ def get_rrset_dict(section):
 
 
 def get_ns_ds_dnskey(zonename, referring_query=None):
-    """Get NS/DS/DNSKEY for zone"""
+    """
+    Get NS/DS/DNSKEY for zone. This routine is usually invoked when
+    the iterative resolution path encounters a signature with an unknown
+    signer.
+    """
 
     if Prefs.VERBOSE and not referring_query.is_nsquery:
         print("# FETCH: NS/DS/DNSKEY for {}".format(zonename))
@@ -523,8 +527,9 @@ def find_insecure_referral(query):
             continue
         ds_rrset, ds_rrsigs = fetch_ds(zonename)
         if ds_rrset is None:
-            print("# INFO: found INSECURE Referral to {}".format(zonename))
             key_cache.SecureSoFar = False
+            print("# INFO: found INSECURE Referral to {}".format(zonename))
+            zone.print_details()
             return
         ds_verified, ds_failed = validate_all(ds_rrset, ds_rrsigs)
         if not ds_verified:
@@ -783,6 +788,7 @@ def get_zone(zonename):
     qclass = dns.rdataclass.from_text('IN')
     query = Query(zonename, qtype, qclass, is_nsquery=True)
     query.set_quiet(True)
+
     _ = send_query_zone(query, cache.closest_zone(query.qname))
     msg = query.response
 
@@ -937,6 +943,9 @@ def match_ds_zone(zone, referring_query=None):
             key_cache.install(zone.name, keylist)
             authenticated = True
             break
+
+        print("ERROR: DS did not match DNSKEY: {} at {}".format(
+            zone.name, nsaddr.addr))
 
     if not authenticated:
         if referring_query and Prefs.VERBOSE and not referring_query.quiet:
