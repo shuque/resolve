@@ -28,10 +28,7 @@ CLOCK_SKEW = 300
 
 # DNSSEC algorithm number -> name
 ALG = {
-    1: "RSAMD5",
-    2: "DSA",
     5: "RSASHA1",
-    6: "NSEC3-DSA",
     7: "NSEC3-RSASHA1",
     8: "RSASHA256",
     10: "RSASHA512",
@@ -39,7 +36,6 @@ ALG = {
     13: "ECDSA-P256",
     14: "ECDSA-P384",
     15: "ED25519",
-    16: "ED448",
 }
 
 # DNSSEC algorithm -> hash function
@@ -59,6 +55,21 @@ DS_ALG = {
     2: SHA256,
     4: SHA384,
 }
+
+
+def supported_algorithm_present(rdataset):
+    """
+    Does given DS or DNSKEY rdataset have at least one algorithm that
+    we support?
+    """
+
+    alglist = ALG.keys()
+
+    for rdata in rdataset:
+        if rdata.algorithm in alglist:
+            return True
+    else:
+        return False
 
 
 class KeyCache:
@@ -116,7 +127,8 @@ class DNSKEY:
         self.rawkey = rr.key
         self.keytag = dns.dnssec.key_id(rr)
         self.sep_flag = (self.flags & 0x01) == 0x01
-        self.revoke_flag = (self.flags >> 7 & 0x01) == 0x01
+        self.zone_flag = (self.flags & 0x0100) == 0x0100
+        self.revoke_flag = (self.flags & 0x0080) == 0x0080
         if self.algorithm in [5, 7, 8, 10]:
             self.key = keydata_to_rsa(rr.key)
         elif self.algorithm in [13, 14]:
@@ -135,6 +147,8 @@ class DNSKEY:
 
     def __repr__(self):
         flags_text = ''
+        if self.zone_flag:
+            flags_text += " ZONE"
         if self.sep_flag:
             flags_text += " SEP"
         if self.revoke_flag:

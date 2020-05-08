@@ -3,7 +3,6 @@ Main suite of functions to perform iterative DNS resolution.
 
 """
 
-import sys
 import time
 
 import dns.message
@@ -24,7 +23,8 @@ from reslib.dnssec import (key_cache, load_keys, validate_all,
                            type_in_bitmap, get_hashed_owner,
                            nsec_covers_name, nsec3_covers_name,
                            nsec_nxdomain_proof, nsec3_nxdomain_proof,
-                           nsec3_wildcard_nodata_proof)
+                           nsec3_wildcard_nodata_proof,
+                           supported_algorithm_present)
 
 
 def get_ns_addrs(zone, additional):
@@ -176,7 +176,7 @@ def process_referral(query):
         raise ResError("Unable to find NS RRset in referral response")
 
     zonename = ns_srrset.rrname
-    if key_cache.SecureSoFar:
+    if key_cache.SecureSoFar and not query.is_nsquery:
         if ds_srrset:
             if zonename != ds_srrset.rrname:
                 raise ResError("DS didn't match NS in referral message")
@@ -194,7 +194,8 @@ def process_referral(query):
                                  ns_srrset,
                                  ds_srrset,
                                  query.response.additional)
-    if vprint_quiet(query):
+
+    if vprint_quiet(query) and not query.is_nsquery:
         zone.print_details()
 
     return zone
@@ -286,7 +287,7 @@ def get_rrset_dict(section):
 def get_ns_ds_dnskey(zonename, referring_query=None):
     """Get NS/DS/DNSKEY for zone"""
 
-    if Prefs.VERBOSE:
+    if Prefs.VERBOSE and not referring_query.is_nsquery:
         print("# FETCH: NS/DS/DNSKEY for {}".format(zonename))
     zone = get_zone(zonename)
     ds_rrset, ds_rrsigs = fetch_ds(zonename)
@@ -295,9 +296,9 @@ def get_ns_ds_dnskey(zonename, referring_query=None):
         raise ResError("DS RRset {} failed to authenticate: {}".format(
             zonename, ds_failed))
     zone.install_ds_rrset(ds_rrset)
-    if Prefs.VERBOSE:
+    if Prefs.VERBOSE and not referring_query.is_nsquery:
         zone.print_details()
-    match_ds(zone, referring_query=referring_query)
+    match_ds_zone(zone, referring_query=referring_query)
     return
 
 
@@ -530,7 +531,7 @@ def find_insecure_referral(query):
             raise ResError("DS RRset {} failed to authenticate: {}".format(
                 zonename, ds_failed))
         zone.install_ds_rrset(ds_rrset)
-        match_ds(zone)
+        match_ds_zone(zone)
     raise ValueError("Can't find insecure referral, yet response is unsigned.")
 
 
@@ -680,10 +681,9 @@ def send_query_zone(query, zone, addResults=None):
     """Send DNS query to nameservers of given zone"""
 
     msg = make_query_message(query)
-    nsaddr_list = get_zone_addresses(zone)
     time_start = time.time()
 
-    for nsaddr in nsaddr_list:
+    for nsaddr in get_zone_addresses(zone):
         check_query_count_limit()
         print_query_trace(query, zone, nsaddr.addr)
         response = None
@@ -709,9 +709,11 @@ def send_query_zone(query, zone, addResults=None):
             print("WARNING: {} error {}".format(nsaddr.addr, e))
             continue
 
-    print("\nERROR: Queries to all servers for zone {} failed.".format(
+    raise ResError("Queries to all servers for zone {} failed.".format(
         zone.name))
-    sys.exit(-1)
+    #print("\nERROR: Queries to all servers for zone {} failed.".format(
+    #    zone.name))
+    #sys.exit(-1)
 
 
 def resolve_name(query, zone, addResults=None):
@@ -754,7 +756,7 @@ def resolve_name(query, zone, addResults=None):
             curr_zone = referral
             if Prefs.DNSSEC:
                 if curr_zone.dslist:
-                    match_ds(curr_zone, referring_query=query)
+                    match_ds_zone(curr_zone, referring_query=query)
                 else:
                     if Prefs.VERBOSE and not query.quiet:
                         check_isolated_dnskey(curr_zone)
@@ -859,7 +861,19 @@ def check_isolated_dnskey(zone):
         print(key)
 
 
-def match_ds(zone, referring_query=None):
+def match_ds_ksklist(ds_rdatalist, ksk_list):
+    """
+    Match DS rdataset to given KSK list. Returns True if any of them match.
+    """
+    for key in ksk_list:
+        if not key.zone_flag:
+            continue
+        if ds_rrset_matches_dnskey(ds_rdatalist, key):
+            return True
+    return False
+
+
+def match_ds_zone(zone, referring_query=None):
     """
     DS (Delegation Signer) processing: Authenticate the secure delegation
     to the zone, by fetching its DNSKEY RRset, authenticating the self
@@ -867,31 +881,74 @@ def match_ds(zone, referring_query=None):
     (previously authenticated) DS data in the zone object.
     """
 
-    dnskey_rrset, dnskey_rrsigs = fetch_dnskey(zone)
-    if dnskey_rrsigs is None:
-        raise ResError("No signatures found for {} DNSKEY set.".format(
-            zone))
+    if not supported_algorithm_present(zone.dslist):
+        raise ResError("No supported algorithms in DS set found")
 
-    try:
-        keylist, sigkeys = check_self_signature(dnskey_rrset, dnskey_rrsigs)
-    except ResError as e:
-        print("\nERROR: DNSKEY did not validate: {}".format(e))
-        sys.exit(1)
+    qname = zone.name
+    qtype = dns.rdatatype.from_text('DNSKEY')
+    qclass = dns.rdataclass.from_text('IN')
+    query = Query(qname, qtype, qclass)
+    query.set_quiet(True)
+    query.dnskey_novalidate = True
+    msg = make_query_message(query)
+
+    authenticated = False
+
+    keylist = None
+
+    for nsaddr in get_zone_addresses(zone):
+        check_query_count_limit()
+        response = None
+        try:
+            response = send_query(msg, nsaddr, query, newid=True)
+        except OSError as e:
+            print("OSError {}: {}: {}".format(e.errno,
+                                              e.strerror,
+                                              nsaddr.addr))
+            continue
+        if not response:
+            print("WARNING: no {} DNSKEY response from {}".format(qname,
+                                                                  nsaddr))
+            continue
+        if response.rcode() not in [dns.rcode.NOERROR, dns.rcode.NXDOMAIN]:
+            stats.cnt_fail += 1
+            print("WARNING: response {} from {}".format(
+                dns.rcode.to_text(response.rcode()), nsaddr.addr))
+            continue
+        dnskey_rrset = response.get_rrset(response.answer,
+                                          qname, qclass, qtype)
+        dnskey_rrsigs = response.get_rrset(response.answer,
+                                           qname, qclass, dns.rdatatype.RRSIG,
+                                           covers=qtype)
+        if dnskey_rrsigs is None:
+            print("ERROR: No signatures for {} DNSKEY RRset at {}".format(
+                zone.name, nsaddr.addr))
+            continue
+
+        try:
+            keylist, sigkeys = check_self_signature(dnskey_rrset,
+                                                    dnskey_rrsigs)
+        except ResError as e:
+            print("ERROR: DNSKEY did not validate: {}".format(e))
+            continue
+
+        if match_ds_ksklist(zone.dslist, sigkeys):
+            zone.set_secure(True)
+            key_cache.install(zone.name, keylist)
+            authenticated = True
+            break
+
+    if not authenticated:
+        if referring_query and Prefs.VERBOSE and not referring_query.quiet:
+            if keylist:
+                print('')
+                for key in keylist:
+                    print(key)
+        raise ResError("DS did not match DNSKEY for {}".format(zone.name))
 
     if referring_query and Prefs.VERBOSE and not referring_query.quiet:
         for key in keylist:
             print(key)
-
-    for key in sigkeys:
-        if not key.sep_flag:
-            continue
-        if ds_rrset_matches_dnskey(zone.dslist, key):
-            zone.set_secure(True)
-            key_cache.install(zone.name, keylist)
-            return True
-
-    print("\nERROR: DS did not match DNSKEY for {}".format(zone.name))
-    sys.exit(-1)
 
 
 def fetch_dnskey(zone):
@@ -912,7 +969,8 @@ def fetch_dnskey(zone):
     dnskey_rrsigs = msg.get_rrset(msg.answer, qname, qclass,
                                   dns.rdatatype.RRSIG, covers=qtype)
     if dnskey_rrsigs is None:
-        raise ResError("No signatures found for root DNSKEY set!")
+        raise ResError("No signatures found for {} DNSKEY set".format(
+            zone.name))
     return dnskey_rrset, dnskey_rrsigs
 
 

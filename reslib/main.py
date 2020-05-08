@@ -8,6 +8,7 @@ import sys
 import time
 import random
 
+from reslib.exception import ResError
 from reslib.common import Prefs, stats, cache, RootZone
 from reslib.options import process_args
 from reslib.query import Query
@@ -46,7 +47,13 @@ def main():
     time_start = time.time()
     if Prefs.VERBOSE:
         print_root_zone()
-    resolve_name(query, RootZone, addResults=query)
+
+    try:
+        resolve_name(query, RootZone, addResults=query)
+    except ResError as e:
+        print("\nERROR:", e)
+        sys.exit(255)
+
     stats.elapsed = time.time() - time_start
 
     if Prefs.VERBOSE and not query.quiet:

@@ -9,14 +9,10 @@ from reslib.common import Prefs, stats
 
 
 def vprint_quiet(query):
+    """Is verbose flag > 1 or is it set and query does not have quiet flag?"""
     if Prefs.VERBOSE > 1:
         return True
-    else:
-        return Prefs.VERBOSE and not query.quiet
-
-
-def vprint(query):
-    return Prefs.VERBOSE
+    return Prefs.VERBOSE and not query.quiet
 
 
 def is_authoritative(msg):
@@ -76,7 +72,8 @@ def send_query(msg, nsaddr, query,
     res = send_query_udp(msg, nsaddr, query,
                          timeout=timeout, retries=retries)
     if res and is_truncated(res):
-        print("WARN: response was truncated; retrying with TCP ..")
+        print("WARN: response from {} was truncated; retrying with TCP".format(
+            nsaddr.addr))
         stats.cnt_tcp_fallback += 1
         res = send_query_tcp(msg, nsaddr, query)
     return res
