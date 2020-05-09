@@ -675,7 +675,7 @@ def check_query_count_limit():
 
 def get_zone_addresses(zone):
     """Return list of nameserver addresses for zone"""
-    result = zone.iplist_sorted_by_rtt()
+    result = zone.iplist_shuffled()
     if not result:
         raise ResError("No nameserver addresses found for zone: {}.".format(
             zone.name))

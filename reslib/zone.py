@@ -3,7 +3,9 @@ Zone class
 """
 
 from binascii import hexlify
+from random import shuffle
 from reslib.nameserver import NameServer
+
 
 class Zone:
     """Zone class"""
@@ -49,6 +51,12 @@ class Zone:
         for ns in self.nslist:
             result += self.cache.get_ns(ns).iplist
         return result
+
+    def iplist_shuffled(self):
+        """Return IP list randomly shuffled"""
+        iplist = self.iplist()
+        shuffle(iplist)
+        return iplist
 
     def iplist_sorted_by_rtt(self):
         """Return IP list sorted by observed RTT"""
