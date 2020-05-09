@@ -23,6 +23,7 @@ class Prefs:
     MAX_CNAME = 15                   # Max #CNAME indirections
     MAX_QUERY = 600                  # Max number of queries
     MAX_DELEG = 200                  # Max number of delegations
+    N3_HASHLIMIT = 512               # Upper bound for NSEC3 hash iterations
 
 
 class Stats:

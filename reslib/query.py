@@ -8,7 +8,7 @@ import dns.rdataclass
 
 from reslib.common import Prefs
 from reslib.exception import ResError
-from reslib.dnssec import key_cache
+from reslib.dnssec import key_cache, sig_validity
 
 
 class Query:
@@ -81,6 +81,16 @@ class Query:
         if self.full_answer_rrset:
             for x in self.full_answer_rrset:
                 print(x.rrset.to_text())
+                if Prefs.DNSSEC and Prefs.VERBOSE > 1:
+                    if x.rrsig is not None:
+                        for sig_rr in x.rrsig:
+                            print("{} {} {} {} {} # validity={}".format(
+                                x.rrsig.name,
+                                x.rrsig.ttl,
+                                dns.rdataclass.to_text(x.rrsig.rdclass),
+                                dns.rdatatype.to_text(x.rrsig.rdtype),
+                                sig_rr,
+                                sig_validity(sig_rr)))
 
         if self.response.rcode() == 0 and self.nodata:
             print("# NODATA: {} of type {} not found".format(

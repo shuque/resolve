@@ -68,8 +68,7 @@ def supported_algorithm_present(rdataset):
     for rdata in rdataset:
         if rdata.algorithm in alglist:
             return True
-    else:
-        return False
+    return False
 
 
 class KeyCache:
@@ -200,6 +199,18 @@ class Signature:
         return "<Signature: {}/{}/{} {} {}>".format(
             self.rrset.name, self.rrset.rdtype, self.rrset.rdclass,
             self.rdata.key_tag, self.rdata.algorithm)
+
+
+def sig_validity(sig_rr):
+    """
+    Return length of signature validity period for given RRSIG RR.
+    """
+    duration = sig_rr.expiration - sig_rr.inception
+    days, remainder = divmod(duration, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, remainder = divmod(remainder, 60)
+    seconds, remainder = divmod(remainder, 60)
+    return "{}d{}h{}m{}s".format(days, hours, minutes, seconds)
 
 
 def get_root_key():
@@ -427,6 +438,10 @@ def nsec3hash(name, algnum, salt, iterations, binary_out=False):
 
     if iterations < 0:
         raise ResError("NSEC3 hash iterations must be >= 0")
+    if iterations > Prefs.N3_HASHLIMIT:
+        raise ResError("NSEC3 hash iterations too high: {} {}".format(
+            name, iterations))
+
     hashfunc = nsec3_hashalg(algnum)
     digest = name.to_digestable()
     while iterations >= 0:
@@ -617,7 +632,7 @@ def nsec3_nxdomain_proof(qname, signer, nsec3_list, optout=False, quiet=False):
                     closest_encloser, hashed_ce.labels[0].decode()))
         if nsec3_covers_name(nsec3, hashed_nc, signer):
             if optout:
-                if not (nsec3[0].flags & 0x1):
+                if not nsec3[0].flags & 0x1:
                     continue
             next_closer_cover = True
             if Prefs.VERBOSE and not quiet:

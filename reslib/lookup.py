@@ -543,9 +543,9 @@ def find_insecure_referral(query):
 def check_signature(query, srrset, found_sigs=False):
     """
     Check signatures if needed. If SecureSoFar is true (i.e. we were
-    expecting signatures) and no signatures are present, then search
-    down from closest enclosing secure zone until we find an authenticated
-    insecure referral, otherwise raise an exception.
+    expecting signatures) and no signatures are present, then call
+    function to find an insecure referral above us. Otherwise validate
+    the signature.
     """
     if not key_cache.SecureSoFar:
         return
