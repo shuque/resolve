@@ -11,7 +11,9 @@ import dns.rdatatype
 import dns.rcode
 import dns.dnssec
 
-from reslib.common import Prefs, cache, stats, RootZone
+from reslib.prefs import Prefs
+from reslib.cache import cache, RootZone
+from reslib.stats import stats
 from reslib.exception import ResError
 from reslib.zone import Zone
 from reslib.query import Query

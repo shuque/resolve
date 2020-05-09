@@ -1,29 +1,6 @@
 """
-Common globals for the package.
+stats class.
 """
-
-from reslib.cache import Cache, get_root_zone
-
-
-class Prefs:
-    """Preferences"""
-    MINIMIZE = False                 # -m: Do qname minimization?
-    TCPONLY = False                  # -t: Use TCP only
-    VERBOSE = 0                      # -v N: Verbosity level (0 default; 1/2)
-    VIOLATE = False                  # -x: ENT nxdomain workaround
-    STATS = False                    # -s: Print statistics
-    NSRESOLVE = False                # -n: Resolve all NS addresses
-    PAYLOAD = 1460                   # -e: no EDNS; set to None
-    DNSSEC = False                   # -z: use DNSSEC
-    DUMPCACHE = False                # -c: dump zone/ns/key caches
-    BATCHFILE = None                 # -b: batch file mode
-    TIMEOUT = 3                      # Query timeout in seconds
-    RETRIES = 2                      # Number of retries per server
-    RETRY = 1                        # of full list (not implemented yet)
-    MAX_CNAME = 15                   # Max #CNAME indirections
-    MAX_QUERY = 600                  # Max number of queries
-    MAX_DELEG = 200                  # Max number of delegations
-    N3_HASHLIMIT = 512               # Upper bound for NSEC3 hash iterations
 
 
 class Stats:
@@ -71,7 +48,3 @@ class Stats:
 
 # Global statistics object
 stats = Stats()
-
-# Global cache and root zone object
-cache = Cache()
-RootZone = get_root_zone(cache)

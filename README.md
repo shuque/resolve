@@ -65,6 +65,8 @@ Perform iterative resolution of a DNS name, type, and class.
      -eN: use EDNS0 buffer size N (default: 1460; 0=disable EDNS)
      -z: use DNSSEC (default is no; work in progress)
      -c: dump zone/ns/key caches at end of program execution
+     -4: only use IPv4 transport
+     -6: only use IPv6 transport
      -b <batchfile>: batch file mode
 
 When using -b, <batchfile> contains one (space separated) query name, type,

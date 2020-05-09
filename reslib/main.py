@@ -9,7 +9,9 @@ import time
 import random
 
 from reslib.exception import ResError
-from reslib.common import Prefs, stats, cache, RootZone
+from reslib.prefs import Prefs
+from reslib.cache import cache, RootZone
+from reslib.stats import stats
 from reslib.options import process_args
 from reslib.query import Query
 from reslib.dnssec import key_cache

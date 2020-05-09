@@ -6,7 +6,7 @@ import dns.name
 import dns.rdatatype
 import dns.rdataclass
 
-from reslib.common import Prefs
+from reslib.prefs import Prefs
 from reslib.exception import ResError
 from reslib.dnssec import key_cache, sig_validity
 

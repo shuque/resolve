@@ -5,7 +5,8 @@ Miscellaneous helper functions.
 import time
 import random
 import dns.resolver
-from reslib.common import Prefs, stats
+from reslib.prefs import Prefs
+from reslib.stats import stats
 
 
 def vprint_quiet(query):

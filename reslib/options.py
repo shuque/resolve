@@ -5,7 +5,7 @@ Command line option processing.
 
 import getopt
 
-from reslib.common import Prefs
+from reslib.prefs import Prefs
 from reslib.usage import usage
 
 
@@ -13,7 +13,7 @@ def process_args(arguments):
     """Process all command line arguments"""
 
     try:
-        (options, args) = getopt.getopt(arguments, 'mtvsnxe:zcb:')
+        (options, args) = getopt.getopt(arguments, 'mtvsnxe:zc46b:')
     except getopt.GetoptError:
         usage()
 
@@ -38,9 +38,16 @@ def process_args(arguments):
             Prefs.DUMPCACHE = True
         elif opt == "-b":
             Prefs.BATCHFILE = optval
+        elif opt == "-4":
+            Prefs.V4_ONLY = True
+        elif opt == "-6":
+            Prefs.V6_ONLY = True
 
     if (Prefs.PAYLOAD == 0) and Prefs.DNSSEC:
-        usage("Error: DNSSEC (-z) requires EDNS (non zero -e)")
+        usage("ERROR: DNSSEC (-z) requires EDNS (non zero -e)")
+
+    if Prefs.V4_ONLY and Prefs.V6_ONLY:
+        usage("ERROR: -4 (IPv4 only) & -6 (IPv6 only) are mutually exclusive")
 
     if Prefs.BATCHFILE:
         if not args:

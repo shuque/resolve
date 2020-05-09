@@ -32,19 +32,23 @@ class Cache:
         self.NSDict = {}                 # dns.name.Name -> NameServer
 
     def get_zone(self, zonename):
+        """Get zone object for given zone name"""
         if zonename in self.ZoneDict:
             return self.ZoneDict[zonename]
         return None
 
     def get_ns(self, nsname):
+        """Get NS object for given nameserver name """
         if nsname in self.NSDict:
             return self.NSDict[nsname]
         return None
 
     def install_ns(self, nsname, nsobj):
+        """Install nameserver object"""
         self.NSDict[nsname] = nsobj
 
     def install_zone(self, zonename, zoneobj):
+        """Install zone object"""
         self.ZoneDict[zonename] = zoneobj
 
     def closest_zone(self, name):
@@ -73,3 +77,8 @@ class Cache:
             ipstring_list = " ".join([x.addr for x in nsobj.iplist])
             print("{} {}".format(nsname, ipstring_list))
         print("#### END: Nameserver Cache dump")
+
+
+# Global cache and root zone object
+cache = Cache()
+RootZone = get_root_zone(cache)

@@ -2,7 +2,8 @@
 batch mode operation.
 """
 
-from reslib.common import Prefs, RootZone
+from reslib.prefs import Prefs
+from reslib.cache import RootZone
 from reslib.query import Query
 from reslib.lookup import resolve_name, print_root_zone
 

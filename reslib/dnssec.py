@@ -18,7 +18,7 @@ from Crypto.Hash import SHA1, SHA256, SHA384, SHA512
 import nacl.encoding
 import nacl.signing
 
-from reslib.common import Prefs
+from reslib.prefs import Prefs
 from reslib.rootkey import RootKeyData
 from reslib.exception import ResError
 

@@ -5,6 +5,7 @@ Zone class
 from binascii import hexlify
 from random import shuffle
 from reslib.nameserver import NameServer
+from reslib.prefs import Prefs
 
 
 class Zone:
@@ -49,7 +50,12 @@ class Zone:
         """Return list of nameserver addresses"""
         result = []
         for ns in self.nslist:
-            result += self.cache.get_ns(ns).iplist
+            iplist = self.cache.get_ns(ns).iplist
+            if Prefs.V6_ONLY:
+                iplist = [i for i in iplist if i.addr.find(':') != -1]
+            elif Prefs.V4_ONLY:
+                iplist = [i for i in iplist if i.addr.find(':') == -1]
+            result += iplist
         return result
 
     def iplist_shuffled(self):
