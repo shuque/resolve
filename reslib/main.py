@@ -54,7 +54,7 @@ def main():
         resolve_name(query, RootZone, addResults=query)
     except ResError as e:
         print("\nERROR:", e)
-        sys.exit(255)
+        return 255
 
     stats.elapsed = time.time() - time_start
 

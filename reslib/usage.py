@@ -28,7 +28,7 @@ Perform iterative resolution of a DNS name, type, and class.
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
      -eN: use EDNS0 buffer size N (default: {2}; 0=disable EDNS)
-     -z: use DNSSEC (default is no; work in progress)
+     -z: perform DNSSEC validation (default is no)
      -c: dump zone/ns/key caches at end
      -4: only use IPv4 transport
      -6: only use IPv6 transport

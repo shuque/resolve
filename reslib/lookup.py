@@ -104,7 +104,7 @@ def authenticate_insecure_referral(query, zonename):
         if rrtype not in (dns.rdatatype.NSEC, dns.rdatatype.NSEC3):
             continue
         srrset = rrset_dict[(rrname, rrtype)]
-        validate_rrset(srrset, query, silent=True)
+        validate_rrset(srrset, query, silent=False)
         if rrtype == dns.rdatatype.NSEC:
             if zonename != rrname:
                 continue
@@ -119,6 +119,9 @@ def authenticate_insecure_referral(query, zonename):
                 not type_in_bitmap(dns.rdatatype.DS, nsec3_rdata) and
                 not type_in_bitmap(dns.rdatatype.CNAME, nsec3_rdata)):
                 authenticated = True
+                if Prefs.VERBOSE and not query.quiet:
+                    print("# H({}) = {}".format(zonename,
+                                                hashed_owner.labels[0].decode()))
             optout = nsec3_rdata.flags & 0x1
 
     if not authenticated and optout:

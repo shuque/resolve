@@ -114,8 +114,9 @@ to an incorrect DS record in the parent zone, that does not match the DNSKEY
 RRset in the zone containing the answer.
 
 ```
-$ resolve.py -vz dnssec-failed.org. A
+$ resolve.py -vz dnssec-failed.org
 ZONE: .
+TTL: Delegation: 518400
 NS: a.root-servers.net. 198.41.0.4 2001:503:ba3e::2:30
 NS: b.root-servers.net. 199.9.14.201 2001:500:200::b
 NS: c.root-servers.net. 192.33.4.12 2001:500:2::c
@@ -129,36 +130,49 @@ NS: j.root-servers.net. 192.58.128.30 2001:503:c27::2:30
 NS: k.root-servers.net. 193.0.14.129 2001:7fd::1
 NS: l.root-servers.net. 199.7.83.42 2001:500:9f::42
 NS: m.root-servers.net. 202.12.27.33 2001:dc3::35
-DNSKEY: . 256 48903 RSASHA256 (8) 2048-bits
-DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits SEP
+DNSKEY: . 257 20326 RSASHA256 (8) 2048-bits ZONE SEP
+DNSKEY: . 256 48903 RSASHA256 (8) 2048-bits ZONE
 
-# QUERY: dnssec-failed.org. A IN at zone . address 198.41.0.4
-#        [SECURE Referral to zone: org. in 0.089 s]
+# QUERY: dnssec-failed.org. A IN at zone . address 2001:500:a8::e
+#        [SECURE Referral to zone: org. in 0.013 s]
 ZONE: org.
-NS: d0.org.afilias-nst.org. 199.19.57.1 2001:500:f::1
-NS: a0.org.afilias-nst.info. 199.19.56.1 2001:500:e::1
-NS: c0.org.afilias-nst.info. 199.19.53.1 2001:500:b::1
-NS: a2.org.afilias-nst.info. 199.249.112.1 2001:500:40::1
-NS: b0.org.afilias-nst.org. 199.19.54.1 2001:500:c::1
-NS: b2.org.afilias-nst.org. 199.249.120.1 2001:500:48::1
-DS: 17883 7 1 38c5cf93b369c7557e0515faaa57060f1bfb12c1
+TTL: Delegation: 172800, Signer: 86400
+NS: a0.org.afilias-nst.info. 2001:500:e::1 199.19.56.1
+NS: a2.org.afilias-nst.info. 2001:500:40::1 199.249.112.1
+NS: b0.org.afilias-nst.org. 2001:500:c::1 199.19.54.1
+NS: b2.org.afilias-nst.org. 2001:500:48::1 199.249.120.1
+NS: c0.org.afilias-nst.info. 2001:500:b::1 199.19.53.1
+NS: d0.org.afilias-nst.org. 2001:500:f::1 199.19.57.1
 DS: 17883 7 2 d889cad790f01979e860d6627b58f85ab554e0e491fe06515f35548d1eb4e6ee
-DNSKEY: org. 256 27074 NSEC3-RSASHA1 (7) 1024-bits
-DNSKEY: org. 257 17883 NSEC3-RSASHA1 (7) 2048-bits SEP
-DNSKEY: org. 256 37022 NSEC3-RSASHA1 (7) 1024-bits
+DS: 17883 7 1 38c5cf93b369c7557e0515faaa57060f1bfb12c1
+DNSKEY: org. 256 62165 NSEC3-RSASHA1 (7) 1024-bits ZONE
+DNSKEY: org. 256 27074 NSEC3-RSASHA1 (7) 1024-bits ZONE
+DNSKEY: org. 257 17883 NSEC3-RSASHA1 (7) 2048-bits ZONE SEP
 
-# QUERY: dnssec-failed.org. A IN at zone org. address 199.19.57.1
+# QUERY: dnssec-failed.org. A IN at zone org. address 199.19.53.1
 #        [SECURE Referral to zone: dnssec-failed.org. in 0.004 s]
 ZONE: dnssec-failed.org.
-NS: dns105.comcast.net. 2001:558:100e:5:68:87:72:244 68.87.72.244
-NS: dns102.comcast.net. 2001:558:1004:7:68:87:85:132 68.87.85.132
-NS: dns104.comcast.net. 2001:558:100a:5:68:87:68:244 68.87.68.244
-NS: dns101.comcast.net. 2001:558:fe23:8:69:252:250:103 69.252.250.103
+TTL: Delegation: 86400, Signer: 86400
 NS: dns103.comcast.net. 2001:558:1014:c:68:87:76:228 68.87.76.228
+NS: dns101.comcast.net. 2001:558:fe23:8:69:252:250:103 69.252.250.103
+NS: dns105.comcast.net. 2001:558:100e:5:68:87:72:244 68.87.72.244
+NS: dns104.comcast.net. 2001:558:100a:5:68:87:68:244 68.87.68.244
+NS: dns102.comcast.net. 2001:558:1004:7:68:87:85:132 68.87.85.132
 DS: 106 5 2 ae3424c9b171af3b202203767e5703426130d76ef6847175f2eed355f86ef1ce
 DS: 106 5 1 4f219dce274f820ea81ea1150638dabe21eb27fc
-DNSKEY: dnssec-failed.org. 256 44973 RSASHA1 (5) 1024-bits
-DNSKEY: dnssec-failed.org. 257 29521 RSASHA1 (5) 2048-bits SEP
+ERROR: DS did not match DNSKEY: dnssec-failed.org. at 68.87.68.244
+ERROR: DS did not match DNSKEY: dnssec-failed.org. at 2001:558:fe23:8:69:252:250:103
+ERROR: DS did not match DNSKEY: dnssec-failed.org. at 68.87.85.132
+ERROR: DS did not match DNSKEY: dnssec-failed.org. at 69.252.250.103
+ERROR: DS did not match DNSKEY: dnssec-failed.org. at 2001:558:100e:5:68:87:72:244
+ERROR: DS did not match DNSKEY: dnssec-failed.org. at 2001:558:100a:5:68:87:68:244
+ERROR: DS did not match DNSKEY: dnssec-failed.org. at 2001:558:1004:7:68:87:85:132
+ERROR: DS did not match DNSKEY: dnssec-failed.org. at 2001:558:1014:c:68:87:76:228
+ERROR: DS did not match DNSKEY: dnssec-failed.org. at 68.87.72.244
+ERROR: DS did not match DNSKEY: dnssec-failed.org. at 68.87.76.228
+
+DNSKEY: dnssec-failed.org. 256 44973 RSASHA1 (5) 1024-bits ZONE
+DNSKEY: dnssec-failed.org. 257 29521 RSASHA1 (5) 2048-bits ZONE SEP
 
 ERROR: DS did not match DNSKEY for dnssec-failed.org.
 ```

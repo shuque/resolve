@@ -6,7 +6,7 @@ Author: Shumon Huque
 
 A command line tool to perform iterative DNS resolution of a single
 DNS name, type, and class. If either type or class or both are omitted, 
-then a  default type of 'A' (IPv4 address record), and a default class 
+then a default type of 'A' (IPv4 address record), and a default class 
 of 'IN' (Internet class) are used.
 
 I originally wrote this program to investigate the behavior of authoritative
@@ -30,8 +30,8 @@ Pre-requisites:
 DNSSEC validation is supported. The most popular signing algorithms
 are supported (RSASHA1, RSASHA1-NSEC3-SHA1, RSASHA256, RSASHA512,
 ECDSAP256SHA256, ECDSAP384SHA384, and ED25519). Support for ED448
-(algorithm 16) will be done in the near future library once I locate
-a crypto library that supports it.
+(algorithm 16) will be done in the near future once I locate a crypto
+library that supports it.
 
 The included document, [DNSSEC.md](DNSSEC.md) has many examples of the
 use of DNSSEC with this program.
@@ -63,7 +63,7 @@ Perform iterative resolution of a DNS name, type, and class.
      -n: resolve all non-glue NS addresses in referrals
      -x: workaround NXDOMAIN on empty non-terminals
      -eN: use EDNS0 buffer size N (default: 1460; 0=disable EDNS)
-     -z: use DNSSEC (default is no; work in progress)
+     -z: perform DNSSEC validation (default is no)
      -c: dump zone/ns/key caches at end of program execution
      -4: only use IPv4 transport
      -6: only use IPv6 transport
