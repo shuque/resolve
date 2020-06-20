@@ -16,7 +16,7 @@ import dns.name
 import dns.rdatatype
 import dns.resolver
 
-from reslib.common import Prefs
+from reslib.prefs import Prefs
 from reslib.dnssec import key_cache, load_keys, validate_all
 from reslib.utils import get_rrset_from_section
 

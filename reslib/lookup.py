@@ -721,9 +721,6 @@ def send_query_zone(query, zone, addResults=None):
 
     raise ResError("Queries to all servers for zone {} failed.".format(
         zone.name))
-    #print("\nERROR: Queries to all servers for zone {} failed.".format(
-    #    zone.name))
-    #sys.exit(-1)
 
 
 def resolve_name(query, zone, addResults=None):
