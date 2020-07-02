@@ -464,8 +464,14 @@ def authenticate_nodata(query):
                 if wildcard != rrname:
                     continue
             elif query.qname != rrname:
-                continue
-            if (not type_in_bitmap(query.qtype, srrset.rrset[0]) and
+                if (nsec_covers_name(srrset.rrset, query.qname) and
+                    srrset.rrset[0].next.is_subdomain(query.qname)):
+                    authenticated = True
+                    if Prefs.VERBOSE and not query.quiet:
+                        print("# INFO: Empty Non-Terminal found")
+                else:
+                    continue
+            elif (not type_in_bitmap(query.qtype, srrset.rrset[0]) and
                 not type_in_bitmap(dns.rdatatype.CNAME, srrset.rrset[0])):
                 authenticated = True
         elif rrtype == dns.rdatatype.NSEC3:
