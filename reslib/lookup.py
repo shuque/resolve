@@ -326,7 +326,8 @@ def validate_wildcard(srrset, query):
     next_label = srrset.rrname.relativize(wildcard_base).labels[-1]
     next_closer = dns.name.Name((next_label,) + wildcard_base.labels)
     query.wildcard = wildcard
-    print("# INFO: Wildcard match: {}".format(wildcard))
+    if Prefs.VERBOSE and not query.quiet:
+        print("# INFO: Wildcard match: {}".format(wildcard))
 
     rrset_dict, _ = get_rrset_dict(query.response.authority)
     authenticated = False
@@ -385,7 +386,7 @@ def validate_rrset(srrset, query, silent=False):
     srrset.set_validated()
     if not silent and vprint_quiet(query):
         for line in srrset.rrset.to_text().split('\n'):
-            print("SECURE: {}".format(line))
+            print("# SECURE: {}".format(line))
 
 
 def authenticate_nxdomain(query):
@@ -467,6 +468,7 @@ def authenticate_nodata(query):
                 if (nsec_covers_name(srrset.rrset, query.qname) and
                     srrset.rrset[0].next.is_subdomain(query.qname)):
                     authenticated = True
+                    query.ent = True
                     if Prefs.VERBOSE and not query.quiet:
                         print("# INFO: Empty Non-Terminal found")
                 else:
@@ -489,6 +491,10 @@ def authenticate_nodata(query):
                 continue
             if hashed_owner != rrname:
                 continue
+            if not nsec3_rdata.windows:
+                query.ent = True
+                if Prefs.VERBOSE and not query.quiet:
+                    print("# INFO: Empty Non-Terminal found")
             if (not type_in_bitmap(query.qtype, nsec3_rdata) and
                 not type_in_bitmap(dns.rdatatype.CNAME, nsec3_rdata)):
                 authenticated = True
@@ -641,9 +647,10 @@ def process_response(query, addResults=None):
                 query.nodata = True
                 if addResults:
                     addResults.nodata = True
-                print("ERROR: NODATA: {} of type {} not found".format(
-                    query.qname,
-                    dns.rdatatype.to_text(query.qtype)))
+                if Prefs.VERBOSE:
+                    print("ERROR: NODATA: {} of type {} not found".format(
+                        query.qname,
+                        dns.rdatatype.to_text(query.qtype)))
             if Prefs.DNSSEC and not query.is_nsquery and key_cache.SecureSoFar:
                 authenticate_nodata(query)
             return query.response.rcode(), None
@@ -655,7 +662,7 @@ def process_response(query, addResults=None):
         if vprint_quiet(query):
             print("#        [Got answer in {:.3f} s]".format(
                 query.elapsed_last))
-        if not query.quiet:
+        if Prefs.VERBOSE and not query.quiet:
             print("ERROR: NXDOMAIN: {} not found".format(query.qname))
         if query.response.answer:
             process_answer(query, addResults=addResults)

@@ -42,6 +42,8 @@ class Query:
         self.dnssec_secure = False          # only set for negative responses?
         self.response = None                # full response message
         self.latest_rcode = None
+        self.wildcard = None
+        self.ent = False
 
     def set_quiet(self, action=True):
         """
@@ -78,6 +80,22 @@ class Query:
         secure = self.is_secure()
 
         print("# ANSWER to {}".format(self))
+        rcode_text = dns.rcode.to_text(self.response.rcode())
+        print("# RCODE: {}".format(rcode_text), end='')
+
+        if self.response.rcode() == 0 and self.nodata:
+            print(" (NODATA)")
+        else:
+            print('')
+
+        if Prefs.DNSSEC:
+            print("# DNSSEC status: {}".format(
+                "SECURE" if secure else "INSECURE"))
+            if self.wildcard:
+                print("# WILDCARD match: {}".format(self.wildcard))
+            if self.ent:
+                print("# EMPTY NON-TERMINAL detected")
+
         if self.full_answer_rrset:
             for x in self.full_answer_rrset:
                 print(x.rrset.to_text())
@@ -91,16 +109,6 @@ class Query:
                                 dns.rdatatype.to_text(x.rrsig.rdtype),
                                 sig_rr,
                                 sig_validity(sig_rr)))
-
-        if self.response.rcode() == 0 and self.nodata:
-            print("# NODATA: {} of type {} not found".format(
-                self.qname, dns.rdatatype.to_text(self.qtype)))
-        elif self.response.rcode() == 3:
-            print("# NXDOMAIN")
-
-        if Prefs.DNSSEC:
-            print("# DNSSEC status: {}".format(
-                "SECURE" if secure else "INSECURE"))
 
     def get_answer_ip_list(self):
         """get list of answer IP addresses if any"""
