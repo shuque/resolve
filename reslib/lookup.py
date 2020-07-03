@@ -464,6 +464,10 @@ def authenticate_nodata(query):
             if wildcard is not None:
                 if wildcard != rrname:
                     continue
+                else:
+                    query.wildcard = wildcard
+                    if Prefs.VERBOSE and not query.quiet:
+                        print("# INFO: Wildcard match: {}".format(wildcard))
             elif query.qname != rrname:
                 if (nsec_covers_name(srrset.rrset, query.qname) and
                     srrset.rrset[0].next.is_subdomain(query.qname)):
@@ -473,7 +477,7 @@ def authenticate_nodata(query):
                         print("# INFO: Empty Non-Terminal found")
                 else:
                     continue
-            elif (not type_in_bitmap(query.qtype, srrset.rrset[0]) and
+            if (not type_in_bitmap(query.qtype, srrset.rrset[0]) and
                 not type_in_bitmap(dns.rdatatype.CNAME, srrset.rrset[0])):
                 authenticated = True
         elif rrtype == dns.rdatatype.NSEC3:
@@ -509,6 +513,7 @@ def authenticate_nodata(query):
                                                nsec3_set,
                                                quiet=query.quiet)
         authenticated = True
+        query.wildcard = wildcard
         if Prefs.VERBOSE and not query.quiet:
             print("# INFO: wildcard NODATA for {}".format(wildcard))
 
@@ -545,8 +550,9 @@ def find_insecure_referral(query):
         ds_rrset, ds_rrsigs = fetch_ds(zonename)
         if ds_rrset is None:
             key_cache.SecureSoFar = False
-            print("# INFO: found INSECURE Referral to {}".format(zonename))
-            zone.print_details()
+            if Prefs.VERBOSE:
+                print("# INFO: found INSECURE Referral to {}".format(zonename))
+                zone.print_details()
             return
         ds_verified, ds_failed = validate_all(ds_rrset, ds_rrsigs)
         if not ds_verified:
@@ -716,12 +722,14 @@ def send_query_zone(query, zone, addResults=None):
             print("OSError {}: {}: {}".format(e.errno, e.strerror, nsaddr.addr))
             continue
         if not response:
-            print("WARNING: no response from {}".format(nsaddr))
+            if Prefs.VERBOSE:
+                print("WARNING: no response from {}".format(nsaddr))
             continue
         if response.rcode() not in [dns.rcode.NOERROR, dns.rcode.NXDOMAIN]:
             stats.cnt_fail += 1
-            print("WARNING: response {} from {}".format(
-                dns.rcode.to_text(response.rcode()), nsaddr.addr))
+            if Prefs.VERBOSE:
+                print("WARNING: response {} from {}".format(
+                    dns.rcode.to_text(response.rcode()), nsaddr.addr))
             continue
         # process and return response; but goto next server on error
         query.elapsed_last = time.time() - time_start
@@ -729,7 +737,8 @@ def send_query_zone(query, zone, addResults=None):
         try:
             return process_response(query, addResults=addResults)
         except ResError as e:
-            print("WARNING: {} error {}".format(nsaddr.addr, e))
+            if Prefs.VERBOSE:
+                print("WARNING: {} error {}".format(nsaddr.addr, e))
             continue
 
     raise ResError("Queries to all servers for zone {} failed.".format(
@@ -959,8 +968,9 @@ def match_ds_zone(zone, referring_query=None):
             authenticated = True
             break
 
-        print("ERROR: DS did not match DNSKEY: {} at {}".format(
-            zone.name, nsaddr.addr))
+        if Prefs.VERBOSE and referring_query and not referring_query.quiet:
+            print("ERROR: DS did not match DNSKEY: {} at {}".format(
+                zone.name, nsaddr.addr))
 
     if not authenticated:
         if referring_query and Prefs.VERBOSE and not referring_query.quiet:

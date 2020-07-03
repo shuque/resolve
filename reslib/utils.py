@@ -38,7 +38,8 @@ def send_query_tcp(msg, nsaddr, query, timeout=Prefs.TIMEOUT):
     try:
         res = dns.query.tcp(msg, nsaddr.addr, timeout=timeout)
     except dns.exception.Timeout:
-        print("WARN: TCP query timeout for {}".format(nsaddr.addr))
+        if Prefs.VERBOSE and not query.quiet:
+            print("WARN: TCP query timeout for {}".format(nsaddr.addr))
     return res
 
 
@@ -56,7 +57,8 @@ def send_query_udp(msg, nsaddr, query,
             nsaddr.rtt = time.time() - t0
             gotresponse = True
         except dns.exception.Timeout:
-            print("WARN: UDP query timeout for {}".format(nsaddr.addr))
+            if Prefs.VERBOSE and not query.quiet:
+                print("WARN: UDP query timeout for {}".format(nsaddr.addr))
     return res
 
 
@@ -73,8 +75,9 @@ def send_query(msg, nsaddr, query,
     res = send_query_udp(msg, nsaddr, query,
                          timeout=timeout, retries=retries)
     if res and is_truncated(res):
-        print("WARN: response from {} was truncated; retrying with TCP".format(
-            nsaddr.addr))
+        if Prefs.VERBOSE and not query.quiet:
+            print("WARN: response from {} truncated; retrying with TCP".format(
+                nsaddr.addr))
         stats.cnt_tcp_fallback += 1
         res = send_query_tcp(msg, nsaddr, query)
     return res

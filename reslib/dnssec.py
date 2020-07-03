@@ -80,8 +80,10 @@ class KeyCache:
     """
 
     def __init__(self):
-        # dict of dns.name.Name: list(DNSKEY)
-        self.data = {}
+        self.reset()
+
+    def reset(self):
+        self.data = {}                  # dict of dns.name.Name: list(DNSKEY)
         self.SecureSoFar = False
         self.install(dns.name.root, [get_root_key()])
 

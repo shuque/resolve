@@ -5,7 +5,9 @@ batch mode operation.
 from reslib.prefs import Prefs
 from reslib.cache import RootZone
 from reslib.query import Query
+from reslib.stats import stats
 from reslib.lookup import resolve_name, print_root_zone
+from reslib.dnssec import key_cache
 
 
 def batchmode(cache, infile, info):
@@ -33,8 +35,10 @@ def batchmode(cache, infile, info):
             continue
 
         print("\n###\n### Query: {}, {}, {}".format(qname, qtype, qclass))
+        stats.reset()
         query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
         starting_zone = cache.closest_zone(query.qname)
+        key_cache.SecureSoFar = starting_zone.secure
         print("### Starting at zone: {}\n###".format(starting_zone.name))
         if Prefs.VERBOSE and starting_zone == RootZone:
             print_root_zone()

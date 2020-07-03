@@ -7,6 +7,10 @@ class Stats:
     """Statistics counters"""
 
     def __init__(self):
+        self.reset()
+
+    def reset(self):
+        """reset statistics counters"""
         self.elapsed = 0
         self.cnt_cname = 0
         self.cnt_query1 = 0                  # regular queries
