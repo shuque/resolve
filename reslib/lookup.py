@@ -29,7 +29,7 @@ from reslib.dnssec import (key_cache, load_keys, validate_all,
                            supported_algorithm_present)
 
 
-def get_ns_addrs(zone, additional):
+def get_ns_addrs(zone, query):
     """
     Populate nameserver addresses for zone from the additional section
     of a given referral message.
@@ -40,6 +40,7 @@ def get_ns_addrs(zone, additional):
     switch to NSRESOLVE mode.
     """
 
+    additional = query.response.additional
     needsGlue = []
     for nsname in zone.nslist:
         if nsname.is_subdomain(zone.name):
@@ -49,13 +50,25 @@ def get_ns_addrs(zone, additional):
     for rrset in additional:
         if rrset.rdtype in [dns.rdatatype.A, dns.rdatatype.AAAA]:
             if not zone.has_ns(rrset.name):
+                if Prefs.VERBOSE > 1:
+                    print(("WARN: referral to {} has unrelated additional" +
+                           "data: {} {}").format(zone.name,
+                                                 rrset.name, rrset.rdtype))
                 continue
+            if not rrset.name.is_subdomain(zone.name):
+                if Prefs.VERBOSE > 1:
+                    print("INFO: referral to {} has unneeded (sibling?) glue: {} {}".format(
+                        zone.name, rrset.name,
+                        dns.rdatatype.to_text(rrset.rdtype)))
             for rr in rrset:
                 if (not Prefs.NSRESOLVE) or (rrset.name in needsGlue):
                     nsobj = cache.get_ns(rrset.name)
                     nsobj.install_ip(rr.address)
 
     if not zone.iplist() or Prefs.NSRESOLVE:
+        if Prefs.VERBOSE > 1:
+            print("INFO: NS addresses need to be explicitly resolved:")
+            zone.print_nsinfo()
         for name in needToResolve:
             nsobj = cache.get_ns(name)
             if nsobj.iplist:
@@ -70,7 +83,7 @@ def get_ns_addrs(zone, additional):
     return
 
 
-def install_zone_in_cache(zonename, ns_srrset, ds_srrset, additional):
+def install_zone_in_cache(zonename, query, ns_srrset, ds_srrset):
     """
     Install zone entry and associated info in global cache. Return
     zone object.
@@ -83,7 +96,7 @@ def install_zone_in_cache(zonename, ns_srrset, ds_srrset, additional):
             _ = zone.install_ns(rr.target)
         if ds_srrset:
             zone.install_ds_rrset(ds_srrset.rrset)
-    get_ns_addrs(zone, additional)
+    get_ns_addrs(zone, query)
     return zone
 
 
@@ -127,7 +140,7 @@ def authenticate_insecure_referral(query, zonename):
     if not authenticated and optout:
         nsec3_nxdomain_proof(zonename, signer, nsec3_set, optout=True,
                              quiet=query.quiet)
-        if Prefs.VERBOSE and not query.quiet:
+        if vprint_quiet(query):
             print("# INFO: NSEC3 opt-out insecure referral")
 
     if not optout and not authenticated:
@@ -195,10 +208,7 @@ def process_referral(query):
 
     print_referral_trace(query, zonename, ds_srrset)
 
-    zone = install_zone_in_cache(zonename,
-                                 ns_srrset,
-                                 ds_srrset,
-                                 query.response.additional)
+    zone = install_zone_in_cache(zonename, query, ns_srrset, ds_srrset)
 
     if vprint_quiet(query) and not query.is_nsquery:
         zone.print_details()
@@ -326,7 +336,7 @@ def validate_wildcard(srrset, query):
     next_label = srrset.rrname.relativize(wildcard_base).labels[-1]
     next_closer = dns.name.Name((next_label,) + wildcard_base.labels)
     query.wildcard = wildcard
-    if Prefs.VERBOSE and not query.quiet:
+    if vprint_quiet(query):
         print("# INFO: Wildcard match: {}".format(wildcard))
 
     rrset_dict, _ = get_rrset_dict(query.response.authority)
@@ -341,7 +351,7 @@ def validate_wildcard(srrset, query):
             nsec = srrset.rrset
             if nsec_covers_name(nsec, next_closer):
                 authenticated = True
-                if Prefs.VERBOSE and not query.quiet:
+                if vprint_quiet(query):
                     print("# INFO: NSEC no closer: {}".format(nsec))
         elif rrtype == dns.rdatatype.NSEC3:
             nsec3 = srrset.rrset
@@ -349,7 +359,7 @@ def validate_wildcard(srrset, query):
             hashed_next = get_hashed_owner(next_closer, signer, nsec3[0])
             if nsec3_covers_name(nsec3, hashed_next, signer):
                 authenticated = True
-                if Prefs.VERBOSE and not query.quiet:
+                if vprint_quiet(query):
                     print("# INFO next closer: {} {}".format(
                         next_closer, hashed_next.labels[0].decode()))
                     print("# INFO: NSEC3: {}".format(nsec3))
@@ -466,14 +476,14 @@ def authenticate_nodata(query):
                     continue
                 else:
                     query.wildcard = wildcard
-                    if Prefs.VERBOSE and not query.quiet:
+                    if vprint_quiet(query):
                         print("# INFO: Wildcard match: {}".format(wildcard))
             elif query.qname != rrname:
                 if (nsec_covers_name(srrset.rrset, query.qname) and
                     srrset.rrset[0].next.is_subdomain(query.qname)):
                     authenticated = True
                     query.ent = True
-                    if Prefs.VERBOSE and not query.quiet:
+                    if vprint_quiet(query):
                         print("# INFO: Empty Non-Terminal found")
                 else:
                     continue
@@ -489,7 +499,7 @@ def authenticate_nodata(query):
             hashed_owner = get_hashed_owner(query.qname, signer, nsec3[0])
             if optout and nsec3_covers_name(nsec3, hashed_owner, signer):
                 authenticated = True
-                if Prefs.VERBOSE and not query.quiet:
+                if vprint_quiet(query):
                     print("# INFO: OptOut H({}) = {}".format(
                         query.qname, hashed_owner))
                 continue
@@ -497,12 +507,12 @@ def authenticate_nodata(query):
                 continue
             if not nsec3_rdata.windows:
                 query.ent = True
-                if Prefs.VERBOSE and not query.quiet:
+                if vprint_quiet(query):
                     print("# INFO: Empty Non-Terminal found")
             if (not type_in_bitmap(query.qtype, nsec3_rdata) and
                 not type_in_bitmap(dns.rdatatype.CNAME, nsec3_rdata)):
                 authenticated = True
-                if Prefs.VERBOSE and not query.quiet:
+                if vprint_quiet(query):
                     print("# INFO: H({}) = {}".format(
                         query.qname, hashed_owner))
 
@@ -514,7 +524,7 @@ def authenticate_nodata(query):
                                                quiet=query.quiet)
         authenticated = True
         query.wildcard = wildcard
-        if Prefs.VERBOSE and not query.quiet:
+        if vprint_quiet(query):
             print("# INFO: wildcard NODATA for {}".format(wildcard))
 
     if not seen_soa:
@@ -550,7 +560,7 @@ def find_insecure_referral(query):
         ds_rrset, ds_rrsigs = fetch_ds(zonename)
         if ds_rrset is None:
             key_cache.SecureSoFar = False
-            if Prefs.VERBOSE:
+            if vprint_quiet(query):
                 print("# INFO: found INSECURE Referral to {}".format(zonename))
                 zone.print_details()
             return
@@ -612,7 +622,7 @@ def process_answer(query, addResults=None):
             query.answer_rrset.append(srrset)
             if addResults:
                 addResults.add_to_full_answer(srrset)
-            if Prefs.VERBOSE:
+            if vprint_quiet(query):
                 print(srrset.rrset.to_text())
             synthetic_cname = synthesize_cname(srrset.rrset, query)
         elif rrtype == dns.rdatatype.CNAME:
@@ -653,7 +663,7 @@ def process_response(query, addResults=None):
                 query.nodata = True
                 if addResults:
                     addResults.nodata = True
-                if Prefs.VERBOSE:
+                if vprint_quiet(query):
                     print("ERROR: NODATA: {} of type {} not found".format(
                         query.qname,
                         dns.rdatatype.to_text(query.qtype)))
@@ -668,7 +678,7 @@ def process_response(query, addResults=None):
         if vprint_quiet(query):
             print("#        [Got answer in {:.3f} s]".format(
                 query.elapsed_last))
-        if Prefs.VERBOSE and not query.quiet:
+        if vprint_quiet(query):
             print("ERROR: NXDOMAIN: {} not found".format(query.qname))
         if query.response.answer:
             process_answer(query, addResults=addResults)
@@ -722,12 +732,12 @@ def send_query_zone(query, zone, addResults=None):
             print("OSError {}: {}: {}".format(e.errno, e.strerror, nsaddr.addr))
             continue
         if not response:
-            if Prefs.VERBOSE:
+            if vprint_quiet(query):
                 print("WARNING: no response from {}".format(nsaddr))
             continue
         if response.rcode() not in [dns.rcode.NOERROR, dns.rcode.NXDOMAIN]:
             stats.cnt_fail += 1
-            if Prefs.VERBOSE:
+            if vprint_quiet(query):
                 print("WARNING: response {} from {}".format(
                     dns.rcode.to_text(response.rcode()), nsaddr.addr))
             continue
@@ -737,7 +747,7 @@ def send_query_zone(query, zone, addResults=None):
         try:
             return process_response(query, addResults=addResults)
         except ResError as e:
-            if Prefs.VERBOSE:
+            if vprint_quiet(query):
                 print("WARNING: {} error {}".format(nsaddr.addr, e))
             continue
 
@@ -787,7 +797,7 @@ def resolve_name(query, zone, addResults=None):
                 if curr_zone.dslist:
                     match_ds_zone(curr_zone, referring_query=query)
                 else:
-                    if Prefs.VERBOSE and not query.quiet:
+                    if vprint_quiet(query):
                         check_isolated_dnskey(curr_zone)
 
     if stats.cnt_deleg >= Prefs.MAX_DELEG:
@@ -968,19 +978,19 @@ def match_ds_zone(zone, referring_query=None):
             authenticated = True
             break
 
-        if Prefs.VERBOSE and referring_query and not referring_query.quiet:
+        if referring_query and vprint_quiet(referring_query.quiet):
             print("ERROR: DS did not match DNSKEY: {} at {}".format(
                 zone.name, nsaddr.addr))
 
     if not authenticated:
-        if referring_query and Prefs.VERBOSE and not referring_query.quiet:
+        if referring_query and vprint_quiet(referring_query):
             if keylist:
                 print('')
                 for key in keylist:
                     print(key)
         raise ResError("DS did not match DNSKEY for {}".format(zone.name))
 
-    if referring_query and Prefs.VERBOSE and not referring_query.quiet:
+    if referring_query and vprint_quiet(referring_query):
         for key in keylist:
             print(key)
 
@@ -1002,8 +1012,11 @@ def fetch_dnskey(zone):
     dnskey_rrset = msg.get_rrset(msg.answer, qname, qclass, qtype)
     dnskey_rrsigs = msg.get_rrset(msg.answer, qname, qclass,
                                   dns.rdatatype.RRSIG, covers=qtype)
+    if dnskey_rrset is None:
+        raise ResError("No {} DNSKEY RRset found in answer".format(
+            zone.name))
     if dnskey_rrsigs is None:
-        raise ResError("No signatures found for {} DNSKEY set".format(
+        raise ResError("No signatures found for {} DNSKEY RRset".format(
             zone.name))
     return dnskey_rrset, dnskey_rrsigs
 

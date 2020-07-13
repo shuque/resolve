@@ -68,6 +68,22 @@ class Zone:
         """Return IP list sorted by observed RTT"""
         return sorted(self.iplist(), key=lambda ip: ip.rtt)
 
+    def print_nsinfo(self):
+        """Print NS info"""
+        for nsname in self.nslist:
+            nsobj = self.cache.get_ns(nsname)
+            addresses = " ".join([x.addr for x in nsobj.iplist])
+            print("NS: {} {}".format(nsobj.name, addresses))
+
+    def print_dsinfo(self):
+        """Print DS info"""
+        for ds_data in self.dslist:
+            print("DS: {} {} {} {}".format(
+                ds_data.key_tag,
+                ds_data.algorithm,
+                ds_data.digest_type,
+                hexlify(ds_data.digest).decode()))
+
     def print_details(self):
         """Print zone information"""
         print("ZONE: {}".format(self.name))
@@ -76,16 +92,8 @@ class Zone:
                 self.ttl_ns, self.ttl_ds))
         else:
             print("TTL: Delegation: {}".format(self.ttl_ns))
-        for nsname in self.nslist:
-            nsobj = self.cache.get_ns(nsname)
-            addresses = " ".join([x.addr for x in nsobj.iplist])
-            print("NS: {} {}".format(nsobj.name, addresses))
-        for ds_data in self.dslist:
-            print("DS: {} {} {} {}".format(
-                ds_data.key_tag,
-                ds_data.algorithm,
-                ds_data.digest_type,
-                hexlify(ds_data.digest).decode()))
+        self.print_nsinfo()
+        self.print_dsinfo()
 
     def __repr__(self):
         return "<Zone: {}>".format(self.name)
