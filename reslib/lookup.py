@@ -444,8 +444,7 @@ def authenticate_nxdomain(query):
     elif nsec_set:
         nsec_nxdomain_proof(query.qname, signer, nsec_set)
 
-    if query.qname == query.orig_qname:
-        query.dnssec_secure = True
+    query.dnssec_secure = True
 
 
 def authenticate_nodata(query):
@@ -482,7 +481,7 @@ def authenticate_nodata(query):
                 if (nsec_covers_name(srrset.rrset, query.qname) and
                     srrset.rrset[0].next.is_subdomain(query.qname)):
                     authenticated = True
-                    query.ent = True
+                    query.ent = query.qname
                     if vprint_quiet(query):
                         print("# INFO: Empty Non-Terminal found")
                 else:
@@ -506,7 +505,7 @@ def authenticate_nodata(query):
             if hashed_owner != rrname:
                 continue
             if not nsec3_rdata.windows:
-                query.ent = True
+                query.ent = query.qname
                 if vprint_quiet(query):
                     print("# INFO: Empty Non-Terminal found")
             if (not type_in_bitmap(query.qtype, nsec3_rdata) and

@@ -43,7 +43,7 @@ class Query:
         self.response = None                # full response message
         self.latest_rcode = None
         self.wildcard = None
-        self.ent = False
+        self.ent = None
 
     def set_quiet(self, action=True):
         """
@@ -79,7 +79,10 @@ class Query:
         """
         secure = self.is_secure()
 
-        print("# ANSWER to {}".format(self))
+        if self.minimize:
+            print("# ANSWER to QUERY: {}".format(self.orig_qname))
+        else:
+            print("# ANSWER to {}".format(self))
         rcode_text = dns.rcode.to_text(self.response.rcode())
         print("# RCODE: {}".format(rcode_text), end='')
 
@@ -93,8 +96,9 @@ class Query:
                 "SECURE" if secure else "INSECURE"))
             if self.wildcard:
                 print("# WILDCARD match: {}".format(self.wildcard))
-            if self.ent:
-                print("# EMPTY NON-TERMINAL detected")
+            if self.ent is not None:
+                if self.ent == self.orig_qname:
+                    print("# EMPTY NON-TERMINAL detected")
 
         if self.full_answer_rrset:
             for x in self.full_answer_rrset:
