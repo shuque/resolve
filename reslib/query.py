@@ -79,10 +79,7 @@ class Query:
         """
         secure = self.is_secure()
 
-        if self.minimize:
-            print("# ANSWER to QUERY: {}".format(self.orig_qname))
-        else:
-            print("# ANSWER to {}".format(self))
+        print("# ANSWER to QUERY: {}".format(self.orig_query_string()))
         rcode_text = dns.rcode.to_text(self.response.rcode())
         print("# RCODE: {}".format(rcode_text), end='')
 
@@ -135,6 +132,11 @@ class Query:
         """Prepend next label"""
         numLabels = len(self.qname) + 1
         self.qname = dns.name.Name(self.orig_qname[-numLabels:])
+
+    def orig_query_string(self):
+        return "{} {} {}".format(self.orig_qname if self.minimize else self.qname,
+                                 dns.rdatatype.to_text(self.qtype),
+                                 dns.rdataclass.to_text(self.qclass))
 
     def __repr__(self):
         return "QUERY: {} {} {}".format(self.qname,
