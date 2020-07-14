@@ -603,8 +603,6 @@ def process_answer(query, addResults=None):
 
     if query.qname != query.orig_qname:
         addResults = None
-        if vprint_quiet(query):
-            print("# INFO: Ignoring AA=1 answer for intermediate name")
 
     rrset_dict, found_sigs = get_rrset_dict(query.response.answer)
 
@@ -637,7 +635,10 @@ def process_answer(query, addResults=None):
                 raise ResError("Too many ({}) CNAME indirections.".format(
                     Prefs.MAX_CNAME))
 
-    if cname_dict:
+    if query.qname != query.orig_qname:
+        if vprint_quiet(query):
+            print("# INFO: Ignoring AA=1 answer for intermediate name")
+    elif cname_dict:
         process_cname(query, rrset_dict, cname_dict, synthetic_cname,
                       addResults=addResults)
     return
