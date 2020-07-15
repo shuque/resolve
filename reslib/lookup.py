@@ -210,7 +210,7 @@ def process_referral(query):
 
     zone = install_zone_in_cache(zonename, query, ns_srrset, ds_srrset)
 
-    if vprint_quiet(query) and not query.is_nsquery:
+    if vprint_quiet(query):
         zone.print_details()
 
     return zone
@@ -315,7 +315,7 @@ def get_ns_ds_dnskey(zonename, referring_query=None):
         raise ResError("DS RRset {} failed to authenticate: {}".format(
             zonename, ds_failed))
     zone.install_ds_rrset(ds_rrset)
-    if Prefs.VERBOSE and not referring_query.is_nsquery:
+    if vprint_quiet(referring_query):
         zone.print_details()
     match_ds_zone(zone, referring_query=referring_query)
     return
