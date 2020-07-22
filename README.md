@@ -24,7 +24,7 @@ Pre-requisites:
 - Python 3
 - [dnspython module](http://www.dnspython.org/) (included with most Linux/*BSD distributions)
 - for DNSSEC support:
-  - [pycryptodome](https://www.pycryptodome.org/en/latest/)
+  - [pycryptodome](https://www.pycryptodome.org/en/latest/) or pycryptodomex
   - [pynacl](https://pypi.org/project/PyNaCl/)
 
 DNSSEC validation is supported. The most popular signing algorithms

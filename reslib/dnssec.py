@@ -12,9 +12,16 @@ import dns.rdata
 import dns.rdatatype
 import dns.rdataclass
 import dns.dnssec
-from Crypto.PublicKey import RSA, ECC
-from Crypto.Signature import pkcs1_15, DSS
-from Crypto.Hash import SHA1, SHA256, SHA384, SHA512
+
+try:
+    from Crypto.PublicKey import RSA, ECC
+    from Crypto.Signature import pkcs1_15, DSS
+    from Crypto.Hash import SHA1, SHA256, SHA384, SHA512
+except (ModuleNotFoundError, ImportError):
+    from Cryptodome.PublicKey import RSA, ECC
+    from Cryptodome.Signature import pkcs1_15, DSS
+    from Cryptodome.Hash import SHA1, SHA256, SHA384, SHA512
+
 import nacl.encoding
 import nacl.signing
 
