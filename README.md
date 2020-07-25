@@ -23,14 +23,14 @@ by itself).
 Pre-requisites:  
 - Python 3
 - [dnspython module](http://www.dnspython.org/) (included with most Linux/*BSD distributions)
-  - [python-cryptography](https://cryptography.io/en/latest/) for DNSSEC support.
+- [python-cryptography](https://cryptography.io/en/latest/) for DNSSEC support.
 
 The included document, [DNSSEC.md](DNSSEC.md) has many examples of the
 use of DNSSEC with this program.
 
 If you need to use a version without DNSSEC, because you haven't or don't
-want to install the pycryptodome and pynacl crypto libraries, you can
-install an earlier version of this module: v0.15 or v0.20 should run fine
+want to install the python-cryptography package, you can install and earlier
+earlier version of this program: v0.15 or v0.20 should run fine
 without them. Just checkout the corresponding tags from this repo, or
 grab the release tarballs for those versions. Direct links to these
 earlier versions:
