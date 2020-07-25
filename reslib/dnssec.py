@@ -22,8 +22,8 @@ except (ModuleNotFoundError, ImportError):
     from Cryptodome.Signature import pkcs1_15, DSS
     from Cryptodome.Hash import SHA1, SHA256, SHA384, SHA512
 
-import nacl.encoding
-import nacl.signing
+from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.hazmat.primitives.asymmetric import ed448
 
 from reslib.prefs import Prefs
 from reslib.rootkey import RootKeyData
@@ -43,6 +43,7 @@ ALG = {
     13: "ECDSA-P256",
     14: "ECDSA-P384",
     15: "ED25519",
+    16: "ED448",
 }
 
 # DNSSEC algorithm -> hash function
@@ -54,6 +55,7 @@ HASHFUNC = {
     13: SHA256,
     14: SHA384,
     15: None,
+    16: None,
 }
 
 # DS (Delegation Signer) Digest Algorithms
@@ -143,6 +145,8 @@ class DNSKEY:
             self.key = keydata_to_ecc(self.algorithm, rr.key)
         elif self.algorithm in [15]:
             self.key = keydata_to_eddsa(self.algorithm, rr.key)
+        elif self.algorithm in [16]:
+            self.key = keydata_to_ed448(self.algorithm, rr.key)
         else:
             raise ResError("DNSKEY algorithm {} not supported".format(
                 self.algorithm))
@@ -186,8 +190,10 @@ class Signature:
         elif isinstance(key, ECC.EccKey):
             verifier = DSS.new(key, 'fips-186-3')
             verifier.verify(self.indata, self.rdata.signature)
-        elif isinstance(key, nacl.signing.VerifyKey):
-            _ = key.verify(self.indata, self.rdata.signature)
+        elif isinstance(key, ed25519.Ed25519PublicKey):
+            _ = key.verify(self.rdata.signature, self.indata)
+        elif isinstance(key, ed448.Ed448PublicKey):
+            _ = key.verify(self.rdata.signature, self.indata)
         else:
             raise ResError("Unknown key type: {}".format(type(key)))
 
@@ -266,7 +272,16 @@ def keydata_to_ecc(algnum, keydata):
 def keydata_to_eddsa(algnum, keydata):
     """Convert raw keydata into an EdDSA key object"""
     if algnum == 15:
-        return nacl.signing.VerifyKey(keydata)
+        #return nacl.signing.VerifyKey(keydata)
+        return ed25519.Ed25519PublicKey.from_public_bytes(keydata)
+    else:
+        raise ResError("Unknown EdDSA algorithm number {}".format(algnum))
+
+
+def keydata_to_ed448(algnum, keydata):
+    """Convert raw keydata into an Ed448 key object"""
+    if algnum == 16:
+        return ed448.Ed448PublicKey.from_public_bytes(keydata)
     else:
         raise ResError("Unknown EdDSA algorithm number {}".format(algnum))
 

@@ -25,13 +25,7 @@ Pre-requisites:
 - [dnspython module](http://www.dnspython.org/) (included with most Linux/*BSD distributions)
 - for DNSSEC support:
   - [pycryptodome](https://www.pycryptodome.org/en/latest/) or pycryptodomex
-  - [pynacl](https://pypi.org/project/PyNaCl/)
-
-DNSSEC validation is supported. The most popular signing algorithms
-are supported (RSASHA1, RSASHA1-NSEC3-SHA1, RSASHA256, RSASHA512,
-ECDSAP256SHA256, ECDSAP384SHA384, and ED25519). Support for ED448
-(algorithm 16) will be done in the near future once I locate a crypto
-library that supports it.
+  - [python-cryptography](https://cryptography.io/en/latest/)
 
 The included document, [DNSSEC.md](DNSSEC.md) has many examples of the
 use of DNSSEC with this program.
