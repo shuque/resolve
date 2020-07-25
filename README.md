@@ -23,9 +23,7 @@ by itself).
 Pre-requisites:  
 - Python 3
 - [dnspython module](http://www.dnspython.org/) (included with most Linux/*BSD distributions)
-- for DNSSEC support:
-  - [pycryptodome](https://www.pycryptodome.org/en/latest/) or pycryptodomex
-  - [python-cryptography](https://cryptography.io/en/latest/)
+  - [python-cryptography](https://cryptography.io/en/latest/) for DNSSEC support.
 
 The included document, [DNSSEC.md](DNSSEC.md) has many examples of the
 use of DNSSEC with this program.
@@ -43,7 +41,7 @@ earlier versions:
 ### Usage
 
 ```
-resolve.py version 0.4.3
+resolve.py version 0.5.0
 Perform iterative resolution of a DNS name, type, and class.
 
     Usage: resolve.py [Options] <qname> [<qtype>] [<qclass>]
@@ -68,6 +66,14 @@ class per line.
 ```
 
 ### Installation
+
+To install the pre-requisite python cryptography package system wide:
+
+* (as root) pip3 install "cryptography>=3.0"
+
+To install the pre-requisite python cryptography package locally for the user:
+
+* pip3 install --user "cryptography>=3.0"
 
 To install system wide:
 

@@ -13,17 +13,14 @@ import dns.rdatatype
 import dns.rdataclass
 import dns.dnssec
 
-try:
-    from Crypto.PublicKey import RSA, ECC
-    from Crypto.Signature import pkcs1_15, DSS
-    from Crypto.Hash import SHA1, SHA256, SHA384, SHA512
-except (ModuleNotFoundError, ImportError):
-    from Cryptodome.PublicKey import RSA, ECC
-    from Cryptodome.Signature import pkcs1_15, DSS
-    from Cryptodome.Hash import SHA1, SHA256, SHA384, SHA512
-
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric import utils
+from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives.asymmetric import ed448
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from reslib.prefs import Prefs
 from reslib.rootkey import RootKeyData
@@ -48,21 +45,21 @@ ALG = {
 
 # DNSSEC algorithm -> hash function
 HASHFUNC = {
-    5: SHA1,
-    7: SHA1,
-    8: SHA256,
-    10: SHA512,
-    13: SHA256,
-    14: SHA384,
+    5: hashes.SHA1,
+    7: hashes.SHA1,
+    8: hashes.SHA256,
+    10: hashes.SHA512,
+    13: hashes.SHA256,
+    14: hashes.SHA384,
     15: None,
     16: None,
 }
 
 # DS (Delegation Signer) Digest Algorithms
 DS_ALG = {
-    1: SHA1,
-    2: SHA256,
-    4: SHA384,
+    1: hashes.SHA1,
+    2: hashes.SHA256,
+    4: hashes.SHA384,
 }
 
 
@@ -92,6 +89,7 @@ class KeyCache:
         self.reset()
 
     def reset(self):
+        """reset cache and security status"""
         self.data = {}                  # dict of dns.name.Name: list(DNSKEY)
         self.SecureSoFar = False
         self.install(dns.name.root, [get_root_key()])
@@ -127,7 +125,7 @@ class KeyCache:
 
 
 class DNSKEY:
-    """Class to hold a DNSKEY and associated information"""
+    """Class to hold a single DNSKEY and associated information"""
 
     def __init__(self, rrname, rr):
         self.name = rrname
@@ -153,8 +151,8 @@ class DNSKEY:
 
     def size(self):
         """Return key size in bits"""
-        if isinstance(self.key, RSA.RsaKey):
-            return self.key.n.bit_length()
+        if self.algorithm in [5, 7, 8, 10]:
+            return self.key.public_numbers().n.bit_length()
         return len(self.rawkey) * 8
 
     def __repr__(self):
@@ -179,23 +177,31 @@ class Signature:
         self.rdata = sig_rdata
         self.indata = indata
 
-    def verify(self, key):
+    def verify(self, dnskey):
         """
         Verify signature with specified key. Raises a crypto key
         specific exception on failure.
         """
-        if isinstance(key, RSA.RsaKey):
-            verifier = pkcs1_15.new(key)
-            verifier.verify(self.indata, self.rdata.signature)
-        elif isinstance(key, ECC.EccKey):
-            verifier = DSS.new(key, 'fips-186-3')
-            verifier.verify(self.indata, self.rdata.signature)
-        elif isinstance(key, ed25519.Ed25519PublicKey):
-            _ = key.verify(self.rdata.signature, self.indata)
-        elif isinstance(key, ed448.Ed448PublicKey):
-            _ = key.verify(self.rdata.signature, self.indata)
+        pubkey = dnskey.key
+        hashalg = HASHFUNC[dnskey.algorithm]
+        if dnskey.algorithm in [5, 7, 8, 10]:
+            _ = pubkey.verify(self.rdata.signature, self.indata,
+                              padding.PKCS1v15(), hashalg())
+        elif dnskey.algorithm in [13, 14]:
+            if dnskey.algorithm == 13:
+                sig_r = self.rdata.signature[0:32]
+                sig_s = self.rdata.signature[32:]
+            elif dnskey.algorithm == 14:
+                sig_r = self.rdata.signature[0:48]
+                sig_s = self.rdata.signature[48:]
+            sig_r = int.from_bytes(sig_r, byteorder='big')
+            sig_s = int.from_bytes(sig_s, byteorder='big')
+            encoded_sig = utils.encode_dss_signature(sig_r, sig_s)
+            _ = pubkey.verify(encoded_sig, self.indata, ec.ECDSA(hashalg()))
+        elif dnskey.algorithm in [15, 16]:
+            _ = pubkey.verify(self.rdata.signature, self.indata)
         else:
-            raise ResError("Unknown key type: {}".format(type(key)))
+            raise ResError("Unknown key type: {}".format(type(pubkey)))
 
     def check_time(self, skew=CLOCK_SKEW):
         """
@@ -251,28 +257,33 @@ def keydata_to_rsa(keydata):
     exponent = int.from_bytes(keydata[1:1+elen], byteorder='big')
     modulus = keydata[1+elen:]
     modulus_int = int.from_bytes(modulus, byteorder='big')
-    return RSA.construct((modulus_int, exponent))
+    #return RSA.construct((modulus_int, exponent))
+    return rsa.RSAPublicNumbers(exponent,
+                                modulus_int).public_key(default_backend())
 
 
 def keydata_to_ecc(algnum, keydata):
     """Convert raw keydata into an ECC key object"""
     if algnum == 13:
         point_length = 32
-        curve = 'p256'
+        #curve = 'p256'
+        curve = ec.SECP256R1()
     elif algnum == 14:
         point_length = 48
-        curve = 'p384'
+        #curve = 'p384'
+        curve = ec.SECP384R1()
     else:
         raise ResError("Invalid algorithm number {} for ECDSA".format(algnum))
     x = int.from_bytes(keydata[0:point_length], byteorder='big')
     y = int.from_bytes(keydata[point_length:], byteorder='big')
-    return ECC.construct(curve=curve, point_x=x, point_y=y)
+    #return ECC.construct(curve=curve, point_x=x, point_y=y)
+    return ec.EllipticCurvePublicNumbers(
+        curve=curve, x=x, y=y).public_key(default_backend())
 
 
 def keydata_to_eddsa(algnum, keydata):
     """Convert raw keydata into an EdDSA key object"""
     if algnum == 15:
-        #return nacl.signing.VerifyKey(keydata)
         return ed25519.Ed25519PublicKey.from_public_bytes(keydata)
     else:
         raise ResError("Unknown EdDSA algorithm number {}".format(algnum))
@@ -307,10 +318,9 @@ def get_sig_info(rrset, rrsigs):
 
     From RFC4034, Section 3.1.8.1, the signature input data is:
     (RRSIG_RDATA | RR(1) | RR(2)... ), where RRSIG_RDATA is the rdata
-    minus the actual signature field. This input is then hashed for
-    most signature algorithms with the hash algorithm defined for that
-    algorithm, except for EdDSA (as used in DNSSEC) which just uses the
-    raw data as input.
+    minus the actual signature field. For algorithms that specify
+    hashing, the hashing occurs when the Signature.verify() method is
+    called.
     """
 
     for sig_rdata in rrsigs.to_rdataset():
@@ -330,12 +340,7 @@ def get_sig_info(rrset, rrsigs):
             rrdata = rr.to_digestable()
             rrlen = struct.pack('!H', len(rrdata))
             indata += (rrlen + rrdata)
-        if HASHFUNC[sig_rdata.algorithm] is not None:
-            hashed = HASHFUNC[sig_rdata.algorithm].new()
-            hashed.update(indata)
-            yield Signature(rrset, sig_rdata, hashed)
-        else:
-            yield Signature(rrset, sig_rdata, indata)
+        yield Signature(rrset, sig_rdata, indata)
 
 
 def sigset_covers_rrset(sigset, rrset):
@@ -356,7 +361,7 @@ def verify_sig_with_keys(sig, keys):
         if key.keytag != sig.rdata.key_tag:
             continue
         try:
-            sig.verify(key.key)
+            sig.verify(key)
             sig.check_time()
         except Exception as e:
             Failed.append((key, e))
@@ -432,8 +437,13 @@ def ds_rrset_matches_dnskey(ds_list, dnskey):
             continue
         if ds.digest_type not in DS_ALG:
             continue
-        hashout = DS_ALG[ds.digest_type].new(data=preimage)
-        if hashout.digest() == ds.digest:
+        #hashout = DS_ALG[ds.digest_type].new(data=preimage)
+        #if hashout.digest() == ds.digest:
+        #    return True
+        digest = hashes.Hash(DS_ALG[ds.digest_type](),
+                             backend=default_backend())
+        digest.update(preimage)
+        if digest.finalize() == ds.digest:
             return True
     return False
 
@@ -448,7 +458,7 @@ def nsec3_hashalg(algnum):
     the DNSSEC specifications.
     """
     if algnum == 1:
-        return SHA1
+        return hashes.SHA1
     else:
         raise ResError("unsupported NSEC3 hash algorithm {}".format(algnum))
 
@@ -469,7 +479,9 @@ def nsec3hash(name, algnum, salt, iterations, binary_out=False):
     hashfunc = nsec3_hashalg(algnum)
     digest = name.to_digestable()
     while iterations >= 0:
-        digest = hashfunc.new(data=digest+salt).digest()
+        d = hashes.Hash(hashfunc(), backend=default_backend())
+        d.update(digest+salt)
+        digest = d.finalize()
         iterations -= 1
     if binary_out:
         return digest
