@@ -64,24 +64,40 @@ TEST_VECTORS = [
     [('csail.mit.edu.', 'A'),
      dict(rcode=0, secure=False, wildcard=False, ent=False, exc=None)],
 
+    # Secure algorithm 13, NSEC zone
+    [('d2a13n1.rootcanary.net.', 'SOA'),
+     dict(rcode=0, secure=True, wildcard=False, ent=False, exc=None)],
+
+    # Bogus answer (bad signature)
+    [('bogus.d2a13n3.rootcanary.net.', 'A'),
+     dict(rcode=0, secure=True, wildcard=False, ent=False, exc=ResError)],
+
+    # Secure algorithm 14, NSEC3 zone
+    [('d2a14n3.rootcanary.net.', 'SOA'),
+     dict(rcode=0, secure=True, wildcard=False, ent=False, exc=None)],
+
+    # Bogus answer (bad signature)
+    [('bogus.d2a14n3.rootcanary.net.', 'A'),
+     dict(rcode=0, secure=True, wildcard=False, ent=False, exc=ResError)],
+
     # Secure algorithm 15, NSEC zone
     [('d2a15n1.rootcanary.net.', 'SOA'),
      dict(rcode=0, secure=True, wildcard=False, ent=False, exc=None)],
 
-    # Secure algorithm 16, NSEC3 zone
+    # Secure algorithm 15, NSEC3 zone
     [('d2a15n3.rootcanary.net.', 'SOA'),
      dict(rcode=0, secure=True, wildcard=False, ent=False, exc=None)],
 
-    # Secure algorithm 16, NSEC3 zone
+    # NXDOMAIN: Secure algorithm 15, NSEC3 zone
     [('nxd.d2a15n3.rootcanary.net.', 'SOA'),
      dict(rcode=3, secure=True, wildcard=False, ent=False, exc=None)],
 
-    # Unknown algorithm (16), which we don't implement yet
+    # Secure algorithm 16, NSEC3 zone
     [('d2a16n3.rootcanary.net.', 'SOA'),
-     dict(rcode=0, secure=True, wildcard=False, ent=False, exc=ResError)],
+     dict(rcode=0, secure=True, wildcard=False, ent=False, exc=None)],
 
-    # Bogus answer (bad signature)
-    [('bogus.d2a15n3.rootcanary.net.', 'A'),
+    # Bogus answer (bad signature) ED448
+    [('bogus.d2a16n3.rootcanary.net.', 'A'),
      dict(rcode=0, secure=True, wildcard=False, ent=False, exc=ResError)],
 
     # Secure CNAME out of zone
@@ -106,10 +122,6 @@ TEST_VECTORS = [
 
     # Secure TLSA record
     [('_443._tcp.www.huque.com.', 'TLSA'),
-     dict(rcode=0, secure=True, wildcard=False, ent=False, exc=None)],
-
-    # Secure TXT record
-    [('sfdc.net.', 'TXT'),
      dict(rcode=0, secure=True, wildcard=False, ent=False, exc=None)],
 
     # Secure DNAME redirection to another secure zone
