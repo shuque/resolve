@@ -141,10 +141,8 @@ class DNSKEY:
             self.key = keydata_to_rsa(rr.key)
         elif self.algorithm in [13, 14]:
             self.key = keydata_to_ecc(self.algorithm, rr.key)
-        elif self.algorithm in [15]:
+        elif self.algorithm in [15, 16]:
             self.key = keydata_to_eddsa(self.algorithm, rr.key)
-        elif self.algorithm in [16]:
-            self.key = keydata_to_ed448(self.algorithm, rr.key)
         else:
             raise ResError("DNSKEY algorithm {} not supported".format(
                 self.algorithm))
@@ -257,7 +255,6 @@ def keydata_to_rsa(keydata):
     exponent = int.from_bytes(keydata[1:1+elen], byteorder='big')
     modulus = keydata[1+elen:]
     modulus_int = int.from_bytes(modulus, byteorder='big')
-    #return RSA.construct((modulus_int, exponent))
     return rsa.RSAPublicNumbers(exponent,
                                 modulus_int).public_key(default_backend())
 
@@ -266,17 +263,14 @@ def keydata_to_ecc(algnum, keydata):
     """Convert raw keydata into an ECC key object"""
     if algnum == 13:
         point_length = 32
-        #curve = 'p256'
         curve = ec.SECP256R1()
     elif algnum == 14:
         point_length = 48
-        #curve = 'p384'
         curve = ec.SECP384R1()
     else:
         raise ResError("Invalid algorithm number {} for ECDSA".format(algnum))
     x = int.from_bytes(keydata[0:point_length], byteorder='big')
     y = int.from_bytes(keydata[point_length:], byteorder='big')
-    #return ECC.construct(curve=curve, point_x=x, point_y=y)
     return ec.EllipticCurvePublicNumbers(
         curve=curve, x=x, y=y).public_key(default_backend())
 
@@ -285,13 +279,7 @@ def keydata_to_eddsa(algnum, keydata):
     """Convert raw keydata into an EdDSA key object"""
     if algnum == 15:
         return ed25519.Ed25519PublicKey.from_public_bytes(keydata)
-    else:
-        raise ResError("Unknown EdDSA algorithm number {}".format(algnum))
-
-
-def keydata_to_ed448(algnum, keydata):
-    """Convert raw keydata into an Ed448 key object"""
-    if algnum == 16:
+    elif algnum == 16:
         return ed448.Ed448PublicKey.from_public_bytes(keydata)
     else:
         raise ResError("Unknown EdDSA algorithm number {}".format(algnum))
@@ -437,9 +425,6 @@ def ds_rrset_matches_dnskey(ds_list, dnskey):
             continue
         if ds.digest_type not in DS_ALG:
             continue
-        #hashout = DS_ALG[ds.digest_type].new(data=preimage)
-        #if hashout.digest() == ds.digest:
-        #    return True
         digest = hashes.Hash(DS_ALG[ds.digest_type](),
                              backend=default_backend())
         digest.update(preimage)
