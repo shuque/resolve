@@ -978,7 +978,7 @@ def match_ds_zone(zone, referring_query=None):
             authenticated = True
             break
 
-        if referring_query and vprint_quiet(referring_query.quiet):
+        if referring_query and vprint_quiet(referring_query):
             print("ERROR: DS did not match DNSKEY: {} at {}".format(
                 zone.name, nsaddr.addr))
 
