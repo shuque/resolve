@@ -7,7 +7,7 @@ class Prefs:
     """Preferences"""
     MINIMIZE = False                 # -m: Do qname minimization?
     TCPONLY = False                  # -t: Use TCP only
-    VERBOSE = 0                      # -v N: Verbosity level (0 default; 1/2)
+    VERBOSE = 0                      # -v: Verbosity level (0 default)
     VIOLATE = False                  # -x: ENT nxdomain workaround
     STATS = False                    # -s: Print statistics
     NSRESOLVE = False                # -n: Resolve all NS addresses

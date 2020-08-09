@@ -381,9 +381,10 @@ def validate_rrset(srrset, query, silent=False):
     server names are in an offpath zone.
     """
 
-    signer = srrset.rrsig[0].signer
-    if not key_cache.has_key(signer):
-        get_ns_ds_dnskey(signer, referring_query=query)
+    for sig_rr in srrset.rrsig:
+        signer = sig_rr.signer
+        if not key_cache.has_key(signer):
+            get_ns_ds_dnskey(signer, referring_query=query)
 
     verified, failed = validate_all(srrset.rrset, srrset.rrsig)
     if not verified:
