@@ -1037,7 +1037,10 @@ def initialize_dnssec():
         raise ResError("Couldn't validate root DNSKEY RRset: {}".format(
             failed))
 
-    key_cache.install(dns.name.root, load_keys(dnskey_rrset))
+    result, errors = load_keys(dnskey_rrset)
+    if errors:
+        print("ERROR: initialzing DNSSEC: {}".format(errors))
+    key_cache.install(dns.name.root, result)
     key_cache.SecureSoFar = True
 
     return

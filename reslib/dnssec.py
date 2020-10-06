@@ -137,6 +137,9 @@ class DNSKEY:
         self.sep_flag = (self.flags & 0x01) == 0x01
         self.zone_flag = (self.flags & 0x0100) == 0x0100
         self.revoke_flag = (self.flags & 0x0080) == 0x0080
+        if not self.rawkey:
+            raise ResError("DNSKEY keytag={} alg={} has null length data".format(
+                self.keytag, self.algorithm))
         if self.algorithm in [5, 7, 8, 10]:
             self.key = keydata_to_rsa(rr.key)
         elif self.algorithm in [13, 14]:
@@ -287,13 +290,20 @@ def keydata_to_eddsa(algnum, keydata):
 
 def load_keys(rrset):
     """
-    return list of DNSKEY class objects from the given DNSKEY RRset
-    parameters (name, keytag, algorithm, key object)
+    Return list of DNSKEY class objects from the given DNSKEY RRset
+    parameters (name, keytag, algorithm, key object).
+    Also returns list of keys that experienced load/parse errors.
     """
     result = []
+    errors = []
     for rr in rrset:
-        result.append(DNSKEY(rrset.name, rr))
-    return result
+        try:
+            d = DNSKEY(rrset.name, rr)
+        except ResError as e:
+            errors.append("{}: {}".format(rrset.name, e))
+        else:
+            result.append(d)
+    return result, errors
 
 
 def get_sig_info(rrset, rrsigs):
@@ -368,13 +378,15 @@ def check_self_signature(rrset, rrsigs):
 
     Verified = []
     Failed = []
-    keys = load_keys(rrset)
+    keys, errors = load_keys(rrset)
 
     for sig in get_sig_info(rrset, rrsigs):
         v, f = verify_sig_with_keys(sig, keys)
         Verified += v
         Failed += f
 
+    if errors:
+        print("ERROR: DNSKEY errors: {}".format(errors))
     if not Verified:
         raise ResError("DNSKEY {} self signature failed to validate: {}".format(
             rrset.name, Failed))
