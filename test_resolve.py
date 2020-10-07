@@ -6,6 +6,7 @@ Unit tests for resolve
 
 import unittest
 
+from reslib.version import VERSION
 from reslib.exception import ResError
 from reslib.prefs import Prefs
 from reslib.cache import cache, RootZone, get_root_zone
@@ -91,6 +92,10 @@ TEST_VECTORS = [
     # NXDOMAIN: Secure algorithm 15, NSEC3 zone
     [('nxd.d2a15n3.rootcanary.net.', 'SOA'),
      dict(rcode=3, secure=True, wildcard=False, ent=False, exc=None)],
+
+    # Bogus answer (bad signature)
+    [('bogus.d2a15n3.rootcanary.net.', 'A'),
+     dict(rcode=0, secure=True, wildcard=False, ent=False, exc=ResError)],
 
     # Secure algorithm 16, NSEC3 zone
     [('d2a16n3.rootcanary.net.', 'SOA'),
@@ -200,6 +205,18 @@ TEST_VECTORS = [
     [('hrcompass--sandbox.cs82.cloudforce.com.', 'A'),
      dict(rcode=0, secure=False, wildcard=True, ent=False, exc=None)],
 
+    # Wildcard + Insecure referral - another example
+    [('proofpoint--c.na79.content.force.com.', 'A'),
+     dict(rcode=0, secure=False, wildcard=True, ent=False, exc=None)],
+
+    # qmin test: NXDOMAIN at intermediate name
+    [('a.b.c.z.e.huque.com.', 'A'),
+     dict(rcode=3, secure=True, wildcard=False, ent=False, exc=None)],
+
+    # qmin test: NODATA at intermediate name
+    [('d.e.huque.com.', 'AAAA'),
+     dict(rcode=0, secure=True, wildcard=False, ent=False, exc=None)],
+
     # FORMER for unknown type
     [('_25._tcp.nist-gov.mail.protection.outlook.com.', 'TLSA'),
      dict(rcode=0, secure=False, wildcard=False, ent=False, exc=ResError)],
@@ -207,6 +224,10 @@ TEST_VECTORS = [
     # Insecure PTR record
     [('23.63.116.50.in-addr.arpa.', 'PTR'),
      dict(rcode=0, secure=False, wildcard=False, ent=False, exc=None)],
+
+    # Signed with 2 algorithms (8 and 13)
+    [('two-algorithms.experiments.powerdns.space.', 'SOA'),
+     dict(rcode=0, secure=True, wildcard=False, ent=False, exc=None)],
 
 ]
 
@@ -218,7 +239,7 @@ class TestAll(unittest.TestCase):
     """
 
     def setUp(self):
-        pass
+        print("reslib version {} ..\n".format(VERSION))
 
     def xx_test_plain(self):
         """Plain DNS tests"""
@@ -254,6 +275,33 @@ class TestAll(unittest.TestCase):
                 qname, qtype = components
                 print("subtest: {} {} ...".format(qname, qtype))
                 query = Query(qname, qtype, 'IN')
+                if expect['exc'] is not None:
+                    with self.assertRaises(expect['exc']):
+                        resolve_name(query, RootZone, addResults=query)
+                    continue
+                resolve_name(query, RootZone, addResults=query)
+                self.assertEqual(query.response.rcode(), expect['rcode'])
+                self.assertEqual(query.is_secure(), expect['secure'],
+                                 msg="DNSSEC secured?")
+                if expect['wildcard']:
+                    self.assertTrue(query.wildcard, msg="Wildcard")
+                if expect['ent']:
+                    self.assertTrue(query.ent, msg="Empty Non-Terminal")
+        print("Total subtests: {}".format(count))
+
+    def xx_test_dnssec_qmin(self):
+        """DNSSEC + QName Minimization tests"""
+        print('\nDNSSEC + QMIN tests:')
+        count = 0
+        for vector in TEST_VECTORS:
+            count += 1
+            with self.subTest(vector=vector):
+                Prefs.DNSSEC = True
+                reset_all()
+                components, expect = vector
+                qname, qtype = components
+                print("subtest: {} {} ...".format(qname, qtype))
+                query = Query(qname, qtype, 'IN', minimize=True)
                 if expect['exc'] is not None:
                     with self.assertRaises(expect['exc']):
                         resolve_name(query, RootZone, addResults=query)

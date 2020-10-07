@@ -92,7 +92,8 @@ class KeyCache:
         """reset cache and security status"""
         self.data = {}                  # dict of dns.name.Name: list(DNSKEY)
         self.SecureSoFar = False
-        self.install(dns.name.root, [get_root_key()])
+        self.RootTA = get_root_key()    # DNSKEY object
+        self.install(dns.name.root, [self.RootTA])
 
     def install(self, zone, keylist):
         """install (zone -> keylist) into dictionary"""
@@ -387,8 +388,10 @@ def check_self_signature(rrset, rrsigs):
 
     if errors:
         print("ERROR: DNSKEY errors: {}".format(errors))
+    if Failed:
+        print("ERROR: DNSKEY self signature failed: {}".format(Failed))
     if not Verified:
-        raise ResError("DNSKEY {} self signature failed to validate: {}".format(
+        raise ResError("DNSKEY {} self signatures failed to validate: {}".format(
             rrset.name, Failed))
 
     return keys, Verified
@@ -425,6 +428,7 @@ def ds_rrset_matches_dnskey(ds_list, dnskey):
     DNSKEY RDATA = Flags | Protocol | Algorithm | Public Key.
     """
 
+    Matched = False
     preimage = (dnskey.name.to_digestable() +
                 struct.pack('!H', dnskey.flags) +
                 struct.pack('B', dnskey.protocol) +
@@ -440,9 +444,15 @@ def ds_rrset_matches_dnskey(ds_list, dnskey):
         digest = hashes.Hash(DS_ALG[ds.digest_type](),
                              backend=default_backend())
         digest.update(preimage)
-        if digest.finalize() == ds.digest:
-            return True
-    return False
+        computed_hash = digest.finalize()
+        if computed_hash == ds.digest:
+            Matched = True
+        elif Prefs.VERBOSE:
+            hex_snippet = computed_hash.hex()[0:8]
+            print("WARNING: DS digest {}... didn't match key with tag {}".format(
+                hex_snippet, ds.key_tag))
+
+    return Matched
 
 
 b32_to_ext_hex = bytes.maketrans(b'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567',

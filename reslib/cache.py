@@ -30,6 +30,7 @@ class Cache:
         """Initialize/empty caches"""
         self.ZoneDict = {}               # dns.name.Name -> Zone
         self.NSDict = {}                 # dns.name.Name -> NameServer
+        self.RRsets = {}                 # (dns.name.Name, rrtype) -> RRset
 
     def get_zone(self, zonename):
         """Get zone object for given zone name"""
@@ -43,6 +44,12 @@ class Cache:
             return self.NSDict[nsname]
         return None
 
+    def get_rrset(self, rrname, rrtype):
+        """Get RRset object from cache"""
+        if (rrname, rrtype) in self.RRsets:
+            return self.RRsets[(rrname, rrtype)]
+        return None
+
     def install_ns(self, nsname, nsobj):
         """Install nameserver object"""
         self.NSDict[nsname] = nsobj
@@ -50,6 +57,11 @@ class Cache:
     def install_zone(self, zonename, zoneobj):
         """Install zone object"""
         self.ZoneDict[zonename] = zoneobj
+
+    def install_rrset(self, srrset):
+        """Install RRset object"""
+        key = (srrset.rrname, srrset.rrtype)
+        self.RRsets[key] = srrset
 
     def closest_zone(self, name):
         """find closest enclosing zone object in Cache"""
@@ -60,7 +72,11 @@ class Cache:
 
     def dump(self):
         """Dump contents of Cache"""
+        self.dump_zones()
+        self.dump_nameservers()
+        self.dump_rrsets()
 
+    def dump_zones(self):
         print("#### Zone Cache dump")
         for zname, zobj in self.ZoneDict.items():
             print("Zone: {}{}".format(zname,
@@ -72,11 +88,19 @@ class Cache:
                     ds.key_tag, ds.algorithm, ds.digest_type))
         print("#### END: Zone Cache dump")
 
+    def dump_nameservers(self):
         print("#### Nameserver Cache dump")
         for nsname, nsobj in self.NSDict.items():
             ipstring_list = " ".join([x.addr for x in nsobj.iplist])
             print("{} {}".format(nsname, ipstring_list))
         print("#### END: Nameserver Cache dump")
+
+    def dump_rrsets(self):
+        print("### RRset Cache dump")
+        for _, srrset in self.RRsets.items():
+            print(srrset)
+        print("### END: RRset Cache dump")
+
 
 
 # Global cache and root zone object
