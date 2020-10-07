@@ -37,8 +37,8 @@ class Query:
         self.got_answer = False
         self.elapsed_last = None
         self.cname_chain = []
-        self.answer_rrset = []
-        self.full_answer_rrset = []
+        self.answer_rrset = []              # list of RRset
+        self.full_answer_rrset = []         # list of RRset
         self.dnssec_secure = False          # only set for negative responses?
         self.response = None                # full response message
         self.latest_rcode = None
