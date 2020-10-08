@@ -77,6 +77,7 @@ class Cache:
         self.dump_rrsets()
 
     def dump_zones(self):
+        """Dump cache of zones"""
         print("#### Zone Cache dump")
         for zname, zobj in self.ZoneDict.items():
             print("Zone: {}{}".format(zname,
@@ -84,11 +85,12 @@ class Cache:
             for ns in zobj.nslist:
                 print("    NS: {}".format(self.NSDict[ns].name))
             for ds in zobj.dslist:
-                print("    DS: {} {} {}".format(
-                    ds.key_tag, ds.algorithm, ds.digest_type))
+                print("    DS: {}{}".format(ds,
+                                            " (matched)" if ds.matched else ""))
         print("#### END: Zone Cache dump")
 
     def dump_nameservers(self):
+        """Dump cache of nameservers"""
         print("#### Nameserver Cache dump")
         for nsname, nsobj in self.NSDict.items():
             ipstring_list = " ".join([x.addr for x in nsobj.iplist])
@@ -96,6 +98,7 @@ class Cache:
         print("#### END: Nameserver Cache dump")
 
     def dump_rrsets(self):
+        """Dump cache of RRsets"""
         print("### RRset Cache dump")
         for _, srrset in self.RRsets.items():
             print(srrset)

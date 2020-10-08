@@ -21,7 +21,7 @@ from reslib.rrset import RRset
 from reslib.utils import (vprint_quiet, make_query_message, send_query,
                           is_referral)
 from reslib.dnssec import (key_cache, load_keys, validate_all,
-                           ds_rrset_matches_dnskey, check_self_signature,
+                           ds_rr_matches_dnskey, check_self_signature,
                            type_in_bitmap, get_hashed_owner,
                            nsec_covers_name, nsec3_covers_name,
                            nsec_nxdomain_proof, nsec3_nxdomain_proof,
@@ -907,16 +907,26 @@ def check_isolated_dnskey(zone):
         print(key)
 
 
-def match_ds_ksklist(ds_rdatalist, ksk_list):
+def match_ds_ksklist(zone, ksk_list):
     """
-    Match DS rdataset to given KSK list. Returns True if any of them match.
+    Match DS rdataset to given KSK list. The provided ksk_list is typically
+    the subset of DNSKEYs that sign the DNSKEY RRset.
+    Returns True if any of them match.
     """
-    for key in ksk_list:
-        if not key.zone_flag:
-            continue
-        if ds_rrset_matches_dnskey(ds_rdatalist, key):
-            return True
-    return False
+    Matched = False
+    for ds in zone.dslist:
+        for key in ksk_list:
+            if not key.zone_flag:
+                continue
+            if ds_rr_matches_dnskey(ds, key):
+                Matched = True
+                ds.matched = True
+                if Prefs.VERBOSE:
+                    print("# DS match   OK: {}".format(ds))
+            else:
+                if Prefs.VERBOSE:
+                    print("# DS match FAIL: {}".format(ds))
+    return Matched
 
 
 def match_ds_zone(zone, referring_query=None):
@@ -978,7 +988,7 @@ def match_ds_zone(zone, referring_query=None):
             print("ERROR: DNSKEY did not validate: {}".format(e))
             continue
 
-        if match_ds_ksklist(zone.dslist, sigkeys):
+        if match_ds_ksklist(zone, sigkeys):
             zone.set_secure(True)
             key_cache.install(zone.name, keylist)
             authenticated = True

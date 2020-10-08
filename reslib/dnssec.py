@@ -63,16 +63,15 @@ DS_ALG = {
 }
 
 
-def supported_algorithm_present(rdataset):
+def supported_algorithm_present(dslist):
     """
-    Does given DS or DNSKEY rdataset have at least one algorithm that
-    we support?
+    Does given DS list have at least one algorithm that we support?
     """
 
     alglist = ALG.keys()
 
-    for rdata in rdataset:
-        if rdata.algorithm in alglist:
+    for ds in dslist:
+        if ds.rdata.algorithm in alglist:
             return True
     return False
 
@@ -420,39 +419,37 @@ def validate_all(rrset, rrsigs):
     return Verified, Failed
 
 
-def ds_rrset_matches_dnskey(ds_list, dnskey):
+def ds_rr_matches_dnskey(ds, dnskey):
     """
-    Check that DS RRset includes at least one DS record whose digest
-    field corresponds to the DNSKEY.
+    Check that DS RR matches the DNSKEY.
     ds_ digest = digest_algorithm( DNSKEY owner name | DNSKEY RDATA);
     DNSKEY RDATA = Flags | Protocol | Algorithm | Public Key.
     """
 
-    Matched = False
     preimage = (dnskey.name.to_digestable() +
                 struct.pack('!H', dnskey.flags) +
                 struct.pack('B', dnskey.protocol) +
                 struct.pack('B', dnskey.algorithm) +
                 dnskey.rawkey)
-    for ds in ds_list:
-        if ds.key_tag != dnskey.keytag:
-            continue
-        if ds.algorithm != dnskey.algorithm:
-            continue
-        if ds.digest_type not in DS_ALG:
-            continue
-        digest = hashes.Hash(DS_ALG[ds.digest_type](),
-                             backend=default_backend())
-        digest.update(preimage)
-        computed_hash = digest.finalize()
-        if computed_hash == ds.digest:
-            Matched = True
-        elif Prefs.VERBOSE:
-            hex_snippet = computed_hash.hex()[0:8]
-            print("WARNING: DS digest {}... didn't match key with tag {}".format(
-                hex_snippet, ds.key_tag))
 
-    return Matched
+    if ds.rdata.key_tag != dnskey.keytag:
+        return False
+    if ds.rdata.algorithm != dnskey.algorithm:
+        return False
+    if ds.rdata.digest_type not in DS_ALG:
+        return False
+    digest = hashes.Hash(DS_ALG[ds.rdata.digest_type](),
+                         backend=default_backend())
+    digest.update(preimage)
+    computed_hash = digest.finalize()
+    if computed_hash == ds.rdata.digest:
+        return True
+    if Prefs.VERBOSE:
+        hex_snippet = computed_hash.hex()[0:8]
+        print("# ERROR: DS digest {}... didn't match key with tag {}".format(
+            hex_snippet, ds.rdata.key_tag))
+
+    return False
 
 
 b32_to_ext_hex = bytes.maketrans(b'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567',

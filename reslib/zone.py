@@ -8,6 +8,23 @@ from reslib.nameserver import NameServer
 from reslib.prefs import Prefs
 
 
+class DS:
+    """Delegation Signer class; holds DS rdata and match status"""
+
+    def __init__(self, rdata):
+        self.rdata = rdata
+        self.matched = False
+
+    def set_matched(self, boolean):
+        self.matched = boolean
+
+    def __repr__(self):
+        return "{} {} {} {}...".format(self.rdata.key_tag,
+                                       self.rdata.algorithm,
+                                       self.rdata.digest_type,
+                                       self.rdata.digest.hex()[0:16])
+
+
 class Zone:
     """Zone class"""
 
@@ -15,7 +32,7 @@ class Zone:
         self.name = zone                           # dns.name.Name
         self.cache = cache                         # Cache class
         self.nslist = []                           # list of dns.name.Name
-        self.dslist = []                           # list of DS rdata objects
+        self.dslist = []                           # list of DS objects
         self.ttl_ns = None
         self.ttl_ds = None
         self.secure = False
@@ -40,7 +57,8 @@ class Zone:
     def install_ds_rrset(self, ds_rrset):
         """Install DS rdata list"""
         self.ttl_ds = ds_rrset.ttl
-        self.dslist = ds_rrset.to_rdataset()
+        for rdata in ds_rrset.to_rdataset():
+            self.dslist.append(DS(rdata))
 
     def set_secure(self, action):
         """Set zone to secure; when signed DS matches signed DNSKEY below"""
@@ -77,12 +95,14 @@ class Zone:
 
     def print_dsinfo(self):
         """Print DS info"""
-        for ds_data in self.dslist:
-            print("DS: {} {} {} {}".format(
+        for ds in self.dslist:
+            ds_data = ds.rdata
+            print("DS: {} {} {} {}{}".format(
                 ds_data.key_tag,
                 ds_data.algorithm,
                 ds_data.digest_type,
-                hexlify(ds_data.digest).decode()))
+                hexlify(ds_data.digest).decode(),
+                " OK" if ds.matched else ""))
 
     def print_details(self):
         """Print zone information"""
