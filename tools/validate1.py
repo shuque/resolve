@@ -80,7 +80,7 @@ if __name__ == '__main__':
                                              qname,
                                              dns.rdatatype.from_text('DNSKEY'))
 
-    key_cache.install(qname, load_keys(dnskey_rrset))
+    key_cache.install(qname, load_keys(dnskey_rrset)[0])
     key_cache.print()
 
     verified, failed = validate_all(soa_rrset, soa_rrsigs)
