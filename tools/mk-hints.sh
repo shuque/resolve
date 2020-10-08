@@ -13,7 +13,7 @@ Root server names and addresses.
 
 ROOT_NS_TTL = 518400
 
-ROOTHINTS = ["
+ROOTHINTS = [
 EOF
 
 curl -s $ROOTHINTS_URL | \
