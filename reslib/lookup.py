@@ -803,7 +803,7 @@ def resolve_name(query, zone, addResults=None):
                 if curr_zone.dslist:
                     match_ds_zone(curr_zone, referring_query=query)
                 else:
-                    if vprint_quiet(query):
+                    if vprint_quiet(query) and not query.is_nsquery:
                         check_isolated_dnskey(curr_zone)
 
     if stats.cnt_deleg >= Prefs.MAX_DELEG:
