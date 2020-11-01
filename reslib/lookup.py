@@ -308,21 +308,27 @@ def get_ns_ds_dnskey(zonename, referring_query=None):
     """
     Get NS/DS/DNSKEY for zone. This routine is usually invoked when
     the iterative resolution path encounters a signature with an unknown
-    signer.
+    signer, e.g. if there are layers of zones on the same nameservers.
     """
 
     if Prefs.VERBOSE and not referring_query.is_nsquery:
         print("# FETCH: NS/DS/DNSKEY for {}".format(zonename))
     zone = get_zone(zonename)
     ds_rrset, ds_rrsigs = fetch_ds(zonename)
-    ds_verified, ds_failed = validate_all(ds_rrset, ds_rrsigs)
-    if not ds_verified:
-        raise ResError("DS RRset {} failed to authenticate: {}".format(
-            zonename, ds_failed))
-    zone.install_ds_rrset(ds_rrset)
-    if vprint_quiet(referring_query):
-        zone.print_details()
-    match_ds_zone(zone, referring_query=referring_query)
+    if ds_rrset is None:
+        key_cache.SecureSoFar = False
+        if vprint_quiet(referring_query):
+            print("# INFO: found INSECURE Referral to {}".format(zonename))
+            zone.print_details()
+    else:
+        ds_verified, ds_failed = validate_all(ds_rrset, ds_rrsigs)
+        if not ds_verified:
+            raise ResError("DS RRset {} failed to authenticate: {}".format(
+                zonename, ds_failed))
+        zone.install_ds_rrset(ds_rrset)
+        if vprint_quiet(referring_query):
+            zone.print_details()
+        match_ds_zone(zone, referring_query=referring_query)
     return
 
 
