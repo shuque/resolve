@@ -137,10 +137,6 @@ TEST_VECTORS = [
     [('www.princeton.huque.com.', 'A'),
      dict(rcode=0, secure=False, wildcard=False, ent=False, exc=None)],
 
-    # DNAME + TLSA secure
-    [('_25._tcp.blue.xy1.nl.', 'TLSA'),
-     dict(rcode=0, secure=True, wildcard=False, ent=False, exc=None)],
-
     # Secure Dangling CNAME
     [('dangling1.huque.com.', 'A'),
      dict(rcode=3, secure=True, wildcard=False, ent=False, exc=None)],
@@ -172,10 +168,6 @@ TEST_VECTORS = [
     # Insecure under Secure zone on NS1
     [('sub1.n.huque.com.', 'SOA'),
      dict(rcode=0, secure=False, wildcard=False, ent=False, exc=None)],
-
-    # Secure answer; Sibling glue in Cloudflare
-    [('embley.com.', 'A'),
-     dict(rcode=0, secure=True, wildcard=False, ent=False, exc=None)],
 
     # Insecure CNAME to secure zone
     [('insecure-to-secure.z.salesforce.com.', 'A'),

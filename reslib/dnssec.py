@@ -282,10 +282,9 @@ def keydata_to_eddsa(algnum, keydata):
     """Convert raw keydata into an EdDSA key object"""
     if algnum == 15:
         return ed25519.Ed25519PublicKey.from_public_bytes(keydata)
-    elif algnum == 16:
+    if algnum == 16:
         return ed448.Ed448PublicKey.from_public_bytes(keydata)
-    else:
-        raise ResError("Unknown EdDSA algorithm number {}".format(algnum))
+    raise ResError("Unknown EdDSA algorithm number {}".format(algnum))
 
 
 def load_keys(rrset):
@@ -463,8 +462,7 @@ def nsec3_hashalg(algnum):
     """
     if algnum == 1:
         return hashes.SHA1
-    else:
-        raise ResError("unsupported NSEC3 hash algorithm {}".format(algnum))
+    raise ResError("unsupported NSEC3 hash algorithm {}".format(algnum))
 
 
 def nsec3hash(name, algnum, salt, iterations, binary_out=False):
@@ -541,11 +539,7 @@ def nsec_covers_name(nsec_rrset, name):
     """
     Does NSEC RR cover the given name?
     """
-    n1 = nsec_rrset.name.canonicalize()
-    n2 = nsec_rrset[0].next.canonicalize()
-    if (name.fullcompare(n1)[1] > 0) and (name.fullcompare(n2)[1] < 0):
-        return True
-    return False
+    return nsec_rrset.name < name < nsec_rrset[0].next
 
 
 def nsec_closest_encloser(qname, zonename, nsec_list):

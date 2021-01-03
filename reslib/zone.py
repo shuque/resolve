@@ -13,10 +13,11 @@ class DS:
 
     def __init__(self, rdata):
         self.rdata = rdata
-        self.matched = False
+        self.matched = []
 
-    def set_matched(self, boolean):
-        self.matched = boolean
+    def add_matched(self, dnskey):
+        """add matching DNSKEY record"""
+        self.matched.append(dnskey)
 
     def __repr__(self):
         return "{} {} {} {}...".format(self.rdata.key_tag,

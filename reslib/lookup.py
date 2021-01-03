@@ -580,7 +580,7 @@ def find_insecure_referral(query):
             raise ResError("DS RRset {} failed to authenticate: {}".format(
                 zonename, ds_failed))
         zone.install_ds_rrset(ds_rrset)
-        match_ds_zone(zone)
+        match_ds_zone(zone, query)
     raise ValueError("Can't find insecure referral, yet response is unsigned.")
 
 
@@ -913,21 +913,23 @@ def check_isolated_dnskey(zone):
         print(key)
 
 
-def match_ds_ksklist(zone, ksk_list):
+def match_ds_ksklist(zone, ksk_list, referring_query):
     """
     Match DS rdataset to given KSK list. The provided ksk_list is typically
     the subset of DNSKEYs that sign the DNSKEY RRset.
-    Returns True if any of them match.
+    Returns True if any of them match, and populates each DS RR object with
+    the corresponding matched DNSKEYs.
     """
     Matched = False
+
     for ds in zone.dslist:
         for key in ksk_list:
             if not key.zone_flag:
                 continue
             if ds_rr_matches_dnskey(ds, key):
                 Matched = True
-                ds.matched = True
-                if Prefs.VERBOSE:
+                ds.add_matched(key)
+                if Prefs.VERBOSE and not referring_query.is_nsquery:
                     print("# DS match   OK: {}".format(ds))
             else:
                 if Prefs.VERBOSE:
@@ -935,7 +937,7 @@ def match_ds_ksklist(zone, ksk_list):
     return Matched
 
 
-def match_ds_zone(zone, referring_query=None):
+def match_ds_zone(zone, referring_query):
     """
     DS (Delegation Signer) processing: Authenticate the secure delegation
     to the zone, by fetching its DNSKEY RRset, authenticating the self
@@ -994,7 +996,7 @@ def match_ds_zone(zone, referring_query=None):
             print("ERROR: DNSKEY did not validate: {}".format(e))
             continue
 
-        if match_ds_ksklist(zone, sigkeys):
+        if match_ds_ksklist(zone, sigkeys, referring_query):
             zone.set_secure(True)
             key_cache.install(zone.name, keylist)
             authenticated = True

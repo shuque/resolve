@@ -22,6 +22,7 @@ Perform iterative resolution of a DNS name, type, and class.
 
      Options:
      -v: increase verbosity level by 1 (default 0)
+     -j: give JSON encoded output
      -m: do qname minimization
      -t: use TCP only
      -s: print summary statistics

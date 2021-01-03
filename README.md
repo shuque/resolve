@@ -41,7 +41,7 @@ earlier versions:
 ### Usage
 
 ```
-resolve.py version 0.5.3
+resolve.py version 0.5.4
 Perform iterative resolution of a DNS name, type, and class.
 
     Usage: resolve.py [Options] <qname> [<qtype>] [<qclass>]
@@ -49,6 +49,7 @@ Perform iterative resolution of a DNS name, type, and class.
 
      Options:
      -v: increase verbosity level by 1 (default 0)
+     -j: give JSON encoded output
      -m: do qname minimization
      -t: use TCP only
      -s: print summary statistics

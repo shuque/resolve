@@ -18,6 +18,7 @@ from reslib.dnssec import key_cache
 from reslib.lookup import resolve_name, initialize_dnssec, print_root_zone
 from reslib.batch import batchmode
 from reslib.exit import exit_status
+from reslib.result import jsonout
 
 
 def main():
@@ -52,11 +53,15 @@ def main():
 
     try:
         resolve_name(query, RootZone, addResults=query)
-    except ResError as e:
-        print("\nERROR:", e)
+    except ResError as exc_info:
+        print("\nERROR:", exc_info)
         return 255
 
     stats.elapsed = time.time() - time_start
+
+    if Prefs.JSON:
+        jsonout(query)
+        return exit_status(query)
 
     if Prefs.VERBOSE and not query.quiet:
         print('')

@@ -48,4 +48,3 @@ def batchmode(cache, infile, info):
         query.print_full_answer()
 
     print("\n### End Batch Mode.")
-    return

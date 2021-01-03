@@ -13,7 +13,7 @@ def process_args(arguments):
     """Process all command line arguments"""
 
     try:
-        (options, args) = getopt.getopt(arguments, 'mtvsnxe:zc46b:')
+        (options, args) = getopt.getopt(arguments, 'mtvsnxe:zc46b:j')
     except getopt.GetoptError:
         usage()
 
@@ -42,6 +42,8 @@ def process_args(arguments):
             Prefs.V4_ONLY = True
         elif opt == "-6":
             Prefs.V6_ONLY = True
+        elif opt == "-j":
+            Prefs.JSON = True
 
     if (Prefs.PAYLOAD == 0) and Prefs.DNSSEC:
         usage("ERROR: DNSSEC (-z) requires EDNS (non zero -e)")
@@ -49,11 +51,13 @@ def process_args(arguments):
     if Prefs.V4_ONLY and Prefs.V6_ONLY:
         usage("ERROR: -4 (IPv4 only) & -6 (IPv6 only) are mutually exclusive")
 
+    if Prefs.JSON:
+        Prefs.VERBOSE = False # turn off verbose printing; json output has details
+
     if Prefs.BATCHFILE:
         if not args:
             return (None, None, None)
-        else:
-            usage()
+        usage()
 
     numargs = len(args)
     if numargs == 1:

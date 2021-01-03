@@ -134,6 +134,7 @@ class Query:
         self.qname = dns.name.Name(self.orig_qname[-numLabels:])
 
     def orig_query_string(self):
+        """Return original query string"""
         return "{} {} {}".format(self.orig_qname if self.minimize else self.qname,
                                  dns.rdatatype.to_text(self.qtype),
                                  dns.rdataclass.to_text(self.qclass))

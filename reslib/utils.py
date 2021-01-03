@@ -85,7 +85,7 @@ def send_query(msg, nsaddr, query,
 
 def make_query_message(query):
     """Make DNS query message from a query object"""
-    use_edns = False if Prefs.PAYLOAD == 0 else True
+    use_edns = Prefs.PAYLOAD != 0
     msg = dns.message.make_query(query.qname,
                                  query.qtype,
                                  rdclass=query.qclass,

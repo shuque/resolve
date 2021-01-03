@@ -8,6 +8,7 @@ class Prefs:
     MINIMIZE = False                 # -m: Do qname minimization?
     TCPONLY = False                  # -t: Use TCP only
     VERBOSE = 0                      # -v: Verbosity level (0 default)
+    JSON = False                     # -j: JSON encoded output
     VIOLATE = False                  # -x: ENT nxdomain workaround
     STATS = False                    # -s: Print statistics
     NSRESOLVE = False                # -n: Resolve all NS addresses

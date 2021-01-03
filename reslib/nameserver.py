@@ -30,7 +30,6 @@ class NameServer:
         """Install an IP address object for given IP string"""
         if not self.has_ip(ipstring):
             self.iplist.append(IPaddress(ipstring))
-        return
 
     def __repr__(self):
         return "<NS: {}: {}>".format(self.name,
