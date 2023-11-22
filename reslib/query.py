@@ -8,7 +8,7 @@ import dns.rdataclass
 
 from reslib.prefs import Prefs
 from reslib.exception import ResError
-from reslib.dnssec import key_cache, sig_validity
+from reslib.dnssec import key_cache, sig_validity, sig_expires_in
 
 
 class Query:
@@ -103,13 +103,14 @@ class Query:
                 if Prefs.DNSSEC and Prefs.VERBOSE > 1:
                     if x.rrsig is not None:
                         for sig_rr in x.rrsig:
-                            print("{} {} {} {} {} # validity={}".format(
+                            print("{} {} {} {} {} # validity={} expires_in={}".format(
                                 x.rrsig.name,
                                 x.rrsig.ttl,
                                 dns.rdataclass.to_text(x.rrsig.rdclass),
                                 dns.rdatatype.to_text(x.rrsig.rdtype),
                                 sig_rr,
-                                sig_validity(sig_rr)))
+                                sig_validity(sig_rr),
+                                sig_expires_in(sig_rr)))
 
     def get_answer_ip_list(self):
         """get list of answer IP addresses if any"""

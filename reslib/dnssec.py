@@ -3,6 +3,7 @@ DNSSEC functions.
 """
 
 import time
+import math
 import base64
 import struct
 from io import BytesIO
@@ -223,16 +224,30 @@ class Signature:
             self.rdata.key_tag, self.rdata.algorithm)
 
 
+def duration2string(duration):
+    """
+    Return time duration in human readable string form.
+    """
+    days, remainder = divmod(duration, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, remainder = divmod(remainder, 60)
+    return "{}d{}h{}m{}s".format(days, hours, minutes, remainder)
+
+
 def sig_validity(sig_rr):
     """
     Return length of signature validity period for given RRSIG RR.
     """
     duration = sig_rr.expiration - sig_rr.inception
-    days, remainder = divmod(duration, 86400)
-    hours, remainder = divmod(remainder, 3600)
-    minutes, remainder = divmod(remainder, 60)
-    seconds, remainder = divmod(remainder, 60)
-    return "{}d{}h{}m{}s".format(days, hours, minutes, seconds)
+    return duration2string(duration)
+
+
+def sig_expires_in(sig_rr):
+    """
+    Return time to expiry of given RRSIG RR.
+    """
+    duration = sig_rr.expiration - math.floor(time.time() + 0.5)
+    return duration2string(duration)
 
 
 def get_root_key():

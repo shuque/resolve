@@ -913,7 +913,7 @@ def check_isolated_dnskey(zone):
         print(key)
 
 
-def match_ds_ksklist(zone, ksk_list, referring_query):
+def match_ds_ksklist(zone, nsaddr, ksk_list, referring_query):
     """
     Match DS rdataset to given KSK list. The provided ksk_list is typically
     the subset of DNSKEYs that sign the DNSKEY RRset.
@@ -930,10 +930,12 @@ def match_ds_ksklist(zone, ksk_list, referring_query):
                 Matched = True
                 ds.add_matched(key)
                 if Prefs.VERBOSE and not referring_query.is_nsquery:
-                    print("# DS match   OK: {}".format(ds))
+                    #print("DEBUG: query", referring_query, zone.name, nsaddr.addr)
+                    print("# DS match OK: {} {}: {} {}".format(zone.name, nsaddr.addr, ds, key))
             else:
                 if Prefs.VERBOSE:
-                    print("# DS match FAIL: {}".format(ds))
+                    #print("DEBUG: query", referring_query, zone.name, nsaddr.addr)
+                    print("# DS match FAIL: {} {}: {} {}".format(zone.name, nsaddr.addr, ds, key))
     return Matched
 
 
@@ -996,7 +998,7 @@ def match_ds_zone(zone, referring_query):
             print("ERROR: DNSKEY did not validate: {}".format(e))
             continue
 
-        if match_ds_ksklist(zone, sigkeys, referring_query):
+        if match_ds_ksklist(zone, nsaddr, sigkeys, referring_query):
             zone.set_secure(True)
             key_cache.install(zone.name, keylist)
             authenticated = True
