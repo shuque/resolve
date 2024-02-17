@@ -31,6 +31,9 @@ from reslib.exception import ResError
 # Tolerable clock skew for signatures in seconds
 CLOCK_SKEW = 300
 
+# Maximum number of keytag collisions we honor
+MAX_KEYTAG_COLLISIONS = 4
+
 # DNSSEC algorithm number -> name
 ALG = {
     5: "RSASHA1",
@@ -369,9 +372,11 @@ def verify_sig_with_keys(sig, keys):
     Verified = []
     Failed = []
 
-    for key in keys:
-        if key.keytag != sig.rdata.key_tag:
-            continue
+    candidate_keys = [key for key in keys if key.keytag == sig.rdata.key_tag]
+    if len(candidate_keys) > MAX_KEYTAG_COLLISIONS:
+        return Verified, [(x, "Keytag Collision Limit") for x in candidate_keys]
+
+    for key in candidate_keys:
         try:
             sig.verify(key)
             sig.check_time()
