@@ -926,7 +926,7 @@ def match_ds_ksklist(zone, nsaddr, ksk_list, referring_query):
         for key in ksk_list:
             if not key.zone_flag:
                 continue
-            if ds_rr_matches_dnskey(ds, key):
+            if ds_rr_matches_dnskey(ds.rdata, key):
                 Matched = True
                 ds.add_matched(key)
                 if Prefs.VERBOSE and not referring_query.is_nsquery:

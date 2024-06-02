@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="resolve",
-    version="0.5.4",
+    version="0.6.6",
     author="Shumon Huque",
     author_email="shuque@gmail.com",
     description="Command line iterative DNS resolution program and library",

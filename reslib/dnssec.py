@@ -451,22 +451,22 @@ def ds_rr_matches_dnskey(ds, dnskey):
                 struct.pack('B', dnskey.algorithm) +
                 dnskey.rawkey)
 
-    if ds.rdata.key_tag != dnskey.keytag:
+    if ds.key_tag != dnskey.keytag:
         return False
-    if ds.rdata.algorithm != dnskey.algorithm:
+    if ds.algorithm != dnskey.algorithm:
         return False
-    if ds.rdata.digest_type not in DS_ALG:
+    if ds.digest_type not in DS_ALG:
         return False
-    digest = hashes.Hash(DS_ALG[ds.rdata.digest_type](),
+    digest = hashes.Hash(DS_ALG[ds.digest_type](),
                          backend=default_backend())
     digest.update(preimage)
     computed_hash = digest.finalize()
-    if computed_hash == ds.rdata.digest:
+    if computed_hash == ds.digest:
         return True
     if Prefs.VERBOSE:
         hex_snippet = computed_hash.hex()[0:8]
         print("# ERROR: DS digest {}... didn't match key with tag {}".format(
-            hex_snippet, ds.rdata.key_tag))
+            hex_snippet, ds.key_tag))
 
     return False
 
