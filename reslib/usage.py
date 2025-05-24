@@ -4,7 +4,7 @@ usage string function
 
 import os
 import sys
-from reslib.version import VERSION
+from reslib.version import __version__
 from reslib.prefs import Prefs
 
 PROGNAME = os.path.basename(sys.argv[0])
@@ -37,5 +37,5 @@ Perform iterative resolution of a DNS name, type, and class.
 
 When using -b, <batchfile> contains one (space separated) query name, type,
 class per line.
-    """.format(PROGNAME, VERSION, Prefs.PAYLOAD))
+    """.format(PROGNAME, __version__, Prefs.PAYLOAD))
     sys.exit(1)

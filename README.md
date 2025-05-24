@@ -41,7 +41,7 @@ earlier versions:
 ### Usage
 
 ```
-resolve.py version 0.6.6
+resolve.py version 0.6.7
 Perform iterative resolution of a DNS name, type, and class.
 
     Usage: resolve.py [Options] <qname> [<qtype>] [<qclass>]
@@ -68,25 +68,17 @@ class per line.
 
 ### Installation
 
-To install the pre-requisite python cryptography package system wide:
-
-* (as root) pip3 install "cryptography>=3.0"
-
-To install the pre-requisite python cryptography package locally for the user:
-
-* pip3 install --user "cryptography>=3.0"
-
 To install system wide:
 
-* (as root) pip3 install git+https://github.com/shuque/resolve.git@v0.6.6
+* (as root) pip3 install git+https://github.com/shuque/resolve.git@v0.6.7
 
 To install for your own account:
 
-* pip3 install git+https://github.com/shuque/resolve.git@v0.6.6
+* pip3 install git+https://github.com/shuque/resolve.git@v0.6.7
 
-To install in a python virtual environment, just:
+To install from a local copy of this repository:
 
-* python3 setup.py install
+* pip3 install .
 
 
 ### Examples

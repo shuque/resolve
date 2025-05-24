@@ -6,7 +6,7 @@ Unit tests for resolve
 
 import unittest
 
-from reslib.version import VERSION
+from reslib.version import __version__
 from reslib.exception import ResError
 from reslib.prefs import Prefs
 from reslib.cache import cache, RootZone, get_root_zone
@@ -231,7 +231,7 @@ class TestAll(unittest.TestCase):
     """
 
     def setUp(self):
-        print("reslib version {} ..\n".format(VERSION))
+        print("reslib version {} ..\n".format(__version__))
 
     def xx_test_plain(self):
         """Plain DNS tests"""
