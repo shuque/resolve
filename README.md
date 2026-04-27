@@ -41,7 +41,7 @@ earlier versions:
 ### Usage
 
 ```
-resolve.py version 0.6.7
+resolve.py version 0.6.8
 Perform iterative resolution of a DNS name, type, and class.
 
     Usage: resolve.py [Options] <qname> [<qtype>] [<qclass>]
@@ -70,11 +70,11 @@ class per line.
 
 To install system wide:
 
-* (as root) pip3 install git+https://github.com/shuque/resolve.git@v0.6.7
+* (as root) pip3 install git+https://github.com/shuque/resolve.git@v0.6.8
 
 To install for your own account:
 
-* pip3 install git+https://github.com/shuque/resolve.git@v0.6.7
+* pip3 install git+https://github.com/shuque/resolve.git@v0.6.8
 
 To install from a local copy of this repository:
 

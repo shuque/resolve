@@ -559,7 +559,14 @@ def nsec_covers_name(nsec_rrset, name):
     """
     Does NSEC RR cover the given name?
     """
-    return nsec_rrset.name < name < nsec_rrset[0].next
+    owner = nsec_rrset.name
+    nextname = nsec_rrset[0].next
+
+    if owner < nextname:
+        return nsec_rrset.name < name < nsec_rrset[0].next
+
+    # Wrap around case (next is apex or sorts before owner)
+    return (name > owner) or (name < next)
 
 
 def nsec_closest_encloser(qname, zonename, nsec_list):
@@ -632,9 +639,10 @@ def nsec3_covers_name(nsec_rrset, name, zonename):
     n2_hash = n2_hash.translate(b32_to_ext_hex).decode()
     n2 = dns.name.Name((n2_hash,) + zonename.labels)
     n2 = n2.canonicalize()
-    if (name.fullcompare(n1)[1] > 0) and (name.fullcompare(n2)[1] < 0):
-        return True
-    return False
+    if n1.fullcompare(n2)[1] < 0:
+        return (name.fullcompare(n1)[1] > 0) and (name.fullcompare(n2)[1] < 0)
+    # Wrap around nsec3
+    return (name.fullcompare(n1)[1] > 0) or (name.fullcompare(n2)[1] < 0)
 
 
 def nsec3_closest_encloser_and_next(qname, zonename, nsec3_list):
