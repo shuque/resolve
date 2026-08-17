@@ -9,7 +9,7 @@ import time
 import random
 
 from reslib.exception import ResError
-from reslib.prefs import Prefs
+from reslib.prefs import prefs
 from reslib.cache import cache, RootZone
 from reslib.stats import stats
 from reslib.options import process_args
@@ -29,26 +29,26 @@ def main():
     random.seed(os.urandom(64))
     qname, qtype, qclass = process_args(sys.argv[1:])
 
-    if Prefs.DNSSEC:
+    if prefs.DNSSEC:
         initialize_dnssec()
 
-    if Prefs.BATCHFILE:
+    if prefs.BATCHFILE:
         time_start = time.time()
-        batchmode(cache, Prefs.BATCHFILE,
+        batchmode(cache, prefs.BATCHFILE,
                   info="Command: {}".format(" ".join(sys.argv)))
         stats.elapsed = time.time() - time_start
-        if Prefs.STATS:
+        if prefs.STATS:
             stats.print()
-        if Prefs.DUMPCACHE:
+        if prefs.DUMPCACHE:
             print('')
             cache.dump()
             key_cache.dump()
         return 0
 
-    query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
+    query = Query(qname, qtype, qclass, minimize=prefs.MINIMIZE)
 
     time_start = time.time()
-    if Prefs.VERBOSE:
+    if prefs.VERBOSE:
         print_root_zone()
 
     try:
@@ -59,18 +59,18 @@ def main():
 
     stats.elapsed = time.time() - time_start
 
-    if Prefs.JSON:
+    if prefs.JSON:
         jsonout(query)
         return exit_status(query)
 
-    if Prefs.VERBOSE and not query.quiet:
+    if prefs.VERBOSE and not query.quiet:
         print('')
     query.print_full_answer()
 
-    if Prefs.STATS:
+    if prefs.STATS:
         stats.print()
 
-    if Prefs.DUMPCACHE:
+    if prefs.DUMPCACHE:
         print('')
         cache.dump()
         key_cache.dump()

@@ -11,7 +11,7 @@ import dns.rdatatype
 import dns.rcode
 import dns.dnssec
 
-from reslib.prefs import Prefs
+from reslib.prefs import prefs
 from reslib.cache import cache, RootZone
 from reslib.stats import stats
 from reslib.exception import ResError
@@ -50,23 +50,23 @@ def get_ns_addrs(zone, query):
     for rrset in additional:
         if rrset.rdtype in [dns.rdatatype.A, dns.rdatatype.AAAA]:
             if not zone.has_ns(rrset.name):
-                if Prefs.VERBOSE > 1:
+                if prefs.VERBOSE > 1:
                     print(("WARN: referral to {} has unrelated additional" +
                            "data: {} {}").format(zone.name,
                                                  rrset.name, rrset.rdtype))
                 continue
             if not rrset.name.is_subdomain(zone.name):
-                if Prefs.VERBOSE > 1:
+                if prefs.VERBOSE > 1:
                     print("INFO: referral to {} has unneeded (sibling?) glue: {} {}".format(
                         zone.name, rrset.name,
                         dns.rdatatype.to_text(rrset.rdtype)))
             for rr in rrset:
-                if (not Prefs.NSRESOLVE) or (rrset.name in needsGlue):
+                if (not prefs.NSRESOLVE) or (rrset.name in needsGlue):
                     nsobj = cache.get_ns(rrset.name)
                     nsobj.install_ip(rr.address)
 
-    if not zone.iplist() or Prefs.NSRESOLVE:
-        if Prefs.VERBOSE > 1:
+    if not zone.iplist() or prefs.NSRESOLVE:
+        if prefs.VERBOSE > 1:
             print("INFO: NS addresses need to be explicitly resolved:")
             zone.print_nsinfo()
         for name in needToResolve:
@@ -132,7 +132,7 @@ def authenticate_insecure_referral(query, zonename):
                 not type_in_bitmap(dns.rdatatype.DS, nsec3_rdata) and
                 not type_in_bitmap(dns.rdatatype.CNAME, nsec3_rdata)):
                 authenticated = True
-                if Prefs.VERBOSE and not query.quiet:
+                if prefs.VERBOSE and not query.quiet:
                     print("# H({}) = {}".format(zonename,
                                                 hashed_owner.labels[0].decode()))
             optout = nsec3_rdata.flags & 0x1
@@ -153,7 +153,7 @@ def print_referral_trace(query, zonename, ds_srrset):
     Print Referral trace: {secure/insecure, zone, response time}
     """
     if vprint_quiet(query):
-        if Prefs.DNSSEC:
+        if prefs.DNSSEC:
             ref_prefix = "SECURE " if ds_srrset else "INSECURE "
         else:
             ref_prefix = None
@@ -253,7 +253,7 @@ def process_cname(query, rrset_dict, cname_dict, synthetic_cname,
         seen.append(final_alias)
         if final_alias not in cname_dict:
             break
-        if Prefs.DNSSEC and synthetic_cname  and \
+        if prefs.DNSSEC and synthetic_cname  and \
            (final_alias == synthetic_cname.name)  and \
            (cname_dict[final_alias] == synthetic_cname[0].target):
             srrset = rrset_dict[(final_alias, dns.rdatatype.CNAME)]
@@ -311,7 +311,7 @@ def get_ns_ds_dnskey(zonename, referring_query=None):
     signer, e.g. if there are layers of zones on the same nameservers.
     """
 
-    if Prefs.VERBOSE and not referring_query.is_nsquery:
+    if prefs.VERBOSE and not referring_query.is_nsquery:
         print("# FETCH: NS/DS/DNSKEY for {}".format(zonename))
     zone = get_zone(zonename)
     ds_rrset, ds_rrsigs = fetch_ds(zonename)
@@ -638,14 +638,14 @@ def process_answer(query, addResults=None):
             query.answer_rrset.append(srrset)
             if addResults:
                 addResults.add_to_full_answer(srrset)
-            if Prefs.VERBOSE:
+            if prefs.VERBOSE:
                 print(srrset.rrset.to_text())
             cname_target = srrset.rrset[0].target
             cname_dict[srrset.rrset.name] = cname_target
             stats.cnt_cname += 1
-            if stats.cnt_cname >= Prefs.MAX_CNAME:
+            if stats.cnt_cname >= prefs.MAX_CNAME:
                 raise ResError("Too many ({}) CNAME indirections.".format(
-                    Prefs.MAX_CNAME))
+                    prefs.MAX_CNAME))
 
     if query.qname != query.orig_qname:
         if vprint_quiet(query):
@@ -679,7 +679,7 @@ def process_response(query, addResults=None):
                     print("ERROR: NODATA: {} of type {} not found".format(
                         query.qname,
                         dns.rdatatype.to_text(query.qtype)))
-            if Prefs.DNSSEC and not query.is_nsquery and key_cache.SecureSoFar:
+            if prefs.DNSSEC and not query.is_nsquery and key_cache.SecureSoFar:
                 authenticate_nodata(query)
             return query.response.rcode(), None
 
@@ -694,7 +694,7 @@ def process_response(query, addResults=None):
             print("ERROR: NXDOMAIN: {} not found".format(query.qname))
         if query.response.answer:
             process_answer(query, addResults=addResults)
-        elif Prefs.DNSSEC and not query.is_nsquery and key_cache.SecureSoFar:
+        elif prefs.DNSSEC and not query.is_nsquery and key_cache.SecureSoFar:
             authenticate_nxdomain(query)
 
     return query.response.rcode(), None
@@ -714,9 +714,9 @@ def print_query_trace(query, zone, address):
 
 def check_query_count_limit():
     """Check query count limit"""
-    if stats.cnt_query1 + stats.cnt_query2 >= Prefs.MAX_QUERY:
+    if stats.cnt_query1 + stats.cnt_query2 >= prefs.MAX_QUERY:
         raise ResError("Max number of queries ({}) exceeded.".format(
-            Prefs.MAX_QUERY))
+            prefs.MAX_QUERY))
 
 
 def get_zone_addresses(zone):
@@ -776,7 +776,7 @@ def resolve_name(query, zone, addResults=None):
     curr_zone = zone
     repeatZone = False
 
-    while stats.cnt_deleg < Prefs.MAX_DELEG:
+    while stats.cnt_deleg < prefs.MAX_DELEG:
 
         if query.minimize:
             if repeatZone:
@@ -788,7 +788,7 @@ def resolve_name(query, zone, addResults=None):
         rc, referral = send_query_zone(query, curr_zone, addResults=addResults)
 
         if rc == dns.rcode.NXDOMAIN:
-            if Prefs.VIOLATE and (query.minimize) and (query.qname != query.orig_qname):
+            if prefs.VIOLATE and (query.minimize) and (query.qname != query.orig_qname):
                 repeatZone = True
             else:
                 break
@@ -805,16 +805,16 @@ def resolve_name(query, zone, addResults=None):
                     referral.name, curr_zone.name))
                 break
             curr_zone = referral
-            if Prefs.DNSSEC:
+            if prefs.DNSSEC:
                 if curr_zone.dslist:
                     match_ds_zone(curr_zone, referring_query=query)
                 else:
                     if vprint_quiet(query) and not query.is_nsquery:
                         check_isolated_dnskey(curr_zone)
 
-    if stats.cnt_deleg >= Prefs.MAX_DELEG:
+    if stats.cnt_deleg >= prefs.MAX_DELEG:
         print("ERROR: Max number of delegation ({}) reached.".format(
-            Prefs.MAX_DELEG))
+            prefs.MAX_DELEG))
 
     return
 
@@ -929,11 +929,11 @@ def match_ds_ksklist(zone, nsaddr, ksk_list, referring_query):
             if ds_rr_matches_dnskey(ds.rdata, key):
                 Matched = True
                 ds.add_matched(key)
-                if Prefs.VERBOSE and not referring_query.is_nsquery:
+                if prefs.VERBOSE and not referring_query.is_nsquery:
                     #print("DEBUG: query", referring_query, zone.name, nsaddr.addr)
                     print("# DS match OK: {} {}: {} {}".format(zone.name, nsaddr.addr, ds, key))
             else:
-                if Prefs.VERBOSE:
+                if prefs.VERBOSE:
                     #print("DEBUG: query", referring_query, zone.name, nsaddr.addr)
                     print("# DS match FAIL: {} {}: {} {}".format(zone.name, nsaddr.addr, ds, key))
     return Matched
@@ -1091,6 +1091,6 @@ def initialize_dnssec():
 def print_root_zone():
     """Print root zone details"""
     RootZone.print_details()
-    if Prefs.DNSSEC:
+    if prefs.DNSSEC:
         for key in key_cache.get_keys(RootZone.name):
             print(key)

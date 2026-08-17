@@ -7,7 +7,7 @@ Simple test of main name resolution function.
 
 import sys
 
-from reslib.prefs import Prefs
+from reslib.prefs import prefs
 from reslib.cache import RootZone
 from reslib.query import Query
 from reslib.lookup import initialize_dnssec, resolve_name
@@ -19,7 +19,7 @@ if __name__ == '__main__':
     qtype = sys.argv[2]
     qclass = 'IN'
 
-    Prefs.DNSSEC = True
+    prefs.DNSSEC = True
     initialize_dnssec()
     query = Query(qname, qtype, qclass)
     resolve_name(query, RootZone, addResults=query)

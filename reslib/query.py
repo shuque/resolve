@@ -6,7 +6,7 @@ import dns.name
 import dns.rdatatype
 import dns.rdataclass
 
-from reslib.prefs import Prefs
+from reslib.prefs import prefs
 from reslib.exception import ResError
 from reslib.dnssec import key_cache, sig_validity, sig_expires_in
 
@@ -14,7 +14,7 @@ from reslib.dnssec import key_cache, sig_validity, sig_expires_in
 class Query:
     """Query name class"""
 
-    def __init__(self, qname, qtype, qclass, minimize=Prefs.MINIMIZE,
+    def __init__(self, qname, qtype, qclass, minimize=prefs.MINIMIZE,
                  is_nsquery=False):
         if isinstance(qname, dns.name.Name):
             self.qname = qname
@@ -88,7 +88,7 @@ class Query:
         else:
             print('')
 
-        if Prefs.DNSSEC:
+        if prefs.DNSSEC:
             print("# DNSSEC status: {}".format(
                 "SECURE" if secure else "INSECURE"))
             if self.wildcard:
@@ -100,7 +100,7 @@ class Query:
         if self.full_answer_rrset:
             for x in self.full_answer_rrset:
                 print(x.rrset.to_text())
-                if Prefs.DNSSEC and Prefs.VERBOSE > 1:
+                if prefs.DNSSEC and prefs.VERBOSE > 1:
                     if x.rrsig is not None:
                         for sig_rr in x.rrsig:
                             print("{} {} {} {} {} # validity={} expires_in={}".format(

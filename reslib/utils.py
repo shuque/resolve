@@ -5,15 +5,15 @@ Miscellaneous helper functions.
 import time
 import random
 import dns.resolver
-from reslib.prefs import Prefs
+from reslib.prefs import prefs
 from reslib.stats import stats
 
 
 def vprint_quiet(query):
     """Is verbose flag > 1 or is it set and query does not have quiet flag?"""
-    if Prefs.VERBOSE > 1:
+    if prefs.VERBOSE > 1:
         return True
-    return Prefs.VERBOSE and not query.quiet
+    return prefs.VERBOSE and not query.quiet
 
 
 def is_authoritative(msg):
@@ -31,7 +31,7 @@ def is_referral(msg):
     return (msg.rcode() == 0) and (not is_authoritative(msg)) and msg.authority
 
 
-def send_query_tcp(msg, nsaddr, query, timeout=Prefs.TIMEOUT):
+def send_query_tcp(msg, nsaddr, query, timeout=prefs.TIMEOUT):
     """Send query over TCP"""
     res = None
     stats.update_query(query, tcp=True)
@@ -44,7 +44,7 @@ def send_query_tcp(msg, nsaddr, query, timeout=Prefs.TIMEOUT):
 
 
 def send_query_udp(msg, nsaddr, query,
-                   timeout=Prefs.TIMEOUT, retries=Prefs.RETRIES):
+                   timeout=prefs.TIMEOUT, retries=prefs.RETRIES):
     """Send query over UDP"""
     gotresponse = False
     res = None
@@ -63,13 +63,13 @@ def send_query_udp(msg, nsaddr, query,
 
 
 def send_query(msg, nsaddr, query,
-               timeout=Prefs.TIMEOUT, retries=Prefs.RETRIES, newid=False):
+               timeout=prefs.TIMEOUT, retries=prefs.RETRIES, newid=False):
     """send DNS query to specified address"""
     res = None
     if newid:
         msg.id = random.randint(1, 65535)
 
-    if Prefs.TCPONLY:
+    if prefs.TCPONLY:
         return send_query_tcp(msg, nsaddr, query, timeout=timeout)
 
     res = send_query_udp(msg, nsaddr, query,
@@ -85,13 +85,13 @@ def send_query(msg, nsaddr, query,
 
 def make_query_message(query):
     """Make DNS query message from a query object"""
-    use_edns = Prefs.PAYLOAD != 0
+    use_edns = prefs.PAYLOAD != 0
     msg = dns.message.make_query(query.qname,
                                  query.qtype,
                                  rdclass=query.qclass,
                                  use_edns=use_edns,
-                                 want_dnssec=Prefs.DNSSEC,
-                                 payload=Prefs.PAYLOAD)
+                                 want_dnssec=prefs.DNSSEC,
+                                 payload=prefs.PAYLOAD)
     msg.flags &= ~dns.flags.RD
     return msg
 

@@ -23,7 +23,7 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives.asymmetric import ed448
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from reslib.prefs import Prefs
+from reslib.prefs import prefs
 from reslib.rootkey import RootKeyData
 from reslib.exception import ResError
 from reslib import mldsa
@@ -506,7 +506,7 @@ def ds_rr_matches_dnskey(ds, dnskey):
     computed_hash = digest.finalize()
     if computed_hash == ds.digest:
         return True
-    if Prefs.VERBOSE:
+    if prefs.VERBOSE:
         hex_snippet = computed_hash.hex()[0:8]
         print("# ERROR: DS digest {}... didn't match key with tag {}".format(
             hex_snippet, ds.key_tag))
@@ -537,7 +537,7 @@ def nsec3hash(name, algnum, salt, iterations, binary_out=False):
 
     if iterations < 0:
         raise ResError("NSEC3 hash iterations must be >= 0")
-    if iterations > Prefs.N3_HASHLIMIT:
+    if iterations > prefs.N3_HASHLIMIT:
         raise ResError("NSEC3 hash iterations too high: {} {}".format(
             name, iterations))
 
@@ -731,7 +731,7 @@ def nsec3_nxdomain_proof(qname, signer, nsec3_list, optout=False, quiet=False):
         hashed_wild = nsec3hashname_from_record(wildcard, nsec3, signer)
         if nsec3.name == hashed_ce:
             closest_encloser_match = True
-            if Prefs.VERBOSE and not quiet:
+            if prefs.VERBOSE and not quiet:
                 print("# INFO: closest{} encloser: {} {}".format(
                     " provable" if optout else "",
                     closest_encloser, hashed_ce.labels[0].decode()))
@@ -740,12 +740,12 @@ def nsec3_nxdomain_proof(qname, signer, nsec3_list, optout=False, quiet=False):
                 if not nsec3[0].flags & 0x1:
                     continue
             next_closer_cover = True
-            if Prefs.VERBOSE and not quiet:
+            if prefs.VERBOSE and not quiet:
                 print("# INFO: next closer: {} {}".format(
                     next_closer, hashed_nc.labels[0].decode()))
         if not optout and nsec3_covers_name(nsec3, hashed_wild, signer):
             wildcard_cover = True
-            if Prefs.VERBOSE and not quiet:
+            if prefs.VERBOSE and not quiet:
                 print("# INFO: wildcard: {} {}".format(
                     wildcard, hashed_wild.labels[0].decode()))
 
@@ -780,14 +780,14 @@ def nsec3_wildcard_nodata_proof(qname, qtype, signer, nsec3_list, quiet=False):
         hashed_wild = nsec3hashname_from_record(wildcard, nsec3, signer)
         if nsec3.name == hashed_ce:
             closest_encloser_match = True
-            if Prefs.VERBOSE and not quiet:
+            if prefs.VERBOSE and not quiet:
                 print("# INFO: closest encloser: {} {}".format(
                     closest_encloser, hashed_ce.labels[0].decode()))
         if nsec3.name == hashed_wild:
             if (not type_in_bitmap(qtype, nsec3[0]) and
                 not type_in_bitmap(dns.rdatatype.CNAME, nsec3[0])):
                 wildcard_match = True
-                if Prefs.VERBOSE and not quiet:
+                if prefs.VERBOSE and not quiet:
                     print("# INFO: wildcard: {} {}".format(
                         wildcard, hashed_wild.labels[0].decode()))
 
