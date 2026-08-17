@@ -6,6 +6,7 @@ private
 public
 stub.py
 test
-reslib/__pycache__
+__pycache__
+zarchive/
 CLAUDE.md
 docs/superpowers/
