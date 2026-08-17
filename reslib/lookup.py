@@ -948,7 +948,20 @@ def match_ds_zone(zone, referring_query):
     """
 
     if not supported_algorithm_present(zone.dslist):
-        raise ResError("No supported algorithms in DS set found")
+        # The DS RRset is authenticated but references only DNSSEC
+        # algorithms we don't support. Per RFC 4035 Section 5.2 (and
+        # RFC 6840 Section 5.11), this is not a validation failure: the
+        # child zone must be treated as insecure/unsigned rather than
+        # bogus, and resolution must continue. (Degrade-to-insecure only
+        # applies when NO supported algorithm is present; a DS set with
+        # even one supported algorithm still validates via that path.)
+        if referring_query and vprint_quiet(referring_query):
+            algs = sorted({int(ds.rdata.algorithm) for ds in zone.dslist})
+            print("# INFO: no supported DNSSEC algorithm (DS alg {}) for "
+                  "zone {}; treating as insecure".format(
+                      ",".join(str(a) for a in algs), zone.name))
+        key_cache.SecureSoFar = False
+        return
 
     qname = zone.name
     qtype = dns.rdatatype.from_text('DNSKEY')

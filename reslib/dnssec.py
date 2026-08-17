@@ -141,6 +141,7 @@ class DNSKEY:
         self.sep_flag = (self.flags & 0x01) == 0x01
         self.zone_flag = (self.flags & 0x0100) == 0x0100
         self.revoke_flag = (self.flags & 0x0080) == 0x0080
+        self.supported = True
         if not self.rawkey:
             raise ResError("DNSKEY keytag={} alg={} has null length data".format(
                 self.keytag, self.algorithm))
@@ -151,8 +152,14 @@ class DNSKEY:
         elif self.algorithm in [15, 16]:
             self.key = keydata_to_eddsa(self.algorithm, rr.key)
         else:
-            raise ResError("DNSKEY algorithm {} not supported".format(
-                self.algorithm))
+            # An algorithm we can't verify (e.g. ML-DSA / alg 18). This is
+            # NOT a parse error: retain the key object so it can be shown in
+            # verbose output and so algorithm-agnostic DS matching still
+            # works, but mark it unusable for signature verification.
+            # verify_sig_with_keys() skips keys where supported is False, so
+            # such a key contributes neither a verification nor a failure.
+            self.key = None
+            self.supported = False
 
     def size(self):
         """Return key size in bits"""
@@ -372,7 +379,8 @@ def verify_sig_with_keys(sig, keys):
     Verified = []
     Failed = []
 
-    candidate_keys = [key for key in keys if key.keytag == sig.rdata.key_tag]
+    candidate_keys = [key for key in keys
+                      if key.supported and key.keytag == sig.rdata.key_tag]
     if len(candidate_keys) > MAX_KEYTAG_COLLISIONS:
         return Verified, [(x, "Keytag Collision Limit") for x in candidate_keys]
 
