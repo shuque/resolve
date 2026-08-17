@@ -7,8 +7,8 @@ ROOT_NS_TTL = 518400
 ROOTHINTS = [
     ("a.root-servers.net.", "198.41.0.4"),
     ("a.root-servers.net.", "2001:503:ba3e::2:30"),
-    ("b.root-servers.net.", "199.9.14.201"),
-    ("b.root-servers.net.", "2001:500:200::b"),
+    ("b.root-servers.net.", "170.247.170.2"),
+    ("b.root-servers.net.", "2801:1b8:10::b"),
     ("c.root-servers.net.", "192.33.4.12"),
     ("c.root-servers.net.", "2001:500:2::c"),
     ("d.root-servers.net.", "199.7.91.13"),

@@ -110,8 +110,8 @@ class KeyCache:
         """reset cache and security status"""
         self.data = {}                  # dict of dns.name.Name: list(DNSKEY)
         self.SecureSoFar = False
-        self.RootTA = get_root_key()    # DNSKEY object
-        self.install(dns.name.root, [self.RootTA])
+        self.RootTA = get_root_keys()   # list of DNSKEY objects
+        self.install(dns.name.root, self.RootTA)
 
     def install(self, zone, keylist):
         """install (zone -> keylist) into dictionary"""
@@ -295,12 +295,15 @@ def sig_expires_in(sig_rr):
     return duration2string(duration)
 
 
-def get_root_key():
-    """Get root key/trust anchor"""
-    rdata = dns.rdata.from_text(dns.rdataclass.from_text('IN'),
-                                dns.rdatatype.from_text('DNSKEY'),
-                                RootKeyData)
-    return DNSKEY(dns.name.root, rdata)
+def get_root_keys():
+    """Get list of root key/trust anchor DNSKEY objects"""
+    keys = []
+    for keydata in RootKeyData:
+        rdata = dns.rdata.from_text(dns.rdataclass.from_text('IN'),
+                                    dns.rdatatype.from_text('DNSKEY'),
+                                    keydata)
+        keys.append(DNSKEY(dns.name.root, rdata))
+    return keys
 
 
 def _to_wire(record):
@@ -311,12 +314,14 @@ def _to_wire(record):
 
 def keydata_to_rsa(keydata):
     """Convert raw keydata into an RSA key object"""
-    if keydata[0] == '\x00':   # exponent field is 3 octets
+    if keydata[0] == 0:        # exponent length field is 3 octets
         elen, = struct.unpack('!H', keydata[1:3])
-    else:                     # exponent field is 1 octet
+        estart = 3
+    else:                     # exponent length field is 1 octet
         elen, = struct.unpack('B', keydata[0:1])
-    exponent = int.from_bytes(keydata[1:1+elen], byteorder='big')
-    modulus = keydata[1+elen:]
+        estart = 1
+    exponent = int.from_bytes(keydata[estart:estart+elen], byteorder='big')
+    modulus = keydata[estart+elen:]
     modulus_int = int.from_bytes(modulus, byteorder='big')
     return rsa.RSAPublicNumbers(exponent,
                                 modulus_int).public_key(default_backend())
@@ -609,7 +614,7 @@ def nsec_covers_name(nsec_rrset, name):
         return nsec_rrset.name < name < nsec_rrset[0].next
 
     # Wrap around case (next is apex or sorts before owner)
-    return (name > owner) or (name < next)
+    return (name > owner) or (name < nextname)
 
 
 def nsec_closest_encloser(qname, zonename, nsec_list):

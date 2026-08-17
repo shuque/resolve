@@ -43,7 +43,7 @@ class Stats:
         if self.cnt_tcp_fallback:
             print("Number of TCP fallbacks: {}".format(self.cnt_tcp_fallback))
         if self.cnt_fail:
-            print("Number of queries failed: {:d} ({:.2f}%%)".format(
+            print("Number of queries failed: {:d} ({:.2f}%)".format(
                 self.cnt_fail,
                 (100.0 * self.cnt_fail/cnt_query_total)))
         if self.cnt_cname:

@@ -2,6 +2,7 @@
 RRset class. Contains an RRset and associated signatures.
 """
 
+import dns.name
 import dns.rdatatype
 
 
