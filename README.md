@@ -81,6 +81,38 @@ To install from a local copy of this repository:
 * pip3 install .
 
 
+### Testing
+
+The `tests/` directory contains an offline unit-test suite (no network
+access is required) that exercises the DNSSEC validation logic, including
+the ML-DSA (algorithm 18) code paths. The tests use Python's `unittest`
+framework and are run with [pytest](https://pytest.org/).
+
+Install pytest if you don't already have it:
+
+* pip3 install pytest
+
+Then, from the top level of the source tree (the directory that contains
+the `tests/` folder), run:
+
+* python3 -m pytest tests/
+
+Use `-v` for per-test output, or name a single file or test:
+
+* python3 -m pytest tests/test_mldsa.py -v
+
+Notes:
+
+* Invoking the suite as `python3 -m pytest` (rather than the bare `pytest`
+  command) puts the source tree on the module search path, so `reslib` is
+  importable without a separate install.
+* If you installed resolve into a virtual environment, activate it first so
+  that `python3` and its dependencies resolve from that environment.
+* If your `cryptography` installation lacks ML-DSA support (this needs a
+  build whose OpenSSL provides ML-DSA; version 50.0.0 or later is known to
+  work), the ML-DSA sign/verify test is skipped rather than failed.
+
+
 ### Examples
 
 This program implements the normal iterative DNS resolution algorithm 
