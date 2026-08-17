@@ -41,40 +41,47 @@ earlier versions:
 ### Usage
 
 ```
-resolve.py version 0.7.0
+usage: resolve.py [-h] [-v] [-j] [-m] [-t] [-s] [-n] [-x] [-e N] [-z] [-c]
+                  [-4 | -6] [-b batchfile]
+                  [qname [qtype [qclass]] ...]
+
+version 0.8.0
 Perform iterative resolution of a DNS name, type, and class.
 
-    Usage: resolve.py [Options] <qname> [<qtype>] [<qclass>]
-           resolve.py [Options] -b <batchfile>
+positional arguments:
+  qname [qtype [qclass]]
+                        query name, optional type (default A), optional class
+                        (default IN)
 
-     Options:
-     -v: increase verbosity level by 1 (default 0)
-     -j: give JSON encoded output
-     -m: do qname minimization
-     -t: use TCP only
-     -s: print summary statistics
-     -n: resolve all non-glue NS addresses in referrals
-     -x: workaround NXDOMAIN on empty non-terminals
-     -eN: use EDNS0 buffer size N (default: 1460; 0=disable EDNS)
-     -z: perform DNSSEC validation (default is no)
-     -c: dump zone/ns/key caches at end of program execution
-     -4: only use IPv4 transport
-     -6: only use IPv6 transport
-     -b <batchfile>: batch file mode
+options:
+  -h, --help            show this help message and exit
+  -v                    increase verbosity level by 1 (default 0)
+  -j                    give JSON encoded output
+  -m                    do qname minimization
+  -t                    use TCP only
+  -s                    print summary statistics
+  -n                    resolve all non-glue NS addresses in referrals
+  -x                    workaround NXDOMAIN on empty non-terminals
+  -e N                  use EDNS0 buffer size N (default: 1460; 0=disable
+                        EDNS)
+  -z                    perform DNSSEC validation (default is no)
+  -c                    dump zone/ns/key caches at end of program execution
+  -4                    only use IPv4 transport
+  -6                    only use IPv6 transport
+  -b batchfile          batch file mode
 
-When using -b, <batchfile> contains one (space separated) query name, type,
-class per line.
+When using -b, <batchfile> contains one (space separated) query name, type, class per line.
 ```
 
 ### Installation
 
 To install system wide:
 
-* (as root) pip3 install git+https://github.com/shuque/resolve.git@v0.7.0
+* (as root) pip3 install git+https://github.com/shuque/resolve.git@v0.8.0
 
 To install for your own account:
 
-* pip3 install git+https://github.com/shuque/resolve.git@v0.7.0
+* pip3 install git+https://github.com/shuque/resolve.git@v0.8.0
 
 To install from a local copy of this repository:
 

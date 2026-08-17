@@ -2,7 +2,7 @@
 batch mode operation.
 """
 
-from reslib.prefs import Prefs
+from reslib.prefs import prefs
 from reslib.cache import RootZone
 from reslib.query import Query
 from reslib.stats import stats
@@ -36,14 +36,14 @@ def batchmode(cache, infile, info):
 
         print("\n###\n### Query: {}, {}, {}".format(qname, qtype, qclass))
         stats.reset()
-        query = Query(qname, qtype, qclass, minimize=Prefs.MINIMIZE)
+        query = Query(qname, qtype, qclass, minimize=prefs.MINIMIZE)
         starting_zone = cache.closest_zone(query.qname)
         key_cache.SecureSoFar = starting_zone.secure
         print("### Starting at zone: {}\n###".format(starting_zone.name))
-        if Prefs.VERBOSE and starting_zone == RootZone:
+        if prefs.VERBOSE and starting_zone == RootZone:
             print_root_zone()
         resolve_name(query, starting_zone, addResults=query)
-        if Prefs.VERBOSE:
+        if prefs.VERBOSE:
             print('')
         query.print_full_answer()
 
