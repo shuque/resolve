@@ -26,6 +26,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from reslib.prefs import Prefs
 from reslib.rootkey import RootKeyData
 from reslib.exception import ResError
+from reslib import mldsa
 
 
 # Tolerable clock skew for signatures in seconds
@@ -45,6 +46,7 @@ ALG = {
     14: "ECDSA-P384",
     15: "ED25519",
     16: "ED448",
+    18: "ML-DSA-44",
 }
 
 # DNSSEC algorithm -> hash function
@@ -67,15 +69,28 @@ DS_ALG = {
 }
 
 
+# Algorithms we can verify without any runtime capability probe.
+VERIFIABLE_ALGORITHMS = frozenset([5, 7, 8, 10, 13, 14, 15, 16])
+
+
+def algorithm_is_verifiable(algnum):
+    """
+    Can we verify signatures made with this DNSSEC algorithm on this host?
+    Alg 18 (ML-DSA-44) depends on a runtime cryptography capability probe.
+    """
+    if algnum in VERIFIABLE_ALGORITHMS:
+        return True
+    if algnum == 18:
+        return mldsa.available()
+    return False
+
+
 def supported_algorithm_present(dslist):
     """
-    Does given DS list have at least one algorithm that we support?
+    Does given DS list have at least one algorithm that we can verify?
     """
-
-    alglist = ALG.keys()
-
     for ds in dslist:
-        if ds.rdata.algorithm in alglist:
+        if algorithm_is_verifiable(ds.rdata.algorithm):
             return True
     return False
 
@@ -151,13 +166,31 @@ class DNSKEY:
             self.key = keydata_to_ecc(self.algorithm, rr.key)
         elif self.algorithm in [15, 16]:
             self.key = keydata_to_eddsa(self.algorithm, rr.key)
+        elif self.algorithm == 18:
+            if mldsa.available():
+                # ML-DSA-44 is supported on this host: the DNSKEY key field
+                # is the raw FIPS 204 public key. A malformed key (e.g. wrong
+                # length) is a genuine load error -> raise so load_keys records
+                # it. A zone signed only with alg 18 then goes BOGUS rather
+                # than degrading to insecure (the degrade-to-insecure decision
+                # is made separately, from the DS algorithm set, in
+                # supported_algorithm_present()).
+                try:
+                    self.key = mldsa.load_public_key(rr.key)
+                except Exception as e:
+                    raise ResError(
+                        "ML-DSA-44 key load failed (keytag={}): {}".format(
+                            self.keytag, e))
+            else:
+                # alg 18 not verifiable on this host: silently unusable, so
+                # supported_algorithm_present() can degrade to insecure.
+                self.key = None
+                self.supported = False
         else:
-            # An algorithm we can't verify (e.g. ML-DSA / alg 18). This is
-            # NOT a parse error: retain the key object so it can be shown in
-            # verbose output and so algorithm-agnostic DS matching still
-            # works, but mark it unusable for signature verification.
-            # verify_sig_with_keys() skips keys where supported is False, so
-            # such a key contributes neither a verification nor a failure.
+            # An unknown algorithm we can't verify. NOT a parse error: retain
+            # the key object so it shows in verbose output and so
+            # algorithm-agnostic DS matching still works, but mark it unusable.
+            # verify_sig_with_keys() skips unsupported keys.
             self.key = None
             self.supported = False
 
@@ -195,7 +228,7 @@ class Signature:
         specific exception on failure.
         """
         pubkey = dnskey.key
-        hashalg = HASHFUNC[dnskey.algorithm]
+        hashalg = HASHFUNC.get(dnskey.algorithm)
         if dnskey.algorithm in [5, 7, 8, 10]:
             _ = pubkey.verify(self.rdata.signature, self.indata,
                               padding.PKCS1v15(), hashalg())
@@ -212,6 +245,8 @@ class Signature:
             _ = pubkey.verify(encoded_sig, self.indata, ec.ECDSA(hashalg()))
         elif dnskey.algorithm in [15, 16]:
             _ = pubkey.verify(self.rdata.signature, self.indata)
+        elif dnskey.algorithm == 18:
+            mldsa.verify(pubkey, self.rdata.signature, self.indata)
         else:
             raise ResError("Unknown key type: {}".format(type(pubkey)))
 
