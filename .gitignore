@@ -8,5 +8,6 @@ stub.py
 test
 __pycache__
 zarchive/
+.claude/worktrees/
 CLAUDE.md
 docs/superpowers/
