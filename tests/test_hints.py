@@ -12,7 +12,8 @@ import unittest
 import dns.name
 
 from reslib.hints import ROOTHINTS, ROOT_NS_TTL
-from reslib.cache import Cache, get_root_zone
+from reslib.cache import get_root_zone
+from reslib.resolver import Resolver
 
 
 def is_valid_ip(addr):
@@ -59,7 +60,7 @@ class TestRootHints(unittest.TestCase):
 class TestRootZoneBootstrap(unittest.TestCase):
 
     def test_get_root_zone_builds_secure_zone(self):
-        cache = Cache()
+        cache = Resolver().cache
         root = get_root_zone(cache)
         self.assertEqual(root.name, dns.name.root)
         self.assertTrue(root.secure)
@@ -68,16 +69,15 @@ class TestRootZoneBootstrap(unittest.TestCase):
         self.assertEqual(len(root.iplist()), 26)
 
     def test_root_zone_installed_and_reachable_via_closest_zone(self):
-        cache = Cache()
+        cache = Resolver().cache
         get_root_zone(cache)
         z = cache.closest_zone(dns.name.from_text("example.com."))
         self.assertIsNotNone(z)
         self.assertEqual(z.name, dns.name.root)
 
     def test_cache_reset_rebuilds_cleanly(self):
-        # Mirrors reset_all()'s cache handling: reset empties the cache,
-        # and get_root_zone repopulates it in place.
-        cache = Cache()
+        # reset empties the cache, and get_root_zone repopulates it in place.
+        cache = Resolver().cache
         get_root_zone(cache)
         cache.reset()
         self.assertEqual(cache.ZoneDict, {})

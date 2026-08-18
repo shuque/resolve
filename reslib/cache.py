@@ -5,12 +5,16 @@ TODO: convert this to a more efficient tree data structure.
 
 import dns.name
 from reslib.hints import ROOTHINTS, ROOT_NS_TTL
-from reslib.zone import Zone
 
 
 def get_root_zone(cache):
     """populate the Root Zone object from hints file"""
-    zone = Zone(dns.name.root, cache)
+    # Imported lazily (rather than at module top) to avoid an import
+    # cycle: reslib.zone is loaded as part of Resolver construction, so
+    # importing it here (rather than at this module's top) keeps that
+    # construction free of self-reference.
+    from reslib.zone import Zone
+    zone = Zone(dns.name.root, resolver=cache.resolver, cache=cache)
     for name, addr in ROOTHINTS:
         name = dns.name.from_text(name)
         nsobj = zone.install_ns(name, clobber=False)
@@ -23,7 +27,8 @@ def get_root_zone(cache):
 class Cache:
     """Cache of Zone & NameServer objects"""
 
-    def __init__(self):
+    def __init__(self, resolver=None):
+        self.resolver = resolver
         self.reset()
 
     def reset(self):
@@ -103,9 +108,3 @@ class Cache:
         for _, srrset in self.RRsets.items():
             print(srrset)
         print("### END: RRset Cache dump")
-
-
-
-# Global cache and root zone object
-cache = Cache()
-RootZone = get_root_zone(cache)

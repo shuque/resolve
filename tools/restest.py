@@ -7,10 +7,10 @@ Simple test of main name resolution function.
 
 import sys
 
-from reslib.prefs import prefs
-from reslib.cache import RootZone
+from reslib.prefs import Prefs
 from reslib.query import Query
-from reslib.lookup import initialize_dnssec, resolve_name
+from reslib.lookup import resolve_name
+from reslib.resolver import Resolver
 
 
 if __name__ == '__main__':
@@ -19,8 +19,10 @@ if __name__ == '__main__':
     qtype = sys.argv[2]
     qclass = 'IN'
 
+    prefs = Prefs()
     prefs.DNSSEC = True
-    initialize_dnssec()
-    query = Query(qname, qtype, qclass)
-    resolve_name(query, RootZone, addResults=query)
+    resolver = Resolver(prefs)
+    resolver.bootstrap()
+    query = Query(qname, qtype, qclass, resolver=resolver)
+    resolve_name(resolver, query, resolver.root_zone, addResults=query)
     query.print_full_answer()

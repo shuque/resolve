@@ -5,7 +5,6 @@ Zone class
 from binascii import hexlify
 from random import shuffle
 from reslib.nameserver import NameServer
-from reslib.prefs import prefs
 
 
 class DS:
@@ -29,9 +28,10 @@ class DS:
 class Zone:
     """Zone class"""
 
-    def __init__(self, zone, cache):
+    def __init__(self, zone, resolver, cache=None):
+        self.resolver = resolver
+        self.cache = cache if cache is not None else self.resolver.cache
         self.name = zone                           # dns.name.Name
-        self.cache = cache                         # Cache class
         self.nslist = []                           # list of dns.name.Name
         self.dslist = []                           # list of DS objects
         self.ttl_ns = None
@@ -70,9 +70,9 @@ class Zone:
         result = []
         for ns in self.nslist:
             iplist = self.cache.get_ns(ns).iplist
-            if prefs.V6_ONLY:
+            if self.resolver.prefs.V6_ONLY:
                 iplist = [i for i in iplist if i.addr.find(':') != -1]
-            elif prefs.V4_ONLY:
+            elif self.resolver.prefs.V4_ONLY:
                 iplist = [i for i in iplist if i.addr.find(':') == -1]
             result += iplist
         return result

@@ -23,7 +23,6 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives.asymmetric import ed448
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from reslib.prefs import prefs
 from reslib.rootkey import RootKeyData
 from reslib.exception import ResError
 from reslib import mldsa
@@ -46,7 +45,7 @@ ALG = {
     14: "ECDSA-P384",
     15: "ED25519",
     16: "ED448",
-    18: "ML-DSA-44",
+    18: "MLDSA44",
 }
 
 # DNSSEC algorithm -> hash function
@@ -103,13 +102,13 @@ class KeyCache:
     not have the required crypto libraries installed.
     """
 
-    def __init__(self):
+    def __init__(self, resolver=None):
+        self.resolver = resolver
         self.reset()
 
     def reset(self):
         """reset cache and security status"""
         self.data = {}                  # dict of dns.name.Name: list(DNSKEY)
-        self.SecureSoFar = False
         self.RootTA = get_root_keys()   # list of DNSKEY objects
         self.install(dns.name.root, self.RootTA)
 
@@ -463,19 +462,18 @@ def check_self_signature(rrset, rrsigs):
     return keys, Verified
 
 
-def validate_all(rrset, rrsigs):
+def validate_all(resolver, rrset, rrsigs):
     """
     Validate rrsigs for rrset with the already authenticated global cache
     of keys in key_cache. Returns a tuple:
     Verified - list of keys that verified the signature.
     Failed - list of (key, error) tuples for failed keys.
     """
-
     Verified = []
     Failed = []
 
     for sig in get_sig_info(rrset, rrsigs):
-        keylist = key_cache.get_keys(sig.rdata.signer)
+        keylist = resolver.key_cache.get_keys(sig.rdata.signer)
         if keylist is None:
             raise ResError("No DNSSEC keys found for {}".format(
                 sig.rdata.signer))
@@ -486,13 +484,12 @@ def validate_all(rrset, rrsigs):
     return Verified, Failed
 
 
-def ds_rr_matches_dnskey(ds, dnskey):
+def ds_rr_matches_dnskey(resolver, ds, dnskey):
     """
     Check that DS RR matches the DNSKEY.
     ds_ digest = digest_algorithm( DNSKEY owner name | DNSKEY RDATA);
     DNSKEY RDATA = Flags | Protocol | Algorithm | Public Key.
     """
-
     preimage = (dnskey.name.to_digestable() +
                 struct.pack('!H', dnskey.flags) +
                 struct.pack('B', dnskey.protocol) +
@@ -511,7 +508,7 @@ def ds_rr_matches_dnskey(ds, dnskey):
     computed_hash = digest.finalize()
     if computed_hash == ds.digest:
         return True
-    if prefs.VERBOSE:
+    if resolver.prefs.VERBOSE:
         hex_snippet = computed_hash.hex()[0:8]
         print("# ERROR: DS digest {}... didn't match key with tag {}".format(
             hex_snippet, ds.key_tag))
@@ -533,16 +530,15 @@ def nsec3_hashalg(algnum):
     raise ResError("unsupported NSEC3 hash algorithm {}".format(algnum))
 
 
-def nsec3hash(name, algnum, salt, iterations, binary_out=False):
+def nsec3hash(resolver, name, algnum, salt, iterations, binary_out=False):
     """
     Compute NSEC3 hash for given domain name and parameters. name is
     of type dns.name.Name, salt is a binary bytestring, algnum and
     iterations are integers.
     """
-
     if iterations < 0:
         raise ResError("NSEC3 hash iterations must be >= 0")
-    if iterations > prefs.N3_HASHLIMIT:
+    if iterations > resolver.prefs.N3_HASHLIMIT:
         raise ResError("NSEC3 hash iterations too high: {} {}".format(
             name, iterations))
 
@@ -561,7 +557,7 @@ def nsec3hash(name, algnum, salt, iterations, binary_out=False):
     return output
 
 
-def nsec3hashname_from_record(name, nsec3, zonename, binary_out=False):
+def nsec3hashname_from_record(resolver, name, nsec3, zonename, binary_out=False):
     """
     Compute NSEC3 hashed name for name and zone, from given NSEC3 record
     parameters.
@@ -569,7 +565,7 @@ def nsec3hashname_from_record(name, nsec3, zonename, binary_out=False):
     algnum = nsec3[0].algorithm
     iterations = nsec3[0].iterations
     salt = nsec3[0].salt
-    hashed_label = nsec3hash(name, algnum, salt, iterations,
+    hashed_label = nsec3hash(resolver, name, algnum, salt, iterations,
                              binary_out=binary_out)
     hashed_name = dns.name.Name((hashed_label,) + zonename.labels)
     return hashed_name
@@ -590,13 +586,13 @@ def type_in_bitmap(rrtype, nsec_rr):
     return False
 
 
-def get_hashed_owner(qname, signer, nsec3_rdata):
+def get_hashed_owner(resolver, qname, signer, nsec3_rdata):
     """
     Obtain NSEC3 hashed owner name for given qname, signer, and
     NSEC3 rdata.
     """
 
-    hash_output = nsec3hash(qname,
+    hash_output = nsec3hash(resolver, qname,
                             nsec3_rdata.algorithm,
                             nsec3_rdata.salt,
                             nsec3_rdata.iterations)
@@ -693,7 +689,7 @@ def nsec3_covers_name(nsec_rrset, name, zonename):
     return (name.fullcompare(n1)[1] > 0) or (name.fullcompare(n2)[1] < 0)
 
 
-def nsec3_closest_encloser_and_next(qname, zonename, nsec3_list):
+def nsec3_closest_encloser_and_next(resolver, qname, zonename, nsec3_list):
     """
     Given qname and an zone name and the set of relavent NSEC3 records,
     return the closest encloser name and the next closer name.
@@ -711,32 +707,31 @@ def nsec3_closest_encloser_and_next(qname, zonename, nsec3_list):
     candidate = None
     for candidate in resultlist:
         for nsec3 in nsec3_list:
-            hashed_name = nsec3hashname_from_record(candidate, nsec3, zonename)
+            hashed_name = nsec3hashname_from_record(resolver, candidate, nsec3, zonename)
             if nsec3_covers_name(nsec3, hashed_name, zonename):
                 return candidate.parent(), candidate
     return candidate, qname
 
 
-def nsec3_nxdomain_proof(qname, signer, nsec3_list, optout=False, quiet=False):
+def nsec3_nxdomain_proof(resolver, qname, signer, nsec3_list, optout=False, quiet=False):
     """
     Check NSEC3 NXDOMAIN proof for given qname, zone, and NSEC list.
     Raise exception if not proved.
     """
-
     closest_encloser_match = False
     next_closer_cover = False
     wildcard_cover = optout
 
     closest_encloser, next_closer = nsec3_closest_encloser_and_next(
-        qname, signer, nsec3_list)
+        resolver, qname, signer, nsec3_list)
     wildcard = dns.name.Name(('*',) + closest_encloser.labels)
     for nsec3 in nsec3_list:
-        hashed_ce = nsec3hashname_from_record(closest_encloser, nsec3, signer)
-        hashed_nc = nsec3hashname_from_record(next_closer, nsec3, signer)
-        hashed_wild = nsec3hashname_from_record(wildcard, nsec3, signer)
+        hashed_ce = nsec3hashname_from_record(resolver, closest_encloser, nsec3, signer)
+        hashed_nc = nsec3hashname_from_record(resolver, next_closer, nsec3, signer)
+        hashed_wild = nsec3hashname_from_record(resolver, wildcard, nsec3, signer)
         if nsec3.name == hashed_ce:
             closest_encloser_match = True
-            if prefs.VERBOSE and not quiet:
+            if resolver.prefs.VERBOSE and not quiet:
                 print("# INFO: closest{} encloser: {} {}".format(
                     " provable" if optout else "",
                     closest_encloser, hashed_ce.labels[0].decode()))
@@ -745,12 +740,12 @@ def nsec3_nxdomain_proof(qname, signer, nsec3_list, optout=False, quiet=False):
                 if not nsec3[0].flags & 0x1:
                     continue
             next_closer_cover = True
-            if prefs.VERBOSE and not quiet:
+            if resolver.prefs.VERBOSE and not quiet:
                 print("# INFO: next closer: {} {}".format(
                     next_closer, hashed_nc.labels[0].decode()))
         if not optout and nsec3_covers_name(nsec3, hashed_wild, signer):
             wildcard_cover = True
-            if prefs.VERBOSE and not quiet:
+            if resolver.prefs.VERBOSE and not quiet:
                 print("# INFO: wildcard: {} {}".format(
                     wildcard, hashed_wild.labels[0].decode()))
 
@@ -759,7 +754,7 @@ def nsec3_nxdomain_proof(qname, signer, nsec3_list, optout=False, quiet=False):
             qname))
 
 
-def nsec3_wildcard_nodata_proof(qname, qtype, signer, nsec3_list, quiet=False):
+def nsec3_wildcard_nodata_proof(resolver, qname, qtype, signer, nsec3_list, quiet=False):
     """
     NSEC3 wildcard NODATA proof for given qname, zone, and NSEC3 list.
 
@@ -772,27 +767,26 @@ def nsec3_wildcard_nodata_proof(qname, qtype, signer, nsec3_list, quiet=False):
     encloser.  Furthermore, the bits corresponding to both QTYPE and
     CNAME MUST NOT be set in the wildcard matching NSEC3 RR.
     """
-
     closest_encloser_match = False
     wildcard_match = False
 
     closest_encloser, _ = nsec3_closest_encloser_and_next(
-        qname, signer, nsec3_list)
+        resolver, qname, signer, nsec3_list)
     wildcard = dns.name.Name(('*',) + closest_encloser.labels)
 
     for nsec3 in nsec3_list:
-        hashed_ce = nsec3hashname_from_record(closest_encloser, nsec3, signer)
-        hashed_wild = nsec3hashname_from_record(wildcard, nsec3, signer)
+        hashed_ce = nsec3hashname_from_record(resolver, closest_encloser, nsec3, signer)
+        hashed_wild = nsec3hashname_from_record(resolver, wildcard, nsec3, signer)
         if nsec3.name == hashed_ce:
             closest_encloser_match = True
-            if prefs.VERBOSE and not quiet:
+            if resolver.prefs.VERBOSE and not quiet:
                 print("# INFO: closest encloser: {} {}".format(
                     closest_encloser, hashed_ce.labels[0].decode()))
         if nsec3.name == hashed_wild:
             if (not type_in_bitmap(qtype, nsec3[0]) and
                 not type_in_bitmap(dns.rdatatype.CNAME, nsec3[0])):
                 wildcard_match = True
-                if prefs.VERBOSE and not quiet:
+                if resolver.prefs.VERBOSE and not quiet:
                     print("# INFO: wildcard: {} {}".format(
                         wildcard, hashed_wild.labels[0].decode()))
 
@@ -800,7 +794,3 @@ def nsec3_wildcard_nodata_proof(qname, qtype, signer, nsec3_list, quiet=False):
         raise ResError("{} NSEC3 Wildcard NODATA proof failed.".format(
             qname))
     return wildcard
-
-
-# Instantiate key cache at module level
-key_cache = KeyCache()

@@ -6,16 +6,18 @@ import dns.name
 import dns.rdatatype
 import dns.rdataclass
 
-from reslib.prefs import prefs
 from reslib.exception import ResError
-from reslib.dnssec import key_cache, sig_validity, sig_expires_in
+from reslib.dnssec import sig_validity, sig_expires_in
 
 
 class Query:
     """Query name class"""
 
-    def __init__(self, qname, qtype, qclass, minimize=prefs.MINIMIZE,
-                 is_nsquery=False):
+    def __init__(self, qname, qtype, qclass, minimize=None,
+                 is_nsquery=False, *, resolver):
+        self.resolver = resolver
+        if minimize is None:
+            minimize = self.resolver.prefs.MINIMIZE
         if isinstance(qname, dns.name.Name):
             self.qname = qname
         else:
@@ -31,6 +33,7 @@ class Query:
             self.qclass = dns.rdataclass.from_text(qclass)
         self.minimize = minimize
         self.is_nsquery = is_nsquery
+        self.secure_so_far = True
         self.quiet = False                  # don't print query being issued
         self.dnskey_novalidate = False      # for pre-DS matching queries
         self.nodata = False
@@ -69,7 +72,7 @@ class Query:
                 count += 1
                 if x.validated:
                     secure_count += 1
-            return key_cache.SecureSoFar and (secure_count == count)
+            return self.secure_so_far and (secure_count == count)
         return  self.dnssec_secure
 
     def print_full_answer(self):
@@ -88,7 +91,7 @@ class Query:
         else:
             print('')
 
-        if prefs.DNSSEC:
+        if self.resolver.prefs.DNSSEC:
             print("# DNSSEC status: {}".format(
                 "SECURE" if secure else "INSECURE"))
             if self.wildcard:
@@ -100,7 +103,7 @@ class Query:
         if self.full_answer_rrset:
             for x in self.full_answer_rrset:
                 print(x.rrset.to_text())
-                if prefs.DNSSEC and prefs.VERBOSE > 1:
+                if self.resolver.prefs.DNSSEC and self.resolver.prefs.VERBOSE > 1:
                     if x.rrsig is not None:
                         for sig_rr in x.rrsig:
                             print("{} {} {} {} {} # validity={} expires_in={}".format(

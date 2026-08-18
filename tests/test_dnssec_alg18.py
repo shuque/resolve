@@ -86,7 +86,7 @@ class TestDnskeyParsing(unittest.TestCase):
     def test_alg18_repr_shows_mldsa_name(self):
         rrset = make_dnskey_rrset(18, b"\x01" * 1312)
         keys, _ = load_keys(rrset)
-        self.assertIn("ML-DSA-44 (18)", repr(keys[0]))
+        self.assertIn("MLDSA44 (18)", repr(keys[0]))
 
     def test_alg18_supported_when_available(self):
         rrset = make_dnskey_rrset(18, b"\x01" * 1312)

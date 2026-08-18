@@ -5,7 +5,7 @@ Command line option processing.
 import argparse
 
 from reslib.version import __version__
-from reslib.prefs import prefs
+from reslib.prefs import Prefs
 
 
 DESCRIPTION = "version {}\nPerform iterative resolution of a DNS name, type, and class.".format(
@@ -55,13 +55,15 @@ def make_parser():
 
 
 def process_args(arguments):
-    """Process command line arguments, populate the prefs singleton in place,
-    and return the (qname, qtype, qclass) tuple."""
+    """Process command line arguments, build and return a populated Prefs
+    instance as (prefs, qname, qtype, qclass). Does NOT mutate any module
+    global."""
 
     parser = make_parser()
     ns = parser.parse_args(arguments)
 
-    # Populate the shared prefs instance IN PLACE (never rebind `prefs`).
+    # Populate a fresh, local Prefs instance.
+    prefs = Prefs()
     prefs.VERBOSE = ns.VERBOSE
     prefs.JSON = ns.JSON
     prefs.MINIMIZE = ns.MINIMIZE
@@ -86,7 +88,7 @@ def process_args(arguments):
 
     if prefs.BATCHFILE:
         if not args:
-            return (None, None, None)
+            return (prefs, None, None, None)
         parser.error("batch mode (-b) does not take positional arguments")
 
     numargs = len(args)
@@ -102,4 +104,4 @@ def process_args(arguments):
     else:
         parser.error("expected <qname> [<qtype>] [<qclass>]")
 
-    return (qname, qtype, qclass)
+    return (prefs, qname, qtype, qclass)

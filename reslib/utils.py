@@ -5,15 +5,13 @@ Miscellaneous helper functions.
 import time
 import random
 import dns.resolver
-from reslib.prefs import prefs
-from reslib.stats import stats
 
 
 def vprint_quiet(query):
     """Is verbose flag > 1 or is it set and query does not have quiet flag?"""
-    if prefs.VERBOSE > 1:
+    if query.resolver.prefs.VERBOSE > 1:
         return True
-    return prefs.VERBOSE and not query.quiet
+    return query.resolver.prefs.VERBOSE and not query.quiet
 
 
 def is_authoritative(msg):
@@ -31,10 +29,12 @@ def is_referral(msg):
     return (msg.rcode() == 0) and (not is_authoritative(msg)) and msg.authority
 
 
-def send_query_tcp(msg, nsaddr, query, timeout=prefs.TIMEOUT):
+def send_query_tcp(msg, nsaddr, query, timeout=None):
     """Send query over TCP"""
+    if timeout is None:
+        timeout = query.resolver.prefs.TIMEOUT
     res = None
-    stats.update_query(query, tcp=True)
+    query.resolver.stats.update_query(query, tcp=True)
     try:
         res = dns.query.tcp(msg, nsaddr.addr, timeout=timeout)
     except dns.exception.Timeout:
@@ -44,11 +44,15 @@ def send_query_tcp(msg, nsaddr, query, timeout=prefs.TIMEOUT):
 
 
 def send_query_udp(msg, nsaddr, query,
-                   timeout=prefs.TIMEOUT, retries=prefs.RETRIES):
+                   timeout=None, retries=None):
     """Send query over UDP"""
+    if timeout is None:
+        timeout = query.resolver.prefs.TIMEOUT
+    if retries is None:
+        retries = query.resolver.prefs.RETRIES
     gotresponse = False
     res = None
-    stats.update_query(query)
+    query.resolver.stats.update_query(query)
     while (not gotresponse) and (retries > 0):
         retries -= 1
         try:
@@ -63,13 +67,17 @@ def send_query_udp(msg, nsaddr, query,
 
 
 def send_query(msg, nsaddr, query,
-               timeout=prefs.TIMEOUT, retries=prefs.RETRIES, newid=False):
+               timeout=None, retries=None, newid=False):
     """send DNS query to specified address"""
+    if timeout is None:
+        timeout = query.resolver.prefs.TIMEOUT
+    if retries is None:
+        retries = query.resolver.prefs.RETRIES
     res = None
     if newid:
         msg.id = random.randint(1, 65535)
 
-    if prefs.TCPONLY:
+    if query.resolver.prefs.TCPONLY:
         return send_query_tcp(msg, nsaddr, query, timeout=timeout)
 
     res = send_query_udp(msg, nsaddr, query,
@@ -78,20 +86,20 @@ def send_query(msg, nsaddr, query,
         if vprint_quiet(query):
             print("WARN: response from {} truncated; retrying with TCP".format(
                 nsaddr.addr))
-        stats.cnt_tcp_fallback += 1
+        query.resolver.stats.cnt_tcp_fallback += 1
         res = send_query_tcp(msg, nsaddr, query)
     return res
 
 
 def make_query_message(query):
     """Make DNS query message from a query object"""
-    use_edns = prefs.PAYLOAD != 0
+    use_edns = query.resolver.prefs.PAYLOAD != 0
     msg = dns.message.make_query(query.qname,
                                  query.qtype,
                                  rdclass=query.qclass,
                                  use_edns=use_edns,
-                                 want_dnssec=prefs.DNSSEC,
-                                 payload=prefs.PAYLOAD)
+                                 want_dnssec=query.resolver.prefs.DNSSEC,
+                                 payload=query.resolver.prefs.PAYLOAD)
     msg.flags &= ~dns.flags.RD
     return msg
 

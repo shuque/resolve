@@ -11,8 +11,6 @@ import dns.rdatatype
 import dns.rcode
 import dns.dnssec
 
-from reslib.prefs import prefs
-
 
 def jsonout(query):
     """
@@ -27,7 +25,7 @@ def jsonout(query):
     result['rcode'] = dns.rcode.to_text(query.response.rcode())
     if query.response.rcode() == 0 and query.nodata:
         result['nodata'] = True
-    if prefs.DNSSEC:
+    if query.resolver.prefs.DNSSEC:
         result['secure'] = query.is_secure()
         if query.wildcard:
             result['wildcard'] = "{}".format(query.wildcard)

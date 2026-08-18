@@ -48,7 +48,3 @@ class Stats:
                 (100.0 * self.cnt_fail/cnt_query_total)))
         if self.cnt_cname:
             print("Number of CNAME indirections: {}".format(self.cnt_cname))
-
-
-# Global statistics object
-stats = Stats()

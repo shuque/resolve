@@ -1,22 +1,26 @@
 """
-Tests for the Prefs dataclass and its module-level singleton.
+Tests for the Prefs dataclass.
 """
 
 import dataclasses
 import unittest
 
-from reslib.prefs import Prefs, prefs
+from reslib.prefs import Prefs
 
 
 class TestPrefs(unittest.TestCase):
 
+    def setUp(self):
+        self.prefs = Prefs()
+
     def test_is_dataclass(self):
         self.assertTrue(dataclasses.is_dataclass(Prefs))
 
-    def test_singleton_is_instance(self):
-        self.assertIsInstance(prefs, Prefs)
+    def test_instance_is_instance(self):
+        self.assertIsInstance(self.prefs, Prefs)
 
     def test_defaults(self):
+        prefs = self.prefs
         self.assertEqual(prefs.MINIMIZE, False)
         self.assertEqual(prefs.TCPONLY, False)
         self.assertEqual(prefs.VERBOSE, 0)
@@ -39,6 +43,7 @@ class TestPrefs(unittest.TestCase):
         self.assertEqual(prefs.N3_HASHLIMIT, 512)
 
     def test_instance_is_mutable(self):
+        prefs = self.prefs
         original = prefs.DNSSEC
         try:
             prefs.DNSSEC = True
