@@ -678,7 +678,8 @@ def process_response(query, addResults=None):
                     print("ERROR: NODATA: {} of type {} not found".format(
                         query.qname,
                         dns.rdatatype.to_text(query.qtype)))
-            if query.resolver.prefs.DNSSEC and not query.is_nsquery and query.secure_so_far:
+            if (query.resolver.prefs.DNSSEC and not query.is_nsquery
+                    and not query.dnskey_novalidate and query.secure_so_far):
                 authenticate_nodata(query)
             return query.response.rcode(), None
 
@@ -693,7 +694,8 @@ def process_response(query, addResults=None):
             print("ERROR: NXDOMAIN: {} not found".format(query.qname))
         if query.response.answer:
             process_answer(query, addResults=addResults)
-        elif query.resolver.prefs.DNSSEC and not query.is_nsquery and query.secure_so_far:
+        elif (query.resolver.prefs.DNSSEC and not query.is_nsquery
+              and not query.dnskey_novalidate and query.secure_so_far):
             authenticate_nxdomain(query)
 
     return query.response.rcode(), None
@@ -847,15 +849,15 @@ def get_zone(resolver, zonename):
     zone.install_ns_rrset_ttl(ns_rrset.ttl)
     for ns_rr in ns_rrset:
         _ = zone.install_ns(ns_rr.target)
-        nsobj = resolver.cache.get_ns(ns_rr.target)
-        if nsobj.iplist:
-            continue
-        for addrtype in ['A', 'AAAA']:
-            query = Query(ns_rr.target, addrtype, 'IN', is_nsquery=True, resolver=resolver)
-            query.quiet = True
-            resolve_name(resolver, query, resolver.cache.closest_zone(query.qname))
-            for ip in query.get_answer_ip_list():
-                nsobj.install_ip(ip)
+
+    # Populate nameserver addresses from the glue in the additional
+    # section of the NS response (as the referral path does). This is
+    # essential when the zone's nameservers are in-bailiwick (e.g. a
+    # parent and child stacked on the same servers, such as . and arpa.):
+    # those names can only be resolved from glue, and attempting to
+    # resolve them iteratively would deadlock on this very zone, which
+    # has just been installed in the cache without any addresses.
+    get_ns_addrs(zone, query)
 
     return zone
 

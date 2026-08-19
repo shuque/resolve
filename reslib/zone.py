@@ -56,8 +56,14 @@ class Zone:
         return self.cache.get_ns(nsname)
 
     def install_ds_rrset(self, ds_rrset):
-        """Install DS rdata list"""
+        """Install DS rdata list, replacing any previously installed set.
+
+        This is the authoritative DS RRset for the zone, so installing it
+        is idempotent: re-fetching (e.g. when a referral is retried against
+        multiple parent servers) must not accumulate duplicate DS entries.
+        """
         self.ttl_ds = ds_rrset.ttl
+        self.dslist = []
         for rdata in ds_rrset.to_rdataset():
             self.dslist.append(DS(rdata))
 
