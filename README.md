@@ -77,11 +77,11 @@ When using -b, <batchfile> contains one (space separated) query name, type, clas
 
 To install system wide:
 
-* (as root) pip3 install git+https://github.com/shuque/resolve.git@v0.9.3
+* (as root) pip3 install git+https://github.com/shuque/resolve.git@v0.9.4
 
 To install for your own account:
 
-* pip3 install git+https://github.com/shuque/resolve.git@v0.9.3
+* pip3 install git+https://github.com/shuque/resolve.git@v0.9.4
 
 To install from a local copy of this repository:
 

@@ -224,6 +224,13 @@ def synthesize_cname(dname_rrset, query):
     if not qname.is_subdomain(dname_owner):
         raise ResError("DNAME not ancestor of qname: {} {}".format(
             dname_owner, qname))
+    # A DNAME whose target lies at or below its own owner is self-
+    # referential: the rewrite stays within the owner's subtree, so the
+    # same DNAME re-applies without bound (RFC 6672, Table 1). Fail fast
+    # rather than grinding through the CNAME-indirection limit.
+    if dname_target.is_subdomain(dname_owner):
+        raise ResError("DNAME loop: target {} is at or below owner {}".format(
+            dname_target, dname_owner))
     cname_target = qname.relativize(dname_owner).concatenate(dname_target)
     cname_rrset = dns.rrset.RRset(qname, query.qclass, dns.rdatatype.CNAME)
     rdataset = dns.rdataset.Rdataset(query.qclass, dns.rdatatype.CNAME)
