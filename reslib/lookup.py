@@ -906,7 +906,8 @@ def check_isolated_dnskey(zone):
         return
 
     try:
-        keylist, _ = check_self_signature(dnskey_rrset, dnskey_rrsigs)
+        keylist, _ = check_self_signature(zone.resolver, dnskey_rrset,
+                                          dnskey_rrsigs)
     except ResError:
         print("WARNING: {} DNSKEY self signature did not validate".format(zone))
 
@@ -1007,7 +1008,8 @@ def match_ds_zone(zone, referring_query):
             continue
 
         try:
-            keylist, sigkeys = check_self_signature(dnskey_rrset,
+            keylist, sigkeys = check_self_signature(zone.resolver,
+                                                    dnskey_rrset,
                                                     dnskey_rrsigs)
         except ResError as e:
             print("ERROR: DNSKEY did not validate: {}".format(e))

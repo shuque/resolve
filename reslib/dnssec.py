@@ -435,7 +435,7 @@ def verify_sig_with_keys(sig, keys):
     return Verified, Failed
 
 
-def check_self_signature(rrset, rrsigs):
+def check_self_signature(resolver, rrset, rrsigs):
     """
     Check self signature of DNSKEY rrset. Raises exception on failure.
     Returns list of DNSKEY keys in the rrset, and the list of the subset
@@ -451,9 +451,12 @@ def check_self_signature(rrset, rrsigs):
         Verified += v
         Failed += f
 
-    if errors:
+    # These are per-signature diagnostics that can fire even when the RRset
+    # ultimately verifies (e.g. one of several DNSKEYs has an expired sig),
+    # so only emit them in verbose mode to avoid noise on the caller's stdout.
+    if errors and resolver.prefs.VERBOSE:
         print("ERROR: DNSKEY errors: {}".format(errors))
-    if Failed:
+    if Failed and resolver.prefs.VERBOSE:
         print("ERROR: DNSKEY self signature failed: {}".format(Failed))
     if not Verified:
         raise ResError("DNSKEY {} self signatures failed to validate: {}".format(
