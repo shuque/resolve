@@ -729,12 +729,32 @@ def get_zone_addresses(zone):
     return result
 
 
+def zone_failure_message(zone, errors):
+    """Build terminal error for a zone whose servers were all exhausted.
+
+    errors is a list of (address, reason) tuples. We surface the distinct
+    set of reasons (first-seen order) so the real cause -- e.g. a DS/DNSKEY
+    mismatch that every server reports identically -- is pulled up to the
+    top-level error instead of a generic 'all servers failed'.
+    """
+    base = "Queries to all servers for zone {} failed.".format(zone.name)
+    if not errors:
+        return base
+    reasons = []
+    for _, reason in errors:
+        if reason not in reasons:
+            reasons.append(reason)
+    label = "Cause" if len(reasons) == 1 else "Causes"
+    return "{} {}: {}".format(base, label, "; ".join(reasons))
+
+
 def send_query_zone(query, zone, addResults=None):
     """Send DNS query to nameservers of given zone"""
 
     msg = make_query_message(query)
     time_start = time.time()
 
+    errors = []
     for nsaddr in get_zone_addresses(zone):
         check_query_count_limit(query.resolver)
         print_query_trace(query, zone, nsaddr.addr)
@@ -743,16 +763,20 @@ def send_query_zone(query, zone, addResults=None):
             response = send_query(msg, nsaddr, query, newid=True)
         except OSError as e:
             print("OSError {}: {}: {}".format(e.errno, e.strerror, nsaddr.addr))
+            errors.append((nsaddr.addr, "OSError {}: {}".format(e.errno, e.strerror)))
             continue
         if not response:
             if vprint_quiet(query):
                 print("WARNING: no response from {}".format(nsaddr))
+            errors.append((nsaddr.addr, "no response"))
             continue
         if response.rcode() not in [dns.rcode.NOERROR, dns.rcode.NXDOMAIN]:
             query.resolver.stats.cnt_fail += 1
+            rcode_text = dns.rcode.to_text(response.rcode())
             if vprint_quiet(query):
                 print("WARNING: response {} from {}".format(
-                    dns.rcode.to_text(response.rcode()), nsaddr.addr))
+                    rcode_text, nsaddr.addr))
+            errors.append((nsaddr.addr, "response {}".format(rcode_text)))
             continue
         # process and return response; but goto next server on error
         query.elapsed_last = time.time() - time_start
@@ -762,10 +786,10 @@ def send_query_zone(query, zone, addResults=None):
         except ResError as e:
             if vprint_quiet(query):
                 print("WARNING: {} error {}".format(nsaddr.addr, e))
+            errors.append((nsaddr.addr, str(e)))
             continue
 
-    raise ResError("Queries to all servers for zone {} failed.".format(
-        zone.name))
+    raise ResError(zone_failure_message(zone, errors))
 
 
 def resolve_name(resolver, query, zone, addResults=None):
