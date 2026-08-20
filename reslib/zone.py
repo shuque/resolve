@@ -92,7 +92,7 @@ class Zone:
                 return [i for i in source if i.addr.find(':') != -1]
             if self.resolver.prefs.V4_ONLY:
                 return [i for i in source if i.addr.find(':') == -1]
-            return source
+            return list(source)
         result = []
         for ns in self.nslist:
             iplist = self.cache.get_ns(ns).iplist

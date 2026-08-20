@@ -14,6 +14,8 @@ from reslib.deleg import (
     classify_record, build_slist, DelegRecordError,
     SLIST_USABLE, SLIST_UNUSABLE, SLIST_ABSENT,
 )
+from reslib.zone import Zone
+from reslib.resolver import Resolver
 
 
 def _tlv(keynum, value):
@@ -259,10 +261,6 @@ class TestBuildSlist(unittest.TestCase):
         self.assertEqual(result.addresses, [])
 
 
-from reslib.zone import Zone
-from reslib.resolver import Resolver
-
-
 class TestZoneDeleg(unittest.TestCase):
 
     def _zone(self):
@@ -280,6 +278,21 @@ class TestZoneDeleg(unittest.TestCase):
         zone = self._zone()
         self.assertFalse(zone.via_deleg)
         self.assertFalse(zone.adt)
+
+    def test_deleg_iplist_respects_v4_only_and_v6_only(self):
+        zone = self._zone()
+        zone.install_deleg_addresses(
+            ["192.0.2.1", "192.0.2.2", "2001:db8::1", "2001:db8::2"], None)
+
+        zone.resolver.prefs.V4_ONLY = True
+        zone.resolver.prefs.V6_ONLY = False
+        addrs = sorted(ip.addr for ip in zone.iplist())
+        self.assertEqual(addrs, ["192.0.2.1", "192.0.2.2"])
+
+        zone.resolver.prefs.V4_ONLY = False
+        zone.resolver.prefs.V6_ONLY = True
+        addrs = sorted(ip.addr for ip in zone.iplist())
+        self.assertEqual(addrs, ["2001:db8::1", "2001:db8::2"])
 
 
 if __name__ == "__main__":
