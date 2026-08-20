@@ -318,5 +318,32 @@ class TestDelegEdnsFlag(unittest.TestCase):
         self.assertFalse(msg.ednsflags & EDNS_DE_FLAG)
 
 
+import dns.rdtypes.ANY.DNSKEY
+from reslib.dnssec import DNSKEY
+
+
+def _make_dnskey_rr(flags):
+    # protocol=3, alg=8 (RSASHA256), a minimal non-empty key blob
+    return dns.rdtypes.ANY.DNSKEY.DNSKEY(
+        dns.rdataclass.IN, dns.rdatatype.DNSKEY,
+        flags=flags, protocol=3, algorithm=8, key=b"\x03\x01\x00\x01abcd")
+
+
+class TestAdtFlag(unittest.TestCase):
+
+    def test_adt_flag_set(self):
+        # 259 = ZONE(0x100) | ADT(0x0002) | SEP(0x0001)
+        rr = _make_dnskey_rr(259)
+        key = DNSKEY(dns.name.from_text("deleg.huque.com."), rr)
+        self.assertTrue(key.adt_flag)
+        self.assertTrue(key.zone_flag)
+        self.assertTrue(key.sep_flag)
+
+    def test_adt_flag_clear(self):
+        rr = _make_dnskey_rr(257)   # ZONE | SEP, no ADT
+        key = DNSKEY(dns.name.from_text("example.com."), rr)
+        self.assertFalse(key.adt_flag)
+
+
 if __name__ == "__main__":
     unittest.main()

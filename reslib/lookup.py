@@ -159,7 +159,7 @@ def print_referral_trace(query, zonename, ds_srrset):
             zonename, query.elapsed_last))
 
 
-def process_referral(query):
+def process_referral(query, referring_zone=None):
     """
     Process referral. Returns a zone object for the referred zone. If
     referring zone is signed, then if DS records are present, they are
@@ -662,7 +662,7 @@ def process_answer(query, addResults=None):
     return
 
 
-def process_response(query, addResults=None):
+def process_response(query, addResults=None, referring_zone=None):
     """
     Process a DNS response. Returns rcode & zone referral.
     """
@@ -670,7 +670,7 @@ def process_response(query, addResults=None):
     if query.response.rcode() == dns.rcode.NOERROR:
 
         if is_referral(query.response):                            # Referral
-            referral = process_referral(query)
+            referral = process_referral(query, referring_zone=referring_zone)
             return query.response.rcode(), referral
 
         if not query.response.answer:                              # NODATA
@@ -789,7 +789,7 @@ def send_query_zone(query, zone, addResults=None):
         query.elapsed_last = time.time() - time_start
         query.response = response
         try:
-            return process_response(query, addResults=addResults)
+            return process_response(query, addResults=addResults, referring_zone=zone)
         except ResError as e:
             if vprint_quiet(query):
                 print("WARNING: {} error {}".format(nsaddr.addr, e))
@@ -1067,6 +1067,8 @@ def match_ds_zone(zone, referring_query):
                     print(key)
         raise ResError("DS did not match DNSKEY for {}".format(zone.name))
 
+    zone.adt = any(getattr(k, "adt_flag", False) for k in keylist)
+
     if referring_query and vprint_quiet(referring_query):
         for key in keylist:
             print(key)
@@ -1117,6 +1119,7 @@ def initialize_dnssec(resolver):
     if errors:
         print("ERROR: initialzing DNSSEC: {}".format(errors))
     resolver.key_cache.install(dns.name.root, result)
+    resolver.root_zone.adt = any(getattr(k, "adt_flag", False) for k in result)
 
     return
 

@@ -155,6 +155,7 @@ class DNSKEY:
         self.sep_flag = (self.flags & 0x01) == 0x01
         self.zone_flag = (self.flags & 0x0100) == 0x0100
         self.revoke_flag = (self.flags & 0x0080) == 0x0080
+        self.adt_flag = (self.flags & 0x0002) == 0x0002
         self.supported = True
         if not self.rawkey:
             raise ResError("DNSKEY keytag={} alg={} has null length data".format(
@@ -207,6 +208,8 @@ class DNSKEY:
             flags_text += " SEP"
         if self.revoke_flag:
             flags_text += " REV"
+        if self.adt_flag:
+            flags_text += " ADT"
         return "DNSKEY: {} {} {} {} ({}) {}-bits{}".format(
             self.name, self.flags, self.keytag,
             ALG.get(self.algorithm, "Unknown"), self.algorithm,
