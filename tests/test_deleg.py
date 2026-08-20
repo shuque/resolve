@@ -259,5 +259,28 @@ class TestBuildSlist(unittest.TestCase):
         self.assertEqual(result.addresses, [])
 
 
+from reslib.zone import Zone
+from reslib.resolver import Resolver
+
+
+class TestZoneDeleg(unittest.TestCase):
+
+    def _zone(self):
+        resolver = Resolver()
+        return Zone(dns.name.from_text("sub0.deleg.huque.com."), resolver)
+
+    def test_deleg_iplist_used_when_via_deleg(self):
+        zone = self._zone()
+        zone.install_deleg_addresses(["192.0.2.1", "2001:db8::1"], None)
+        self.assertTrue(zone.via_deleg)
+        addrs = [ip.addr for ip in zone.iplist()]
+        self.assertEqual(sorted(addrs), sorted(["192.0.2.1", "2001:db8::1"]))
+
+    def test_default_zone_not_via_deleg(self):
+        zone = self._zone()
+        self.assertFalse(zone.via_deleg)
+        self.assertFalse(zone.adt)
+
+
 if __name__ == "__main__":
     unittest.main()

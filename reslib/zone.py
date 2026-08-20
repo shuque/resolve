@@ -4,7 +4,7 @@ Zone class
 
 from binascii import hexlify
 from random import shuffle
-from reslib.nameserver import NameServer
+from reslib.nameserver import NameServer, IPaddress
 
 
 class DS:
@@ -37,6 +37,10 @@ class Zone:
         self.ttl_ns = None
         self.ttl_ds = None
         self.secure = False
+        self.via_deleg = False           # servers came from a DELEG record
+        self.deleg_iplist = []           # list of IPaddress (DELEG source)
+        self.deleg_rrset = None          # dns.rrset.RRset, for trace/print
+        self.adt = False                 # delegating zone's DNSKEY ADT flag
         self.cache.install_zone(zone, self)
 
     def has_ns(self, ns):
@@ -71,8 +75,24 @@ class Zone:
         """Set zone to secure; when signed DS matches signed DNSKEY below"""
         self.secure = action
 
+    def install_deleg_addresses(self, ip_strings, deleg_rrset):
+        """Install DELEG-derived server addresses. NS names are never stored
+        (delext Section 5.2: accompanying NS MUST NOT be cached)."""
+        self.via_deleg = True
+        self.deleg_rrset = deleg_rrset
+        self.deleg_iplist = [IPaddress(ip) for ip in ip_strings]
+
     def iplist(self):
-        """Return list of nameserver addresses"""
+        """Return list of nameserver addresses. When the zone was reached via
+        a DELEG record, the addresses come from the DELEG server source, not
+        from NS + glue."""
+        if self.via_deleg:
+            source = self.deleg_iplist
+            if self.resolver.prefs.V6_ONLY:
+                return [i for i in source if i.addr.find(':') != -1]
+            if self.resolver.prefs.V4_ONLY:
+                return [i for i in source if i.addr.find(':') == -1]
+            return source
         result = []
         for ns in self.nslist:
             iplist = self.cache.get_ns(ns).iplist
@@ -119,6 +139,9 @@ class Zone:
                 self.ttl_ns, self.ttl_ds))
         else:
             print("TTL: Delegation: {}".format(self.ttl_ns))
+        if self.via_deleg:
+            print("DELEG servers: {}".format(
+                " ".join(ip.addr for ip in self.deleg_iplist)))
         self.print_nsinfo()
         self.print_dsinfo()
 
