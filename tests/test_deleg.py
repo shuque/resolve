@@ -347,6 +347,108 @@ class TestAdtFlag(unittest.TestCase):
 
 from reslib.lookup import get_rrset_dict
 import dns.message
+import dns.rcode
+import dns.rdatatype
+from unittest import mock
+
+from reslib.lookup import process_referral
+import reslib.lookup as lookup
+from reslib.query import Query
+from reslib.exception import ResError
+
+ZONE = "sub0.deleg.huque.com."
+NSNAME = "ns.example.net."
+
+
+def _ns_rrset(owner_text=ZONE, target_text=NSNAME):
+    return dns.rrset.from_text(owner_text, 3600, "IN", "NS", target_text)
+
+
+def _referral_query(resolver, authority_rrsets):
+    """Build a Query whose response carries the given authority RRsets."""
+    msg = dns.message.Message()
+    for rrset in authority_rrsets:
+        msg.authority.append(rrset)
+    query = Query(ZONE, "A", "IN", resolver=resolver)
+    query.response = msg
+    return query
+
+
+class TestProcessReferralDeleg(unittest.TestCase):
+    """Offline coverage of the DELEG / NS dispatch in process_referral.
+
+    All cases run with prefs.DNSSEC=False so the validate/DS block is skipped
+    and no signatures or network are needed. The secure/insecure-via-DS
+    decision and DELEG RRSIG validation are exercised live in Task 9.
+    """
+
+    def _resolver(self):
+        r = Resolver()
+        r.prefs.DELEG = True
+        r.prefs.DNSSEC = False
+        return r
+
+    def test_deleg_happy_path_inline_addrs(self):
+        # (a) inline server-ipv4 DELEG -> usable, no callbacks, no network.
+        deleg = _deleg_rrset(ZONE, [_tlv(1, bytes.fromhex("c0000201"))])
+        resolver = self._resolver()
+        query = _referral_query(resolver, [deleg])
+        zone = process_referral(query)
+        self.assertTrue(zone.via_deleg)
+        self.assertEqual([ip.addr for ip in zone.deleg_iplist], ["192.0.2.1"])
+        self.assertEqual([ip.addr for ip in zone.iplist()], ["192.0.2.1"])
+
+    def test_ns_not_cached_on_deleg_path(self):
+        # (b) DELEG + stray NS -> NS must not be validated or cached, and the
+        # zone must have no NS names. Regression test for FINDING 1.
+        deleg = _deleg_rrset(ZONE, [_tlv(1, bytes.fromhex("c0000201"))])
+        ns = _ns_rrset()
+        resolver = self._resolver()
+        query = _referral_query(resolver, [deleg, ns])
+        zone = process_referral(query)
+        self.assertTrue(zone.via_deleg)
+        self.assertEqual(zone.nslist, [])
+        self.assertNotIn((dns.name.from_text(ZONE), dns.rdatatype.NS),
+                         resolver.cache.RRsets)
+        # DELEG itself is cached.
+        self.assertIn((dns.name.from_text(ZONE), DELEG_RDTYPE),
+                      resolver.cache.RRsets)
+
+    def test_unusable_deleg_raises_no_fallback(self):
+        # (c) DELEG with only an unsupported key -> classify "none" ->
+        # SLIST_UNUSABLE -> ResError, and NS is never cached (no fallback).
+        deleg = _deleg_rrset(ZONE, [_tlv(99, b"\x00\x00")])
+        ns = _ns_rrset()
+        resolver = self._resolver()
+        query = _referral_query(resolver, [deleg, ns])
+        with self.assertRaises(ResError):
+            process_referral(query)
+        self.assertNotIn((dns.name.from_text(ZONE), dns.rdatatype.NS),
+                         resolver.cache.RRsets)
+
+    def test_deleg_only_cut_no_ns(self):
+        # (d) DELEG with no NS at all -> guard relaxation; usable zone.
+        deleg = _deleg_rrset(ZONE, [_tlv(1, bytes.fromhex("c0000201"))])
+        resolver = self._resolver()
+        query = _referral_query(resolver, [deleg])
+        zone = process_referral(query)
+        self.assertTrue(zone.via_deleg)
+        self.assertEqual([ip.addr for ip in zone.iplist()], ["192.0.2.1"])
+
+    def test_prefs_deleg_false_takes_ns_path(self):
+        # (e) DELEG present but prefs.DELEG=False -> NS path dispatched.
+        deleg = _deleg_rrset(ZONE, [_tlv(1, bytes.fromhex("c0000201"))])
+        ns = _ns_rrset()
+        resolver = self._resolver()
+        resolver.prefs.DELEG = False
+        query = _referral_query(resolver, [deleg, ns])
+        with mock.patch.object(lookup, "_process_ns_referral") as ns_path, \
+             mock.patch.object(lookup, "_process_deleg_referral") as de_path:
+            ns_path.return_value = "NS_ZONE"
+            result = process_referral(query)
+        self.assertEqual(result, "NS_ZONE")
+        self.assertEqual(ns_path.call_count, 1)
+        self.assertEqual(de_path.call_count, 0)
 
 
 class TestGetRrsetDictNoCache(unittest.TestCase):

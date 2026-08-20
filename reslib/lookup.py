@@ -14,9 +14,7 @@ import dns.dnssec
 
 from reslib.exception import ResError
 from reslib.deleg import (DELEG_RDTYPE, DELEGPARAM_RDTYPE,
-                          parse_deleginfos, DelegParseError,
-                          build_slist, SLIST_USABLE, SLIST_UNUSABLE,
-                          SLIST_ABSENT)
+                          build_slist, SLIST_UNUSABLE)
 from reslib.zone import Zone
 from reslib.query import Query
 from reslib.rrset import RRset
@@ -102,15 +100,21 @@ def install_zone_in_cache(zonename, query, ns_srrset, ds_srrset):
     return zone
 
 
-def authenticate_insecure_referral(query, zonename):
+def authenticate_insecure_referral(query, zonename, install_cache=True):
     """
     Authenticate insecure referral. AUTHORITY section should have a
     signed NSEC/NSEC3 record that demonstrates that no DS record exists.
     However, the opt-out flag on the NSEC/NSEC3 records, if present may
     omit this requirement.
+
+    install_cache is forwarded to get_rrset_dict. The DELEG path passes
+    install_cache=False so that a stray NS accompanying the DELEG is not
+    re-cached here (delext Section 5.2); the DELEG path installs the DELEG,
+    DS and NSEC/NSEC3 RRsets selectively afterwards.
     """
 
-    rrset_dict, _ = get_rrset_dict(query.resolver, query.response.authority)
+    rrset_dict, _ = get_rrset_dict(query.resolver, query.response.authority,
+                                   install_cache=install_cache)
     authenticated = False
     optout = False
     nsec3_set = []
@@ -276,7 +280,8 @@ def _process_deleg_referral(query, rrset_dict, deleg_srrset, ds_srrset,
             if zonename != ds_srrset.rrname:
                 raise ResError("DS didn't match DELEG in referral message")
         else:
-            authenticate_insecure_referral(query, zonename)
+            authenticate_insecure_referral(query, zonename,
+                                           install_cache=False)
             if not query.is_nsquery:
                 query.secure_so_far = False
     else:
