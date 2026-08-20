@@ -465,5 +465,70 @@ class TestGetRrsetDictNoCache(unittest.TestCase):
         self.assertEqual(resolver.cache.RRsets, {})
 
 
+import dns.rdtypes.ANY.NSEC
+from reslib.lookup import adt_bitmap_consistent
+
+
+class TestAdtEnforcement(unittest.TestCase):
+    """Bitmap-consistency core of ADT delegation-type proof enforcement
+    (delext Section 6.2), against synthetic NSEC RRsets. No network."""
+
+    def test_bitmap_consistent_deleg_present(self):
+        rrset = dns.rrset.from_text_list(
+            dns.name.from_text("sub0.deleg.huque.com."), 3600, "IN", "NSEC",
+            ["nsec-next.deleg.huque.com. RRSIG TYPE61440"])
+        # DELEG present in Authority, bitmap lists TYPE61440 -> consistent
+        self.assertTrue(
+            adt_bitmap_consistent(rrset[0], deleg_present=True,
+                                  ns_present=False))
+
+    def test_bitmap_inconsistent_deleg_stripped(self):
+        # bitmap says DELEG exists, but DELEG RRset absent from Authority
+        rrset = dns.rrset.from_text_list(
+            dns.name.from_text("sub0.deleg.huque.com."), 3600, "IN", "NSEC",
+            ["nsec-next.deleg.huque.com. RRSIG TYPE61440"])
+        self.assertFalse(
+            adt_bitmap_consistent(rrset[0], deleg_present=False,
+                                  ns_present=False))
+
+    def test_bitmap_consistent_ns_only(self):
+        rrset = dns.rrset.from_text_list(
+            dns.name.from_text("sub2.deleg.huque.com."), 3600, "IN", "NSEC",
+            ["nsec-next.deleg.huque.com. NS DS RRSIG"])
+        self.assertTrue(
+            adt_bitmap_consistent(rrset[0], deleg_present=False,
+                                  ns_present=True))
+
+
+class TestAdtFlagPopulatedFromKeylist(unittest.TestCase):
+    """Carried minor from Task 5: unit-test the exact expression used in
+    match_ds_zone / initialize_dnssec to set zone.adt / root_zone.adt --
+    any(getattr(k, "adt_flag", False) for k in keylist) -- against
+    constructed DNSKEY objects. A full match_ds_zone integration test would
+    require a live DNSKEY response over the network, which is unavailable
+    here (see class docstring in TestProcessReferralDeleg)."""
+
+    def test_any_true_when_one_key_has_adt_flag(self):
+        rr_adt = _make_dnskey_rr(259)     # ZONE | SEP | ADT
+        rr_plain = _make_dnskey_rr(257)   # ZONE | SEP, no ADT
+        keylist = [
+            DNSKEY(dns.name.from_text("deleg.huque.com."), rr_plain),
+            DNSKEY(dns.name.from_text("deleg.huque.com."), rr_adt),
+        ]
+        self.assertTrue(any(getattr(k, "adt_flag", False) for k in keylist))
+
+    def test_any_false_when_no_key_has_adt_flag(self):
+        rr_plain1 = _make_dnskey_rr(257)
+        rr_plain2 = _make_dnskey_rr(256)  # ZONE only
+        keylist = [
+            DNSKEY(dns.name.from_text("example.com."), rr_plain1),
+            DNSKEY(dns.name.from_text("example.com."), rr_plain2),
+        ]
+        self.assertFalse(any(getattr(k, "adt_flag", False) for k in keylist))
+
+    def test_any_false_for_empty_keylist(self):
+        self.assertFalse(any(getattr(k, "adt_flag", False) for k in []))
+
+
 if __name__ == "__main__":
     unittest.main()

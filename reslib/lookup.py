@@ -168,6 +168,69 @@ def print_referral_trace(query, zonename, ds_srrset):
             zonename, query.elapsed_last))
 
 
+def adt_bitmap_consistent(nsec_rdata, deleg_present, ns_present):
+    """Return True if an NSEC/NSEC3 type bitmap is consistent with the
+    delegation types present in the referral (delext Section 6.2).
+
+    The DELEG(61440) bit MUST be set iff a DELEG RRset is present in the
+    Authority section; the NS bit MUST be set iff an NS RRset is present.
+    A mismatch signals stripping or injection -> tampered referral.
+    """
+    if type_in_bitmap(DELEG_RDTYPE, nsec_rdata) != deleg_present:
+        return False
+    if type_in_bitmap(dns.rdatatype.NS, nsec_rdata) != ns_present:
+        return False
+    return True
+
+
+def enforce_adt_proof(query, zonename, deleg_present, ns_present, rrset_dict):
+    """Enforce the ADT delegation-type proof for a referral from a zone whose
+    validated DNSKEY carries the ADT flag (delext Sections 6.2 / 8.2.1).
+
+    Requires a validated NSEC or NSEC3 record matching the delegated name whose
+    type bitmap is consistent with the delegation types present. Missing or
+    inconsistent -> ResError (bogus).
+    """
+    for (rrname, rrtype) in rrset_dict:
+        if rrtype not in (dns.rdatatype.NSEC, dns.rdatatype.NSEC3):
+            continue
+        srrset = rrset_dict[(rrname, rrtype)]
+        validate_rrset(srrset, query, silent=True)
+        if rrtype == dns.rdatatype.NSEC:
+            if rrname != zonename:
+                continue
+            if adt_bitmap_consistent(srrset.rrset[0], deleg_present, ns_present):
+                return
+            raise ResError(
+                "ADT proof inconsistent for {} (referral tampered)".format(
+                    zonename))
+        else:  # NSEC3
+            nsec3_rdata = srrset.rrset[0]
+            signer = srrset.rrsig[0].signer
+            hashed_owner = get_hashed_owner(query.resolver, zonename, signer,
+                                            nsec3_rdata)
+            if hashed_owner != rrname:
+                continue
+            if adt_bitmap_consistent(nsec3_rdata, deleg_present, ns_present):
+                return
+            raise ResError(
+                "ADT proof inconsistent for {} (referral tampered)".format(
+                    zonename))
+
+    raise ResError(
+        "ADT flag set for delegating zone but referral lacks NSEC/NSEC3 "
+        "delegation-type proof for {}".format(zonename))
+
+
+def _referral_zonename(deleg_srrset, ns_srrset):
+    """The delegated owner name, from whichever delegation RRset is present."""
+    if deleg_srrset is not None:
+        return deleg_srrset.rrname
+    if ns_srrset is not None:
+        return ns_srrset.rrname
+    raise ResError("Referral has neither DELEG nor NS RRset")
+
+
 def process_referral(query, referring_zone=None):
     """
     Process referral. Returns a zone object for the referred zone.
@@ -210,6 +273,15 @@ def process_referral(query, referring_zone=None):
                 raise ResError("Multiple DELEG RRset found in referral")
 
     follow_deleg = query.resolver.prefs.DELEG and deleg_srrset is not None
+
+    adt_active = (query.resolver.prefs.DNSSEC and query.secure_so_far
+                  and not query.is_nsquery
+                  and referring_zone is not None and referring_zone.adt)
+    if adt_active:
+        deleg_present = deleg_srrset is not None
+        ns_present = ns_srrset is not None
+        enforce_adt_proof(query, _referral_zonename(deleg_srrset, ns_srrset),
+                          deleg_present, ns_present, rrset_dict)
 
     if follow_deleg:
         return _process_deleg_referral(query, rrset_dict, deleg_srrset,
