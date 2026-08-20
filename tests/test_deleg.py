@@ -345,5 +345,23 @@ class TestAdtFlag(unittest.TestCase):
         self.assertFalse(key.adt_flag)
 
 
+from reslib.lookup import get_rrset_dict
+import dns.message
+
+
+class TestGetRrsetDictNoCache(unittest.TestCase):
+
+    def test_install_cache_false_leaves_cache_empty(self):
+        resolver = Resolver()
+        msg = dns.message.from_text(
+            "id 1\n;QUESTION\nsub0.deleg.huque.com. IN NS\n"
+            ";AUTHORITY\nsub0.deleg.huque.com. 3600 IN NS ns.example.net.\n")
+        rrset_dict, _ = get_rrset_dict(resolver, msg.authority,
+                                       install_cache=False)
+        self.assertTrue(rrset_dict)
+        # nothing installed
+        self.assertEqual(resolver.cache.RRsets, {})
+
+
 if __name__ == "__main__":
     unittest.main()

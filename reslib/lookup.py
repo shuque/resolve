@@ -8,10 +8,15 @@ import time
 import dns.message
 import dns.query
 import dns.rdatatype
+import dns.rdataclass
 import dns.rcode
 import dns.dnssec
 
 from reslib.exception import ResError
+from reslib.deleg import (DELEG_RDTYPE, DELEGPARAM_RDTYPE,
+                          parse_deleginfos, DelegParseError,
+                          build_slist, SLIST_USABLE, SLIST_UNUSABLE,
+                          SLIST_ABSENT)
 from reslib.zone import Zone
 from reslib.query import Query
 from reslib.rrset import RRset
@@ -161,21 +166,29 @@ def print_referral_trace(query, zonename, ds_srrset):
 
 def process_referral(query, referring_zone=None):
     """
-    Process referral. Returns a zone object for the referred zone. If
-    referring zone is signed, then if DS records are present, they are
-    authenticated, otherwise the lack of secure referral is authenticated.
-    The returned zone object is populated with the nameserver names,
+    Process referral. Returns a zone object for the referred zone.
+
+    When DELEG is enabled (prefs.DELEG) and a DELEG RRset is present in the
+    referral, the child zone's servers are sourced from the DELEG record and
+    any accompanying NS is ignored (not validated, not cached). Secure/
+    insecure status is still decided by the DS RRset.
+
+    For the legacy NS path (DELEG disabled or absent), behaviour is unchanged:
+    if the referring zone is signed, then if DS records are present they are
+    authenticated, otherwise the lack of a secure referral is authenticated,
+    and the returned zone object is populated with the nameserver names,
     addresses, and if present, DS RRset data.
     """
+    ns_srrset = ds_srrset = deleg_srrset = None
 
-    ns_srrset = ds_srrset = None
-
-    rrset_dict, _ = get_rrset_dict(query.resolver, query.response.authority)
+    # Build the authority dict WITHOUT auto-caching so a stray NS accompanying
+    # a DELEG can never be cached (delext Section 5.2). The legacy NS path
+    # re-installs the relevant RRsets explicitly below.
+    rrset_dict, _ = get_rrset_dict(query.resolver, query.response.authority,
+                                   install_cache=False)
 
     for (rrname, rrtype) in rrset_dict:
         srrset = rrset_dict[(rrname, rrtype)]
-        if rrtype != dns.rdatatype.NS:
-            validate_rrset(srrset, query, silent=True)
         if rrtype == dns.rdatatype.NS:
             if ns_srrset is None:
                 ns_srrset = srrset
@@ -186,6 +199,39 @@ def process_referral(query, referring_zone=None):
                 ds_srrset = srrset
             else:
                 raise ResError("Multiple DS RRset found in referral")
+        elif rrtype == DELEG_RDTYPE:
+            if deleg_srrset is None:
+                deleg_srrset = srrset
+            else:
+                raise ResError("Multiple DELEG RRset found in referral")
+
+    follow_deleg = query.resolver.prefs.DELEG and deleg_srrset is not None
+
+    if follow_deleg:
+        return _process_deleg_referral(query, rrset_dict, deleg_srrset,
+                                       ds_srrset, referring_zone)
+    return _process_ns_referral(query, rrset_dict, ns_srrset, ds_srrset)
+
+
+def _install_referral_rrsets(query, rrset_dict, keep_types):
+    """Install only the referral RRsets whose type is in keep_types (plus the
+    NSEC/NSEC3 records needed for proofs), so a stray NS is never cached."""
+    proof_types = (dns.rdatatype.NSEC, dns.rdatatype.NSEC3)
+    for (_, rrtype), srrset in rrset_dict.items():
+        if rrtype in keep_types or rrtype in proof_types:
+            query.resolver.cache.install_rrset(srrset)
+
+
+def _process_ns_referral(query, rrset_dict, ns_srrset, ds_srrset):
+    """Legacy NS-based referral (DELEG disabled or absent). Behaviour is
+    preserved from the pre-DELEG process_referral: everything except NS is
+    validated, and NS + DS (+ NSEC/NSEC3) are installed in the cache."""
+    for (rrname, rrtype), srrset in rrset_dict.items():
+        if rrtype != dns.rdatatype.NS:
+            validate_rrset(srrset, query, silent=True)
+    _install_referral_rrsets(
+        query, rrset_dict,
+        keep_types=(dns.rdatatype.NS, dns.rdatatype.DS))
 
     if ns_srrset is None:
         raise ResError("Unable to find NS RRset in referral response")
@@ -204,13 +250,110 @@ def process_referral(query, referring_zone=None):
             query.secure_so_far = False
 
     print_referral_trace(query, zonename, ds_srrset)
-
     zone = install_zone_in_cache(zonename, query, ns_srrset, ds_srrset)
+    if vprint_quiet(query):
+        zone.print_details()
+    return zone
+
+
+def _process_deleg_referral(query, rrset_dict, deleg_srrset, ds_srrset,
+                            referring_zone):
+    """DELEG-based referral: source servers from the DELEG record; ignore NS.
+
+    Accompanying NS is neither validated nor cached (delext Section 5.2).
+    A DELEG-only cut (no NS) is legal here, unlike the legacy NS path. A
+    present-but-unusable DELEG raises a terminal ResError with NO NS fallback
+    (draft-ietf-deleg Section 4.4).
+    """
+    zonename = deleg_srrset.rrname
+
+    # Validate the DELEG RRset like DS when in a secure chain, and decide
+    # secure/insecure via the DS RRset exactly as the NS path does.
+    if query.resolver.prefs.DNSSEC and query.secure_so_far and not query.is_nsquery:
+        validate_rrset(deleg_srrset, query, silent=True)
+        if ds_srrset:
+            validate_rrset(ds_srrset, query, silent=True)
+            if zonename != ds_srrset.rrname:
+                raise ResError("DS didn't match DELEG in referral message")
+        else:
+            authenticate_insecure_referral(query, zonename)
+            if not query.is_nsquery:
+                query.secure_so_far = False
+    else:
+        if not query.is_nsquery:
+            query.secure_so_far = False
+
+    # Install DELEG + DS + NSEC/NSEC3 proofs; NEVER install NS.
+    _install_referral_rrsets(
+        query, rrset_dict,
+        keep_types=(DELEG_RDTYPE, dns.rdatatype.DS))
+
+    print_referral_trace(query, zonename, ds_srrset)
+
+    # Reuse/create the zone object.
+    zone = query.resolver.cache.get_zone(zonename)
+    if zone is None:
+        zone = Zone(zonename, query.resolver)
+    zone.install_ns_rrset_ttl(deleg_srrset.rrset.ttl)
+    if ds_srrset:
+        zone.install_ds_rrset(ds_srrset.rrset)
+
+    # Build the server list from the DELEG record.
+    result = _build_deleg_slist(query, deleg_srrset.rrset, zonename)
+    if result.state == SLIST_UNUSABLE:
+        raise ResError(
+            "DELEG for {} present but unusable; no NS fallback".format(
+                zonename))
+    zone.install_deleg_addresses(result.addresses, deleg_srrset.rrset)
 
     if vprint_quiet(query):
         zone.print_details()
-
     return zone
+
+
+def _build_deleg_slist(query, deleg_rrset, zonename):
+    """Drive build_slist with resolver-backed callbacks for server-name and
+    include-delegparam resolution.
+
+    CONTROLLER RULING option (b): the build_slist / fetch_delegparam contract
+    does not surface how many CNAME/DNAME hops a nested resolution consumed,
+    so draft-ietf-deleg Section 4.2 step 7 ("a CNAME/DNAME step counts the
+    same as a DELEGPARAM step against the loop limit") is not enforced through
+    a single shared budget. This is safe against unbounded recursion because
+    every path is independently bounded:
+      * the include-delegparam chain depth is bounded by max_chain
+        (prefs.MAX_DELEGPARAM) inside build_slist;
+      * each nested resolve_name (both server-name address resolution and the
+        DELEGPARAM fetch) follows CNAME/DNAME only up to the resolver-global
+        MAX_CNAME counter, which raises ResError when exceeded.
+    The divergence is thus a matter of using two finite budgets instead of one
+    shared budget; there is no unbounded-loop hole.
+    """
+
+    def resolve_addrs(name):
+        ips = []
+        for addrtype in ['A', 'AAAA']:
+            nsquery = Query(name, addrtype, 'IN', is_nsquery=True,
+                            resolver=query.resolver)
+            nsquery.quiet = True
+            resolve_name(query.resolver, nsquery,
+                         query.resolver.cache.closest_zone(nsquery.qname))
+            ips.extend(nsquery.get_answer_ip_list())
+        return ips
+
+    def fetch_delegparam(name):
+        dpquery = Query(name, DELEGPARAM_RDTYPE, 'IN', resolver=query.resolver)
+        dpquery.quiet = True
+        resolve_name(query.resolver, dpquery,
+                     query.resolver.cache.closest_zone(name))
+        msg = dpquery.response
+        if msg is None:
+            return None
+        return msg.get_rrset(msg.answer, name, dns.rdataclass.IN,
+                             DELEGPARAM_RDTYPE)
+
+    return build_slist(deleg_rrset, zonename, resolve_addrs, fetch_delegparam,
+                       max_chain=query.resolver.prefs.MAX_DELEGPARAM)
 
 
 def synthesize_cname(dname_rrset, query):
