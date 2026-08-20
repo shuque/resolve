@@ -465,8 +465,8 @@ class TestGetRrsetDictNoCache(unittest.TestCase):
         self.assertEqual(resolver.cache.RRsets, {})
 
 
-import dns.rdtypes.ANY.NSEC
-from reslib.lookup import adt_bitmap_consistent
+from reslib.lookup import adt_bitmap_consistent, enforce_adt_proof
+from reslib.rrset import RRset
 
 
 class TestAdtEnforcement(unittest.TestCase):
@@ -504,9 +504,10 @@ class TestAdtFlagPopulatedFromKeylist(unittest.TestCase):
     """Carried minor from Task 5: unit-test the exact expression used in
     match_ds_zone / initialize_dnssec to set zone.adt / root_zone.adt --
     any(getattr(k, "adt_flag", False) for k in keylist) -- against
-    constructed DNSKEY objects. A full match_ds_zone integration test would
-    require a live DNSKEY response over the network, which is unavailable
-    here (see class docstring in TestProcessReferralDeleg)."""
+    constructed DNSKEY objects. See TestMatchDsZoneAdtAssignment below for
+    coverage of the real `zone.adt = ...` assignment inside match_ds_zone
+    itself (Fix round 1 strengthens this minor beyond re-testing any() +
+    DNSKEY.adt_flag, which TestAdtFlag already covers)."""
 
     def test_any_true_when_one_key_has_adt_flag(self):
         rr_adt = _make_dnskey_rr(259)     # ZONE | SEP | ADT
@@ -528,6 +529,192 @@ class TestAdtFlagPopulatedFromKeylist(unittest.TestCase):
 
     def test_any_false_for_empty_keylist(self):
         self.assertFalse(any(getattr(k, "adt_flag", False) for k in []))
+
+
+class TestMatchDsZoneAdtAssignment(unittest.TestCase):
+    """Fix round 1: exercise the REAL `zone.adt = ...` assignment inside
+    match_ds_zone (reslib/lookup.py, near the "DS did not match DNSKEY"
+    raise), not just the boolean expression in isolation.
+
+    match_ds_zone's network-facing collaborators (get_zone_addresses,
+    send_query, check_self_signature, match_ds_ksklist,
+    supported_algorithm_present) are mocked so the function's own control
+    flow runs for real, offline, all the way through to the zone.adt
+    assignment line. This is the "reasonable effort" version of a live
+    match_ds_zone integration test, which would otherwise require a real
+    signed DNSKEY response over the network.
+    """
+
+    def _zone(self, resolver):
+        zone = Zone(dns.name.from_text("deleg.huque.com."), resolver)
+        zone.dslist = [mock.Mock()]  # non-empty; supported_algorithm_present is patched
+        return zone
+
+    def _run_match_ds_zone(self, keylist):
+        resolver = Resolver()
+        zone = self._zone(resolver)
+
+        fake_response = mock.Mock()
+        fake_response.rcode.return_value = dns.rcode.NOERROR
+        fake_response.get_rrset.return_value = mock.Mock()  # non-None sentinel
+
+        with mock.patch.object(lookup, "supported_algorithm_present",
+                               return_value=True), \
+             mock.patch.object(lookup, "get_zone_addresses",
+                               return_value=[mock.Mock()]), \
+             mock.patch.object(lookup, "send_query",
+                               return_value=fake_response), \
+             mock.patch.object(lookup, "check_self_signature",
+                               return_value=(keylist, keylist)), \
+             mock.patch.object(lookup, "match_ds_ksklist", return_value=True):
+            lookup.match_ds_zone(zone, None)
+        return zone
+
+    def test_zone_adt_set_true_when_adt_flagged_key_signs(self):
+        key_adt = DNSKEY(dns.name.from_text("deleg.huque.com."),
+                         _make_dnskey_rr(259))  # ZONE | SEP | ADT
+        zone = self._run_match_ds_zone([key_adt])
+        self.assertTrue(zone.adt)
+
+    def test_zone_adt_set_false_when_no_adt_flagged_key_signs(self):
+        key_plain = DNSKEY(dns.name.from_text("deleg.huque.com."),
+                           _make_dnskey_rr(257))  # ZONE | SEP, no ADT
+        zone = self._run_match_ds_zone([key_plain])
+        self.assertFalse(zone.adt)
+
+
+class TestEnforceAdtProof(unittest.TestCase):
+    """Fix round 1: directly exercise enforce_adt_proof's raise paths and
+    consistent-match return, against a synthetic rrset_dict keyed exactly
+    as process_referral builds it: (rrname, rrtype) -> reslib.rrset.RRset.
+    validate_rrset is patched to a no-op (it always re-validates and does
+    not short-circuit on srrset.validated, so real signatures would
+    otherwise be required)."""
+
+    ZONENAME = dns.name.from_text("sub0.deleg.huque.com.")
+
+    def _query(self):
+        return Query(self.ZONENAME, "A", "IN", resolver=Resolver())
+
+    def test_inconsistent_bitmap_deleg_stripped_raises(self):
+        # Bitmap lists TYPE61440 (DELEG), but DELEG RRset absent from
+        # Authority -> stripped -> ResError.
+        nsec_rrset = dns.rrset.from_text_list(
+            self.ZONENAME, 3600, "IN", "NSEC",
+            ["nsec-next.deleg.huque.com. RRSIG TYPE61440"])
+        srrset = RRset(self.ZONENAME, dns.rdatatype.NSEC, rrset=nsec_rrset)
+        rrset_dict = {(self.ZONENAME, dns.rdatatype.NSEC): srrset}
+        with mock.patch.object(lookup, "validate_rrset"):
+            with self.assertRaises(ResError):
+                enforce_adt_proof(self._query(), self.ZONENAME,
+                                  deleg_present=False, ns_present=False,
+                                  rrset_dict=rrset_dict)
+
+    def test_missing_proof_owner_mismatch_raises(self):
+        # NSEC present, but its owner is not the delegated name -> no proof
+        # matches zonename -> ResError.
+        other = dns.name.from_text("other.deleg.huque.com.")
+        nsec_rrset = dns.rrset.from_text_list(
+            other, 3600, "IN", "NSEC",
+            ["nsec-next.deleg.huque.com. RRSIG TYPE61440"])
+        srrset = RRset(other, dns.rdatatype.NSEC, rrset=nsec_rrset)
+        rrset_dict = {(other, dns.rdatatype.NSEC): srrset}
+        with mock.patch.object(lookup, "validate_rrset"):
+            with self.assertRaises(ResError):
+                enforce_adt_proof(self._query(), self.ZONENAME,
+                                  deleg_present=True, ns_present=False,
+                                  rrset_dict=rrset_dict)
+
+    def test_missing_proof_no_nsec_at_all_raises(self):
+        with mock.patch.object(lookup, "validate_rrset"):
+            with self.assertRaises(ResError):
+                enforce_adt_proof(self._query(), self.ZONENAME,
+                                  deleg_present=True, ns_present=False,
+                                  rrset_dict={})
+
+    def test_consistent_match_returns_without_raising(self):
+        nsec_rrset = dns.rrset.from_text_list(
+            self.ZONENAME, 3600, "IN", "NSEC",
+            ["nsec-next.deleg.huque.com. RRSIG TYPE61440"])
+        srrset = RRset(self.ZONENAME, dns.rdatatype.NSEC, rrset=nsec_rrset)
+        rrset_dict = {(self.ZONENAME, dns.rdatatype.NSEC): srrset}
+        with mock.patch.object(lookup, "validate_rrset"):
+            enforce_adt_proof(self._query(), self.ZONENAME,
+                              deleg_present=True, ns_present=False,
+                              rrset_dict=rrset_dict)  # must not raise
+
+    def test_nsec3_consistent_match_returns_without_raising(self):
+        hashed_owner = dns.name.from_text(
+            "1avvqn74sg75ukfcmhfb4ulocmkn3mo2.deleg.huque.com.")
+        nsec3_rrset = dns.rrset.from_text_list(
+            hashed_owner, 3600, "IN", "NSEC3",
+            ["1 0 0 - 1AVVQN74SG75UKFCMHFB4ULOCMKN3MO2 RRSIG TYPE61440"])
+        srrset = RRset(hashed_owner, dns.rdatatype.NSEC3, rrset=nsec3_rrset,
+                       rrsig=[mock.Mock(signer=dns.name.root)])
+        rrset_dict = {(hashed_owner, dns.rdatatype.NSEC3): srrset}
+        with mock.patch.object(lookup, "validate_rrset"), \
+             mock.patch.object(lookup, "get_hashed_owner",
+                               return_value=hashed_owner):
+            enforce_adt_proof(self._query(), self.ZONENAME,
+                              deleg_present=True, ns_present=False,
+                              rrset_dict=rrset_dict)  # must not raise
+
+
+class TestProcessReferralAdtGate(unittest.TestCase):
+    """Fix round 1: gate-wiring test proving the adt_active conjuncts in
+    process_referral are actually applied -- i.e. enforce_adt_proof is only
+    called when referring_zone is non-None and referring_zone.adt is True
+    (with DNSSEC/secure_so_far/not-nsquery already held by defaults).
+    _process_ns_referral / _process_deleg_referral are stubbed out so this
+    test isolates the gate itself, not the dispatch or enforcement body."""
+
+    def _resolver(self):
+        r = Resolver()
+        r.prefs.DELEG = False
+        r.prefs.DNSSEC = True
+        return r
+
+    def _query(self, resolver):
+        return _referral_query(resolver, [_ns_rrset()])
+
+    def _patched(self, adt_mock):
+        return (mock.patch.object(lookup, "enforce_adt_proof", adt_mock),
+                mock.patch.object(lookup, "_process_ns_referral",
+                                  return_value="STUB_ZONE"),
+                mock.patch.object(lookup, "_process_deleg_referral",
+                                  return_value="STUB_ZONE"))
+
+    def test_called_when_referring_zone_adt_true(self):
+        resolver = self._resolver()
+        query = self._query(resolver)
+        referring_zone = Zone(dns.name.from_text("deleg.huque.com."), resolver)
+        referring_zone.adt = True
+        adt_mock = mock.Mock()
+        p1, p2, p3 = self._patched(adt_mock)
+        with p1, p2, p3:
+            result = process_referral(query, referring_zone=referring_zone)
+        self.assertEqual(result, "STUB_ZONE")
+        adt_mock.assert_called_once()
+
+    def test_not_called_when_referring_zone_adt_false(self):
+        resolver = self._resolver()
+        query = self._query(resolver)
+        referring_zone = Zone(dns.name.from_text("deleg.huque.com."), resolver)
+        referring_zone.adt = False
+        adt_mock = mock.Mock()
+        p1, p2, p3 = self._patched(adt_mock)
+        with p1, p2, p3:
+            process_referral(query, referring_zone=referring_zone)
+        adt_mock.assert_not_called()
+
+    def test_not_called_when_referring_zone_is_none(self):
+        resolver = self._resolver()
+        query = self._query(resolver)
+        adt_mock = mock.Mock()
+        p1, p2, p3 = self._patched(adt_mock)
+        with p1, p2, p3:
+            process_referral(query, referring_zone=None)
+        adt_mock.assert_not_called()
 
 
 if __name__ == "__main__":
