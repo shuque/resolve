@@ -6,6 +6,8 @@ import time
 import random
 import dns.resolver
 
+from reslib.deleg import EDNS_DE_FLAG
+
 
 def vprint_quiet(query):
     """Is verbose flag > 1 or is it set and query does not have quiet flag?"""
@@ -101,6 +103,8 @@ def make_query_message(query):
                                  want_dnssec=query.resolver.prefs.DNSSEC,
                                  payload=query.resolver.prefs.PAYLOAD)
     msg.flags &= ~dns.flags.RD
+    if query.resolver.prefs.DELEG and query.resolver.prefs.PAYLOAD != 0:
+        msg.ednsflags |= EDNS_DE_FLAG
     return msg
 
 

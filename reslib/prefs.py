@@ -29,3 +29,5 @@ class Prefs:
     MAX_QUERY: int = 600             # Max number of queries
     MAX_DELEG: int = 200             # Max number of delegations
     N3_HASHLIMIT: int = 512          # Upper bound for NSEC3 hash iterations
+    DELEG: bool = False              # --deleg: set EDNS DE flag, follow DELEG
+    MAX_DELEGPARAM: int = 10         # Max include-delegparam chain depth

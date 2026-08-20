@@ -295,5 +295,28 @@ class TestZoneDeleg(unittest.TestCase):
         self.assertEqual(addrs, ["2001:db8::1", "2001:db8::2"])
 
 
+import dns.flags
+from reslib.utils import make_query_message
+from reslib.query import Query
+
+
+class TestDelegEdnsFlag(unittest.TestCase):
+
+    def test_de_flag_set_when_prefs_deleg(self):
+        resolver = Resolver()
+        resolver.prefs.DELEG = True
+        q = Query("sub0.deleg.huque.com.", "A", "IN", resolver=resolver)
+        msg = make_query_message(q)
+        from reslib.deleg import EDNS_DE_FLAG
+        self.assertTrue(msg.ednsflags & EDNS_DE_FLAG)
+
+    def test_de_flag_absent_by_default(self):
+        resolver = Resolver()
+        q = Query("sub0.deleg.huque.com.", "A", "IN", resolver=resolver)
+        msg = make_query_message(q)
+        from reslib.deleg import EDNS_DE_FLAG
+        self.assertFalse(msg.ednsflags & EDNS_DE_FLAG)
+
+
 if __name__ == "__main__":
     unittest.main()

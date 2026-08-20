@@ -6,6 +6,13 @@ import argparse
 
 from reslib.version import __version__
 from reslib.prefs import Prefs
+from reslib.deleg import DELEG_RDTYPE, DELEGPARAM_RDTYPE
+
+
+_QTYPE_MNEMONICS = {
+    "DELEG": DELEG_RDTYPE,
+    "DELEGPARAM": DELEGPARAM_RDTYPE,
+}
 
 
 DESCRIPTION = "version {}\nPerform iterative resolution of a DNS name, type, and class.".format(
@@ -41,6 +48,8 @@ def make_parser():
                         help="perform DNSSEC validation (default is no)")
     parser.add_argument("-c", action="store_true", dest="DUMPCACHE",
                         help="dump zone/ns/key caches at end of program execution")
+    parser.add_argument("--deleg", action="store_true", dest="DELEG",
+                        help="set EDNS DE flag and follow DELEG referrals")
     transport = parser.add_mutually_exclusive_group()
     transport.add_argument("-4", action="store_true", dest="V4_ONLY",
                            help="only use IPv4 transport")
@@ -77,9 +86,13 @@ def process_args(arguments):
     prefs.V4_ONLY = ns.V4_ONLY
     prefs.V6_ONLY = ns.V6_ONLY
     prefs.BATCHFILE = ns.BATCHFILE
+    prefs.DELEG = ns.DELEG
 
     if prefs.PAYLOAD == 0 and prefs.DNSSEC:
         parser.error("DNSSEC (-z) requires EDNS (non zero -e)")
+
+    if prefs.PAYLOAD == 0 and prefs.DELEG:
+        parser.error("DELEG (--deleg) requires EDNS (non zero -e)")
 
     if prefs.JSON:
         prefs.VERBOSE = 0    # json output carries its own detail
@@ -103,5 +116,8 @@ def process_args(arguments):
         qname, qtype, qclass = args
     else:
         parser.error("expected <qname> [<qtype>] [<qclass>]")
+
+    if qtype is not None and qtype.upper() in _QTYPE_MNEMONICS:
+        qtype = _QTYPE_MNEMONICS[qtype.upper()]
 
     return (prefs, qname, qtype, qclass)
