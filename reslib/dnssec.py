@@ -468,6 +468,19 @@ def check_self_signature(resolver, rrset, rrsigs):
     return keys, Verified
 
 
+def signer_on_path(rrname, signer):
+    """
+    RFC 4035 Section 5.3.1: an RRSIG is only usable if its signer is the
+    zone authoritative for the RRset. The RRset owner name must therefore
+    be at or below the signer's zone -- i.e. the signer is the owner's
+    zone or an ancestor of it. This rejects a signature made by an
+    unrelated (e.g. a securely delegated but off-path) zone, which an
+    on-path attacker could otherwise use to inject records owned by a
+    victim name but validly signed by a zone the attacker controls.
+    """
+    return rrname.is_subdomain(signer)
+
+
 def validate_all(resolver, rrset, rrsigs):
     """
     Validate rrsigs for rrset with the already authenticated global cache
@@ -479,10 +492,16 @@ def validate_all(resolver, rrset, rrsigs):
     Failed = []
 
     for sig in get_sig_info(rrset, rrsigs):
-        keylist = resolver.key_cache.get_keys(sig.rdata.signer)
+        signer = sig.rdata.signer
+        # Pin the signer to the owner's zone path before any key lookup,
+        # so an off-path signer's keys are never fetched or trusted.
+        if not signer_on_path(rrset.name, signer):
+            Failed.append((signer, "signer {} not on path to owner {}".format(
+                signer, rrset.name)))
+            continue
+        keylist = resolver.key_cache.get_keys(signer)
         if keylist is None:
-            raise ResError("No DNSSEC keys found for {}".format(
-                sig.rdata.signer))
+            raise ResError("No DNSSEC keys found for {}".format(signer))
         v, f = verify_sig_with_keys(sig, keylist)
         Verified += v
         Failed += f

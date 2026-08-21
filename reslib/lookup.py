@@ -20,7 +20,7 @@ from reslib.query import Query
 from reslib.rrset import RRset
 from reslib.utils import (vprint_quiet, make_query_message, send_query,
                           is_referral)
-from reslib.dnssec import (load_keys, validate_all,
+from reslib.dnssec import (load_keys, validate_all, signer_on_path,
                            ds_rr_matches_dnskey, check_self_signature,
                            type_in_bitmap, get_hashed_owner,
                            nsec_covers_name, nsec3_covers_name,
@@ -623,6 +623,10 @@ def validate_rrset(srrset, query, silent=False):
 
     for sig_rr in srrset.rrsig:
         signer = sig_rr.signer
+        # Don't fetch keys for a signer that isn't on the path to the
+        # RRset owner (RFC 4035 5.3.1); validate_all discards it anyway.
+        if not signer_on_path(srrset.rrname, signer):
+            continue
         if not query.resolver.key_cache.has_key(signer):
             get_ns_ds_dnskey(signer, referring_query=query)
 
