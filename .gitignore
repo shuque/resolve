@@ -7,6 +7,7 @@ public
 stub.py
 test
 __pycache__
+tools/live_test.py
 zarchive/
 .claude/worktrees/
 CLAUDE.md
