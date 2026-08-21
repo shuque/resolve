@@ -643,6 +643,51 @@ class TestMatchDsZoneTerminalError(unittest.TestCase):
         self.assertIn("DS did not match DNSKEY", str(cm.exception))
 
 
+class TestMatchDsZoneDnskeyQueryTrace(unittest.TestCase):
+    """The child-zone DNSKEY query issued inside match_ds_zone must get its
+    own "# QUERY:" trace block (rather than sharing the parent referral's
+    block), gated on the referring query's verbosity."""
+
+    def _run_verbose(self, verbose):
+        resolver = Resolver()
+        resolver.prefs.VERBOSE = verbose
+        resolver.prefs.DNSSEC = True
+        zone = Zone(dns.name.from_text("sub1.deleg.huque.com."), resolver)
+        zone.dslist = [mock.Mock()]
+        referring = Query(dns.name.from_text("www.sub1.deleg.huque.com."),
+                          "A", "IN", resolver=resolver)
+        nsaddr = mock.Mock()
+        nsaddr.addr = "198.51.45.6"
+        fake_response = mock.Mock()
+        fake_response.rcode.return_value = dns.rcode.NOERROR
+        fake_response.get_rrset.return_value = mock.Mock()
+        keylist = [DNSKEY(dns.name.from_text("sub1.deleg.huque.com."),
+                          _make_dnskey_rr(257))]
+        buf = io.StringIO()
+        with mock.patch.object(lookup, "supported_algorithm_present",
+                               return_value=True), \
+             mock.patch.object(lookup, "get_zone_addresses",
+                               return_value=[nsaddr]), \
+             mock.patch.object(lookup, "send_query",
+                               return_value=fake_response), \
+             mock.patch.object(lookup, "check_self_signature",
+                               return_value=(keylist, keylist)), \
+             mock.patch.object(lookup, "match_ds_ksklist", return_value=True), \
+             redirect_stdout(buf):
+            lookup.match_ds_zone(zone, referring)
+        return buf.getvalue()
+
+    def test_dnskey_query_gets_own_header_when_verbose(self):
+        out = self._run_verbose(verbose=True)
+        self.assertIn(
+            "# QUERY: sub1.deleg.huque.com. DNSKEY IN at zone "
+            "sub1.deleg.huque.com. address 198.51.45.6", out)
+
+    def test_no_header_when_referring_query_quiet(self):
+        out = self._run_verbose(verbose=False)
+        self.assertNotIn("# QUERY:", out)
+
+
 class TestEnforceAdtProof(unittest.TestCase):
     """Fix round 1: directly exercise enforce_adt_proof's raise paths and
     consistent-match return, against a synthetic rrset_dict keyed exactly

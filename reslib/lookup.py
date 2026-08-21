@@ -1241,7 +1241,11 @@ def match_ds_zone(zone, referring_query):
     qtype = dns.rdatatype.from_text('DNSKEY')
     qclass = dns.rdataclass.from_text('IN')
     query = Query(qname, qtype, qclass, resolver=zone.resolver)
-    query.set_quiet(True)
+    # Tie this child DNSKEY query's verbosity to the referring context so it
+    # gets its own "# QUERY:" trace block (via print_query_trace below), matched
+    # to the same gate as the "DS match OK" / DNSKEY prints. Quiet when the
+    # referring query is quiet or absent.
+    query.set_quiet(not (referring_query and vprint_quiet(referring_query)))
     query.dnskey_novalidate = True
     msg = make_query_message(query)
 
@@ -1251,6 +1255,7 @@ def match_ds_zone(zone, referring_query):
 
     for nsaddr in get_zone_addresses(zone):
         check_query_count_limit(zone.resolver)
+        print_query_trace(query, zone, nsaddr.addr)
         response = None
         try:
             response = send_query(msg, nsaddr, query, newid=True)
