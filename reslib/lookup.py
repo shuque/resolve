@@ -617,6 +617,10 @@ def validate_rrset(srrset, query, silent=False):
     server names are in an offpath zone.
     """
 
+    if not srrset.rrsig:
+        raise ResError("No RRSIG for {}/{}".format(
+            srrset.rrname, dns.rdatatype.to_text(srrset.rrtype)))
+
     for sig_rr in srrset.rrsig:
         signer = sig_rr.signer
         if not query.resolver.key_cache.has_key(signer):

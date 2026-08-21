@@ -660,6 +660,24 @@ class TestEnforceAdtProof(unittest.TestCase):
                               rrset_dict=rrset_dict)  # must not raise
 
 
+class TestValidateRrsetNoRrsig(unittest.TestCase):
+    """Final review M1: validate_rrset must fail closed with ResError -- not a
+    TypeError -- when the RRset has no RRSIG. On the ADT delegation-type-proof
+    path an attacker can strip the RRSIG from the NSEC; a ResError is caught by
+    the per-server loop (try next / terminal reject), whereas a TypeError would
+    escape it and abort resolution with a traceback."""
+
+    def test_missing_rrsig_raises_reserror(self):
+        name = dns.name.from_text("sub0.deleg.huque.com.")
+        nsec_rrset = dns.rrset.from_text_list(
+            name, 3600, "IN", "NSEC",
+            ["nsec-next.deleg.huque.com. RRSIG TYPE61440"])
+        srrset = RRset(name, dns.rdatatype.NSEC, rrset=nsec_rrset)  # rrsig=None
+        query = Query(name, "A", "IN", resolver=Resolver())
+        with self.assertRaises(ResError):
+            lookup.validate_rrset(srrset, query)
+
+
 class TestProcessReferralAdtGate(unittest.TestCase):
     """Fix round 1: gate-wiring test proving the adt_active conjuncts in
     process_referral are actually applied -- i.e. enforce_adt_proof is only
