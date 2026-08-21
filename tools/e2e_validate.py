@@ -42,7 +42,7 @@ TARGETS = [
     (".", "SOA", SECURE),                    # alg 8 (root KSK/ZSK)
     ("iana.org.", "SOA", SECURE),            # alg 8 RSASHA256
     ("cloudflare.com.", "SOA", SECURE),      # alg 13 ECDSAP256SHA256
-    # Post-quantum test bed (alg 18, ML-DSA-44). See docs/MLDSA-VALIDATION.md.
+    # Post-quantum test bed (alg 18, ML-DSA-44). See MLDSA44.md.
     ("mldsa.huque.com.", "SOA", SECURE),
     # Deliberately broken signatures -> must be refused, never SECURE.
     ("dnssec-failed.org.", "SOA", BOGUS),
