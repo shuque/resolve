@@ -596,6 +596,51 @@ class TestMatchDsZoneAdtAssignment(unittest.TestCase):
         self.assertFalse(zone.adt)
 
 
+class TestMatchDsZoneTerminalError(unittest.TestCase):
+    """match_ds_zone's terminal failure message must name the actual cause.
+    "DS did not match DNSKEY" is only truthful when a validated DNSKEY RRset
+    was obtained and compared against the DS. When every nameserver is
+    unreachable (or none returns a usable, self-signed DNSKEY) no comparison
+    ever happens -- keylist stays None -- and the message must say so instead
+    of blaming a DS mismatch (the sub0.deleg.huque.com case: DELEG points at
+    unroutable placeholder addresses)."""
+
+    def _zone(self, resolver):
+        zone = Zone(dns.name.from_text("sub0.deleg.huque.com."), resolver)
+        zone.dslist = [mock.Mock()]
+        return zone
+
+    def _run(self, response, ds_match):
+        resolver = Resolver()
+        zone = self._zone(resolver)
+        with mock.patch.object(lookup, "supported_algorithm_present",
+                               return_value=True), \
+             mock.patch.object(lookup, "get_zone_addresses",
+                               return_value=[mock.Mock()]), \
+             mock.patch.object(lookup, "send_query", return_value=response), \
+             mock.patch.object(lookup, "check_self_signature",
+                               return_value=(["KEY"], ["KEY"])), \
+             mock.patch.object(lookup, "match_ds_ksklist",
+                               return_value=ds_match):
+            lookup.match_ds_zone(zone, None)
+
+    def test_all_servers_unreachable_reports_no_dnskey(self):
+        # send_query returns None for every address -> keylist never set.
+        with self.assertRaises(ResError) as cm:
+            self._run(response=None, ds_match=False)
+        self.assertIn("Could not obtain a validated DNSKEY", str(cm.exception))
+
+    def test_dnskey_obtained_but_ds_mismatch_reports_ds(self):
+        # A usable DNSKEY came back but no KSK matched the DS -> genuine
+        # DS-mismatch, keep the original message.
+        fake_response = mock.Mock()
+        fake_response.rcode.return_value = dns.rcode.NOERROR
+        fake_response.get_rrset.return_value = mock.Mock()
+        with self.assertRaises(ResError) as cm:
+            self._run(response=fake_response, ds_match=False)
+        self.assertIn("DS did not match DNSKEY", str(cm.exception))
+
+
 class TestEnforceAdtProof(unittest.TestCase):
     """Fix round 1: directly exercise enforce_adt_proof's raise paths and
     consistent-match return, against a synthetic rrset_dict keyed exactly

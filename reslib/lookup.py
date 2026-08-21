@@ -1305,6 +1305,14 @@ def match_ds_zone(zone, referring_query):
                 print('')
                 for key in keylist:
                     print(key)
+        if keylist is None:
+            # No nameserver returned a usable, self-signed DNSKEY RRset (all
+            # unreachable, or every response failed self-signature), so the
+            # DS was never actually compared -- don't blame a DS mismatch.
+            raise ResError(
+                "Could not obtain a validated DNSKEY RRset for {} "
+                "(no nameserver returned a usable, self-signed DNSKEY)".format(
+                    zone.name))
         raise ResError("DS did not match DNSKEY for {}".format(zone.name))
 
     zone.adt = any(getattr(k, "adt_flag", False) for k in keylist)
