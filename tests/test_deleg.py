@@ -717,5 +717,20 @@ class TestProcessReferralAdtGate(unittest.TestCase):
         adt_mock.assert_not_called()
 
 
+class TestDelegPresentation(unittest.TestCase):
+
+    def test_format_deleg_rrset(self):
+        rrset = dns.rrset.RRset(
+            dns.name.from_text("sub0.deleg.huque.com."),
+            dns.rdataclass.IN, DELEG_RDTYPE)
+        blob = bytes.fromhex("00010004c0000201")
+        rrset.add(dns.rdata.from_wire(dns.rdataclass.IN, DELEG_RDTYPE,
+                                      blob, 0, len(blob)), ttl=3600)
+        from reslib.query import format_deleg_rrset
+        text = format_deleg_rrset(rrset)
+        self.assertIn("server-ipv4=192.0.2.1", text)
+        self.assertIn("sub0.deleg.huque.com.", text)
+
+
 if __name__ == "__main__":
     unittest.main()

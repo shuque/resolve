@@ -8,6 +8,19 @@ import dns.rdataclass
 
 from reslib.exception import ResError
 from reslib.dnssec import sig_validity, sig_expires_in
+from reslib.deleg import format_deleginfo, DELEG_RDTYPE, DELEGPARAM_RDTYPE
+
+
+def format_deleg_rrset(rrset):
+    """Presentation-format block for a DELEG/DELEGPARAM RRset."""
+    type_name = "DELEG" if rrset.rdtype == DELEG_RDTYPE else "DELEGPARAM"
+    lines = []
+    for rdata in rrset:
+        lines.append("{} {} {} {} {}".format(
+            rrset.name, rrset.ttl,
+            dns.rdataclass.to_text(rrset.rdclass),
+            type_name, format_deleginfo(rdata.data)))
+    return "\n".join(lines)
 
 
 class Query:
@@ -102,7 +115,10 @@ class Query:
 
         if self.full_answer_rrset:
             for x in self.full_answer_rrset:
-                print(x.rrset.to_text())
+                if x.rrset.rdtype in (DELEG_RDTYPE, DELEGPARAM_RDTYPE):
+                    print(format_deleg_rrset(x.rrset))
+                else:
+                    print(x.rrset.to_text())
                 if self.resolver.prefs.DNSSEC and self.resolver.prefs.VERBOSE > 1:
                     if x.rrsig is not None:
                         for sig_rr in x.rrsig:
