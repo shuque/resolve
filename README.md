@@ -28,24 +28,19 @@ Pre-requisites:
 The included document, [DNSSEC.md](DNSSEC.md) has many examples of the
 use of DNSSEC with this program.
 
-If you need to use a version without DNSSEC, because you haven't or don't
-want to install the python-cryptography package, you can install and earlier
-earlier version of this program: v0.15 or v0.20 should run fine
-without them. Just checkout the corresponding tags from this repo, or
-grab the release tarballs for those versions. Direct links to these
-earlier versions:
-- https://github.com/shuque/resolve/tree/v0.15
-- https://github.com/shuque/resolve/tree/v0.20
+This program also supports the emerging DELEG (extensible delegation)
+protocol, including its DNSSEC anti-downgrade protections. See
+[DELEG.md](DELEG.md) for details.
 
 
 ### Usage
 
 ```
 usage: resolve.py [-h] [-v] [-j] [-m] [-t] [-s] [-n] [-x] [-e N] [-z] [-c]
-                  [-4 | -6] [-b batchfile]
+                  [--deleg] [-4 | -6] [-b batchfile]
                   [qname [qtype [qclass]] ...]
 
-version 0.8.0
+version X.Y.Z
 Perform iterative resolution of a DNS name, type, and class.
 
 positional arguments:
@@ -66,6 +61,7 @@ options:
                         EDNS)
   -z                    perform DNSSEC validation (default is no)
   -c                    dump zone/ns/key caches at end of program execution
+  --deleg               set EDNS DE flag and follow DELEG referrals
   -4                    only use IPv4 transport
   -6                    only use IPv6 transport
   -b batchfile          batch file mode
