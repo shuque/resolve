@@ -5,6 +5,7 @@ Zone class
 from binascii import hexlify
 from random import shuffle
 from reslib.nameserver import NameServer, IPaddress
+from reslib.deleg import format_deleg_rrset
 
 
 class DS:
@@ -140,6 +141,9 @@ class Zone:
         else:
             print("TTL: Delegation: {}".format(self.ttl_ns))
         if self.via_deleg:
+            if self.deleg_rrset is not None:
+                for line in format_deleg_rrset(self.deleg_rrset).split("\n"):
+                    print("DELEG: {}".format(line))
             print("DELEG servers: {}".format(
                 " ".join(ip.addr for ip in self.deleg_iplist)))
         self.print_nsinfo()

@@ -1,7 +1,9 @@
 """Unit tests for the DELEG DelegInfos codec (reslib/deleg.py)."""
 
+import io
 import struct
 import unittest
+from contextlib import redirect_stdout
 
 import dns.name
 import dns.rdata
@@ -827,6 +829,27 @@ class TestDelegPresentation(unittest.TestCase):
         text = format_deleg_rrset(rrset)
         self.assertIn("server-ipv4=192.0.2.1", text)
         self.assertIn("sub0.deleg.huque.com.", text)
+
+
+class TestZonePrintDetailsDeleg(unittest.TestCase):
+    """print_details must show the full DELEG RRset in presentation form
+    (prefixed 'DELEG:'), before the derived 'DELEG servers:' line, so the
+    -v trace exposes the actual DelegInfos key/values, not just the IPs."""
+
+    def test_deleg_rrset_printed_before_servers(self):
+        blob = _tlv(1, bytes.fromhex("c0000201"))  # server-ipv4=192.0.2.1
+        rrset = _deleg_rrset("sub0.deleg.huque.com.", [blob])
+        zone = Zone(dns.name.from_text("sub0.deleg.huque.com."), Resolver())
+        zone.install_deleg_addresses(["192.0.2.1"], rrset)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            zone.print_details()
+        out = buf.getvalue()
+        self.assertIn(
+            "DELEG: sub0.deleg.huque.com. 3600 IN DELEG server-ipv4=192.0.2.1",
+            out)
+        # The presentation record must precede the derived server-IP line.
+        self.assertLess(out.index("DELEG: "), out.index("DELEG servers:"))
 
 
 if __name__ == "__main__":

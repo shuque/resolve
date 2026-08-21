@@ -9,7 +9,7 @@ increasing key order with no duplicate keys.
 This module is I/O-free: it holds only the pure decode/classify logic (plus
 the type-code/flag constants), so it can be imported and unit tested without
 pulling in any resolver machinery. It is a leaf module -- it imports only
-stdlib and dns.name.
+stdlib and dnspython (dns.name, dns.rdataclass), no reslib modules.
 
 Decode primitives are ported from adns_server/adns/deleg.py.
 """
@@ -18,6 +18,7 @@ import socket
 import struct
 
 import dns.name
+import dns.rdataclass
 
 
 # Pre-standardization type codes (agreed with collaborators).
@@ -185,6 +186,21 @@ def format_deleginfo(rdata_bytes):
     for k in sorted(di.unknown_keys):
         parts.append("key{}={}".format(k, di.keys[k].hex()))
     return " ".join(parts)
+
+
+def format_deleg_rrset(rrset):
+    """Presentation-format block for a DELEG/DELEGPARAM RRset.
+
+    One presentation line per rdata: "owner ttl class TYPE key=val ...".
+    """
+    type_name = "DELEG" if rrset.rdtype == DELEG_RDTYPE else "DELEGPARAM"
+    lines = []
+    for rdata in rrset:
+        lines.append("{} {} {} {} {}".format(
+            rrset.name, rrset.ttl,
+            dns.rdataclass.to_text(rrset.rdclass),
+            type_name, format_deleginfo(rdata.data)))
+    return "\n".join(lines)
 
 
 class DelegRecordError(Exception):
