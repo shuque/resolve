@@ -103,6 +103,29 @@ class TestOptions(unittest.TestCase):
             process_args(["-h"])
         self.assertEqual(cm.exception.code, 0)
 
+    def test_deleg_flag(self):
+        prefs, qname, qtype, qclass = process_args(["--deleg", "example.com"])
+        self.assertTrue(prefs.DELEG)
+
+    def test_deleg_default_off(self):
+        prefs, _, _, _ = process_args(["example.com"])
+        self.assertFalse(prefs.DELEG)
+
+    def test_deleg_requires_edns(self):
+        with self.assertRaises(SystemExit) as cm:
+            process_args(["--deleg", "-e", "0", "example.com"])
+        self.assertEqual(cm.exception.code, 2)
+
+    def test_deleg_qtype_mnemonic(self):
+        prefs, qname, qtype, qclass = process_args(
+            ["--deleg", "sub0.deleg.huque.com", "DELEG"])
+        self.assertEqual(qtype, 61440)
+
+    def test_delegparam_qtype_mnemonic(self):
+        prefs, qname, qtype, qclass = process_args(
+            ["--deleg", "param.deleg.huque.com", "DELEGPARAM"])
+        self.assertEqual(qtype, 65433)
+
 
 if __name__ == "__main__":
     unittest.main()
