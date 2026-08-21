@@ -173,12 +173,18 @@ def adt_bitmap_consistent(nsec_rdata, deleg_present, ns_present):
     delegation types present in the referral (delext Section 6.2).
 
     The DELEG(61440) bit MUST be set iff a DELEG RRset is present in the
-    Authority section; the NS bit MUST be set iff an NS RRset is present.
-    A mismatch signals stripping or injection -> tampered referral.
+    Authority section: that is the anti-downgrade check -- a bitmap that
+    proves a DELEG exists while the referral carries none (or vice versa)
+    signals a stripped/injected DELEG.
+
+    The NS direction is deliberately NOT checked. A "stacked" cut carries
+    both NS and DELEG as zone truth, so its signed NSEC bitmap legitimately
+    lists NS; but a DE=1 referral omits the NS RRset (the server sends the
+    DELEG in its place, per delext Section 5.2). NS-in-bitmap vs
+    NS-absent-from-Authority is thus a normal, non-tampered state. ns_present
+    is retained for symmetry with the caller but does not gate the result.
     """
     if type_in_bitmap(DELEG_RDTYPE, nsec_rdata) != deleg_present:
-        return False
-    if type_in_bitmap(dns.rdatatype.NS, nsec_rdata) != ns_present:
         return False
     return True
 
@@ -274,8 +280,14 @@ def process_referral(query, referring_zone=None):
 
     follow_deleg = query.resolver.prefs.DELEG and deleg_srrset is not None
 
-    adt_active = (query.resolver.prefs.DNSSEC and query.secure_so_far
-                  and not query.is_nsquery
+    # Anti-downgrade enforcement applies only when this resolver actually
+    # sent DE=1 (prefs.DELEG). A resolver that did not send DE=1 expects a
+    # traditional referral and has no delegation-type proof to demand; only
+    # a DE=1 sender must detect a stripped/tampered referral (delext Section
+    # 8.2.2). prefs.DELEG is local intent, so an on-path attacker who flips
+    # the wire DE bit cannot suppress this check.
+    adt_active = (query.resolver.prefs.DELEG and query.resolver.prefs.DNSSEC
+                  and query.secure_so_far and not query.is_nsquery
                   and referring_zone is not None and referring_zone.adt)
     if adt_active:
         deleg_present = deleg_srrset is not None

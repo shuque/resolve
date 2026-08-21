@@ -499,6 +499,19 @@ class TestAdtEnforcement(unittest.TestCase):
             adt_bitmap_consistent(rrset[0], deleg_present=False,
                                   ns_present=True))
 
+    def test_bitmap_consistent_stacked_deleg_ns_omitted(self):
+        # Stacked cut: the signed NSEC bitmap legitimately carries both NS
+        # and DELEG (zone truth), but a DE=1 referral sends only the DELEG
+        # RRset (the server drops NS in its favour). NS-in-bitmap vs
+        # NS-absent-from-Authority is therefore NOT a tampering signal --
+        # only the DELEG direction is checked.
+        rrset = dns.rrset.from_text_list(
+            dns.name.from_text("sub0.deleg.huque.com."), 3600, "IN", "NSEC",
+            ["nsec-next.deleg.huque.com. NS DS RRSIG TYPE61440"])
+        self.assertTrue(
+            adt_bitmap_consistent(rrset[0], deleg_present=True,
+                                  ns_present=False))
+
 
 class TestAdtFlagPopulatedFromKeylist(unittest.TestCase):
     """Carried minor from Task 5: unit-test the exact expression used in
@@ -681,14 +694,18 @@ class TestValidateRrsetNoRrsig(unittest.TestCase):
 class TestProcessReferralAdtGate(unittest.TestCase):
     """Fix round 1: gate-wiring test proving the adt_active conjuncts in
     process_referral are actually applied -- i.e. enforce_adt_proof is only
-    called when referring_zone is non-None and referring_zone.adt is True
-    (with DNSSEC/secure_so_far/not-nsquery already held by defaults).
-    _process_ns_referral / _process_deleg_referral are stubbed out so this
-    test isolates the gate itself, not the dispatch or enforcement body."""
+    called when the resolver itself sent DE=1 (prefs.DELEG), referring_zone
+    is non-None, and referring_zone.adt is True (with DNSSEC/secure_so_far/
+    not-nsquery already held by defaults). Anti-downgrade enforcement is
+    gated on prefs.DELEG because a resolver that did not send DE=1 expects a
+    traditional referral and has no delegation-type proof to demand; only
+    when it knows it sent DE=1 must it detect a stripped/tampered referral
+    (delext Section 8.2.2). _process_ns_referral / _process_deleg_referral
+    are stubbed so this isolates the gate, not the dispatch or body."""
 
     def _resolver(self):
         r = Resolver()
-        r.prefs.DELEG = False
+        r.prefs.DELEG = True
         r.prefs.DNSSEC = True
         return r
 
@@ -732,6 +749,23 @@ class TestProcessReferralAdtGate(unittest.TestCase):
         p1, p2, p3 = self._patched(adt_mock)
         with p1, p2, p3:
             process_referral(query, referring_zone=None)
+        adt_mock.assert_not_called()
+
+    def test_not_called_when_prefs_deleg_false(self):
+        # The resolver did not send DE=1: even against an ADT zone it expects
+        # a traditional referral and must NOT demand a delegation-type proof
+        # (delext Section 8.2.2 -- anti-downgrade applies only when DE=1 was
+        # sent). An on-path attacker can flip the wire DE bit but cannot
+        # change the resolver's local prefs.DELEG.
+        resolver = self._resolver()
+        resolver.prefs.DELEG = False
+        query = self._query(resolver)
+        referring_zone = Zone(dns.name.from_text("deleg.huque.com."), resolver)
+        referring_zone.adt = True
+        adt_mock = mock.Mock()
+        p1, p2, p3 = self._patched(adt_mock)
+        with p1, p2, p3:
+            process_referral(query, referring_zone=referring_zone)
         adt_mock.assert_not_called()
 
 
